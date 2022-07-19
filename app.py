@@ -1,16 +1,69 @@
 #!/usr/bin/python3
-import os
-import sys
-import pygame
-import pygame.midi
-import traceback
+import os,sys,glm,copy,binascii,struct,math,traceback
+import pygame, pygame.midi, pygame.gfxdraw
 
 OFFSET = 12
 
-GFX = False
+BOARD_W = 16
+BOARD_H = 8
+BOARD_SZ = glm.ivec2(BOARD_W, BOARD_H)
+
+SCALE = glm.vec2(64.0)
+SCREEN_W = BOARD_W * SCALE.x
+SCREEN_H = BOARD_H * SCALE.y
+SCREEN_SZ = glm.ivec2(SCREEN_W, SCREEN_H)
+GFX = True
+TITLE = "Linnstrument System"
+FOCUS = False
+
+NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+
+def get_note(x, y):
+    ofs = (BOARD_H - y) // 2 - 8
+    if y%2 == 1:
+        return NOTES[((x-ofs)*2)%len(NOTES)]
+    else:
+        return NOTES[((x-ofs)*2+7)%len(NOTES)]
+
+def get_color(x, y):
+    if len(get_note(x, y)) == 1:
+        return glm.ivec3(127)
+    return glm.ivec3(32)
+
+class Object:
+   def __init__(self, **kwargs):
+        self.game = kwargs.get('game', None)
+        self.attached = False
+        if self.game:
+            self.game.world.attach(self)
+        
+        self.pos = glm.vec2(*kwargs.get('pos', (0.0, 0.0)))
+        self.vel = glm.vec2(*kwargs.get('vel', (0.0, 0.0)))
+        self.sz = glm.vec2(*kwargs.get('sz', (0.0, 0.0)))
+        self.surface = kwargs.get('surface', None)
+
+
+class Screen(Object):
+    def __init__(self,screen):
+        self.pos = glm.vec2(0.0, 0.0)
+        self.sz = glm.vec2(SCREEN_W, SCREEN_H)
+        self.surface = pygame.Surface(SCREEN_SZ).convert()
+        self.screen = screen
+    
+    def render(self):
+        self.screen.blit(self.surface, (0,0))
 
 class Core:
     def __init__(self):
+
+        if GFX:
+            pygame.init()
+            pygame.display.set_caption(TITLE)
+            if FOCUS:
+                pygame.mouse.set_visible(0)
+                pygame.event.set_grab(True)
+            self.screen = Screen(pygame.display.set_mode(SCREEN_SZ))
+        
         pygame.midi.init()
         
         self.out = []
@@ -50,41 +103,104 @@ class Core:
         print('outs: ' + ', '.join(outnames))
         print('ins: ' + ', '.join(innames))
         
+        self.midi = None
         if ins:
-            self.midi = pygame.midi.Input(ins[1][0])
+            try:
+                self.midi = pygame.midi.Input(ins[1][0])
+            except:
+                pass
         
         self.done = False
+        self.dirty = True
+            
+        w = 16
+        h = 8
+        self.board = [[0 for x in range(w)] for y in range(h)]
+
+        self.font = pygame.font.Font(None, 32)
 
     def logic(self, t):
-        if self.midi.poll():
-            events = self.midi.read(10)
-            for ev in events:
-                data = ev[0]
-                ch = data[0] & 0x0f
-                msg = data[0] >> 4
-                if msg == 9: # note on
-                    data[1] *= 2
-                    data[1] -= OFFSET
-                    self.out[0].write([ev])
-                    print('note on: ', data)
-                elif msg == 8: # note off
-                    data[1] *= 2
-                    data[1] -= OFFSET
-                    self.out[0].write([ev])
-                    print('note off: ', data)
-                else:
-                    self.out[0].write([ev])
-    
+        keys = pygame.key.get_pressed()
+        for ev in pygame.event.get():
+            if ev.type == pygame.QUIT:
+                self.done = True
+                break
+            elif ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_ESCAPE:
+                    self.done = True
+        
+        if self.midi:
+            while self.midi.poll():
+                events = self.midi.read(100)
+                for ev in events:
+                    data = ev[0]
+                    ch = data[0] & 0x0f
+                    msg = data[0] >> 4
+                    if msg == 9: # note on
+                        data[1] *= 2
+                        data[1] -= OFFSET
+                        self.out[0].write([ev])
+                        print('note on: ', data)
+                    elif msg == 8: # note off
+                        data[1] *= 2
+                        data[1] -= OFFSET
+                        self.out[0].write([ev])
+                        print('note off: ', data)
+                    else:
+                        self.out[0].write([ev])
+
+    def render(self):
+        if not GFX:
+            return
+        if not self.dirty:
+            return
+        self.dirty = False
+        
+        self.screen.surface.fill((0,0,0))
+        b = 2 # border
+        sz = SCREEN_W / BOARD_W
+        y = 0
+        for row in self.board:
+            x = 0
+            for cell in row:
+                # write text
+                note = get_note(x, y)
+                col = get_color(x, y)
+                pygame.gfxdraw.box(self.screen.surface, [x*sz + b, y*sz + b, sz - b, sz - b], col)
+                
+                text = self.font.render(note, True, glm.ivec3(128))
+                textpos = text.get_rect()
+                textpos.x = x*sz + sz//3
+                textpos.y = y*sz + sz//3
+                text = self.font.render(note, True, glm.ivec3(255))
+                self.screen.surface.blit(text, textpos)
+                textpos = text.get_rect()
+                textpos.x = x*sz + sz//3
+                textpos.y = y*sz + sz//3
+                textpos.x += 1
+                textpos.y += 1
+                self.screen.surface.blit(text, textpos)
+                x += 1
+            y += 1
+
+    def draw(self):
+        if not GFX:
+            return
+        
+        self.screen.render()
+        pygame.display.flip()
+
     def __call__(self):
         
         try:
             self.done = False
             while not self.done:
-                # t = self.clock.tick(60)*0.001
-                t = 0
+                t = 0.0
                 self.logic(t)
                 if self.done:
                     break
+                self.render()
+                self.draw()
         except:
             print(traceback.format_exc())
         
