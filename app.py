@@ -5,6 +5,8 @@ import pygame
 import pygame.midi
 import traceback
 
+OFFSET = 12
+
 GFX = False
 
 class Core:
@@ -49,19 +51,27 @@ class Core:
         print('ins: ' + ', '.join(innames))
         
         if ins:
-            self.midi = pygame.midi.Input(ins[0][0])
+            self.midi = pygame.midi.Input(ins[1][0])
         
         self.done = False
 
     def logic(self, t):
         if self.midi.poll():
-            events = self.midi.read()
+            events = self.midi.read(10)
             for ev in events:
-                print(ev)
-                if ev[0] == 0x99: # note on
-                    pass
-                elif ev[0] == 0x89: # note off
-                    pass
+                data = ev[0]
+                if data[0] == 144: # note on
+                    data[1] *= 2
+                    data[1] -= OFFSET
+                    self.out[0].write([ev])
+                    print('note on: ', data)
+                elif data[0] == 128: # note off
+                    data[1] *= 2
+                    data[1] -= OFFSET
+                    self.out[0].write([ev])
+                    print('note off: ', data)
+                else:
+                    self.out[0].write([ev])
     
     def __call__(self):
         
