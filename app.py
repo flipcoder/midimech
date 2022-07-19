@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import os,sys,glm,copy,binascii,struct,math,traceback
 import pygame, pygame.midi, pygame.gfxdraw
+import mido
 
 OFFSET = 12
 BOARD_W = 16
@@ -15,6 +16,7 @@ TITLE = "Linnstrument Visualizer"
 FOCUS = False
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 WHOLETONE = True
+FONT_SZ = 32
 
 # NOTE_COLORS = [
 #     glm.ivec3(255, 0, 0), # C
@@ -79,6 +81,13 @@ class Screen(Object):
 class Core:
     def __init__(self):
 
+        self.midi_fn = None
+        self.midifile = None
+        if len(sys.argv) > 1:
+            self.midi_fn = sys.argv[1]
+            if self.midi_fn.to_lower().endswith('.mid'):
+                self.midifile = mido.MidiFile(midi_fn)
+
         if GFX:
             pygame.init()
             pygame.display.set_caption(TITLE)
@@ -140,7 +149,7 @@ class Core:
         h = 8
         self.board = [[0 for x in range(w)] for y in range(h)]
 
-        self.font = pygame.font.Font(None, 32)
+        self.font = pygame.font.Font(None, FONT_SZ)
 
     def logic(self, t):
         keys = pygame.key.get_pressed()
@@ -191,15 +200,15 @@ class Core:
                 col = get_color(x, y)
                 pygame.gfxdraw.box(self.screen.surface, [x*sz + b, y*sz + b, sz - b, sz - b], col)
                 
-                text = self.font.render(note, True, glm.ivec3(128))
+                text = self.font.render(note, True, glm.ivec3(0))
                 textpos = text.get_rect()
-                textpos.x = x*sz + sz//3
-                textpos.y = y*sz + sz//3
+                textpos.x = x*sz + sz//2 - FONT_SZ//4
+                textpos.y = y*sz + sz//2 - FONT_SZ//4
                 text = self.font.render(note, True, glm.ivec3(255))
                 self.screen.surface.blit(text, textpos)
                 textpos = text.get_rect()
-                textpos.x = x*sz + sz//3
-                textpos.y = y*sz + sz//3
+                textpos.x = x*sz + sz//2 - FONT_SZ//4
+                textpos.y = y*sz + sz//2 - FONT_SZ//4
                 textpos.x += 1
                 textpos.y += 1
                 self.screen.surface.blit(text, textpos)
