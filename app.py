@@ -60,12 +60,14 @@ class Core:
             events = self.midi.read(10)
             for ev in events:
                 data = ev[0]
-                if data[0] == 144: # note on
+                ch = data[0] & 0x0f
+                msg = data[0] >> 4
+                if msg == 9: # note on
                     data[1] *= 2
                     data[1] -= OFFSET
                     self.out[0].write([ev])
                     print('note on: ', data)
-                elif data[0] == 128: # note off
+                elif msg == 8: # note off
                     data[1] *= 2
                     data[1] -= OFFSET
                     self.out[0].write([ev])
