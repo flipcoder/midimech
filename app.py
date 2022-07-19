@@ -3,32 +3,55 @@ import os,sys,glm,copy,binascii,struct,math,traceback
 import pygame, pygame.midi, pygame.gfxdraw
 
 OFFSET = 12
-
 BOARD_W = 16
 BOARD_H = 8
 BOARD_SZ = glm.ivec2(BOARD_W, BOARD_H)
-
 SCALE = glm.vec2(64.0)
 SCREEN_W = BOARD_W * SCALE.x
 SCREEN_H = BOARD_H * SCALE.y
 SCREEN_SZ = glm.ivec2(SCREEN_W, SCREEN_H)
 GFX = True
-TITLE = "Linnstrument System"
+TITLE = "Linnstrument Visualizer"
 FOCUS = False
-
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+WHOLETONE = True
+
+# NOTE_COLORS = [
+#     glm.ivec3(255, 0, 0), # C
+#     glm.ivec3(255/2, 0, 0), # C#
+#     glm.ivec3(255, 127, 0), # D
+#     glm.ivec3(255/2, 127/2, 0), # D#
+#     glm.ivec3(255, 255, 0), # E
+#     glm.ivec3(0, 255, 0), # F
+#     glm.ivec3(0, 255/2, 0), # F#
+#     glm.ivec3(0, 0, 255), # G
+#     glm.ivec3(0, 0, 255/2), # G#
+#     glm.ivec3(128, 0, 128), # A
+#     glm.ivec3(128/2, 0, 128/2), # A#
+#     glm.ivec3(255, 0, 255) # B
+# ]
+
+def get_note_index(x, y):
+    base_offset = -2
+    ofs = (BOARD_H - y) // 2 + base_offset
+    step = 2 if WHOLETONE else 1
+    if y%2 == 1:
+        return ((x-ofs)*step)%len(NOTES)
+    else:
+        return ((x-ofs)*step+7)%len(NOTES)
 
 def get_note(x, y):
-    ofs = (BOARD_H - y) // 2 - 8
-    if y%2 == 1:
-        return NOTES[((x-ofs)*2)%len(NOTES)]
-    else:
-        return NOTES[((x-ofs)*2+7)%len(NOTES)]
+    return NOTES[get_note_index(x, y)]
 
 def get_color(x, y):
-    if len(get_note(x, y)) == 1:
+    # return NOTE_COLORS[get_note_index(x, y)]
+    note = get_note(x, y)
+    if note in 'FB':
+        return glm.ivec3(64)
+    elif len(note) == 1:
         return glm.ivec3(127)
-    return glm.ivec3(32)
+    else:
+        return glm.ivec3(32)
 
 class Object:
    def __init__(self, **kwargs):
