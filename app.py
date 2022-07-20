@@ -35,7 +35,7 @@ FONT_SZ = 32
 
 OCTAVES = [
     [3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6],
-    [3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5],
+    [3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5],
     [2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5],
     [2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4],
     [1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4],
@@ -45,7 +45,7 @@ OCTAVES = [
 ]
 
 def get_octave(x, y):
-    return OCTAVES[y - BOARD_H][x] + 1
+    return OCTAVES[y - BOARD_H][x] + 2
 
 def get_note_index(x, y):
     base_offset = -4
@@ -270,7 +270,7 @@ class Core:
             for cell in row:
                 # write text
                 note = get_note(x, y)
-                note = str(get_octave(x, y))
+                # note = str(get_octave(x, y))
 
                 col = None
                 
