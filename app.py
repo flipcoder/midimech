@@ -45,7 +45,7 @@ OCTAVES = [
 ]
 
 def get_octave(x, y):
-    return OCTAVES[y - BOARD_H][x]
+    return OCTAVES[y - BOARD_H][x] + 1
 
 def get_note_index(x, y):
     base_offset = -4
@@ -195,8 +195,8 @@ class Core:
 
     def mark(self, midinote, state):
         y = 0
-        print('')
-        print("midi note: ", midinote)
+        # print('')
+        # print("midi note: ", midinote)
         for row in self.board:
             x = 0
             for cell in row:
@@ -204,7 +204,7 @@ class Core:
                 if midinote%12 == idx:
                     octave = get_octave(x, y)
                     if octave == midinote//12:
-                        print(x,y)
+                        # print(x,y)
                         self.board[y][x] = state
                 x += 1
             y += 1
