@@ -11,7 +11,7 @@ import pygame_gui
 import mido
 from collections import OrderedDict
 
-PANEL = False
+PANEL = True
 MENU_SZ = 64 if PANEL else 32
 OFFSET = 12
 BOARD_W = 16
@@ -56,13 +56,13 @@ OCTAVES = [
 ]
 
 CHORD_SHAPES = OrderedDict()
-CHORD_SHAPES["M7"] = [
-    " o o",
+CHORD_SHAPES["maj7"] = [
+    " . o",
     "o o "
 ]
-CHORD_SHAPES["m7"] = [
+CHORD_SHAPES["min7"] = [
     " o ",
-    "o o",
+    "o .",
     " x "
 ]
 CHORD_SHAPES["sus2"] = [
@@ -73,16 +73,16 @@ CHORD_SHAPES["sus4"] = [
     "oo",
     "x "
 ]
-CHORD_SHAPES["7"] = [
+CHORD_SHAPES["dom7"] = [
     "o  ",
-    " o ",
+    " . ",
     "x o "
 ]
-CHORD_SHAPES["M"] = [
+CHORD_SHAPES["maj"] = [
     " o ",
     "x o"
 ]
-CHORD_SHAPES["m"] = [
+CHORD_SHAPES["min"] = [
     "o o",
     " x "
 ]
@@ -98,7 +98,6 @@ class Object:
         self.vel = glm.vec2(*kwargs.get('vel', (0.0, 0.0)))
         self.sz = glm.vec2(*kwargs.get('sz', (0.0, 0.0)))
         self.surface = kwargs.get('surface', None)
-
 
 class Screen(Object):
     def __init__(self,screen):
@@ -282,7 +281,7 @@ class Core:
         self.board = [[0 for x in range(w)] for y in range(h)]
 
         self.font = pygame.font.Font(None, FONT_SZ)
-        # self.retro_font = pygame.font.Font("PressStart2P.ttf", FONT_SZ)
+        self.retro_font = pygame.font.Font("PressStart2P.ttf", FONT_SZ)
         self.clock = pygame.time.Clock()
 
     def quit(self):
@@ -431,6 +430,7 @@ class Core:
                     next_chord = False
                     polygons = []
                     polygon = []
+                    root = None
                     for rj, chord_row in enumerate(shape):
                         for ri, ch in enumerate(chord_row):
                             try:
@@ -440,26 +440,25 @@ class Core:
                                 next_chord = True
                                 break
                             # mark does not exist (not this chord)
-                            if not mark and ch!=' ':
+                            if ch=='x':
+                                root = glm.ivec2(ri, rj)
+                            if not mark and ch in 'ox':
                                 next_chord=True # double break
                                 polygon = []
                                 break
-                            polygon += [glm.ivec2((x+ri)*sz, (y+rj)*sz+MENU_SZ)]
+                            # polygon += [glm.ivec2((x+ri)*sz, (y+rj)*sz+MENU_SZ)]
                         if next_chord: # double break
                             break
-                        if polygon:
-                            polygons += [polygon]
+                        # if polygon:
+                        #     polygons += [polygon]
                     if not next_chord:
-                        for poly in polygons:
-                            pygame.draw.polygon(self.screen.surface, glm.ivec3(0,255,0), poly, 2)
-                        text = self.font.render(name, True, glm.ivec3(255))
+                        # for poly in polygons:
+                        #     pygame.draw.polygon(self.screen.surface, glm.ivec3(0,255,0), poly, 2)
+                        text = self.retro_font.render(name, True, glm.ivec3(255))
                         textpos = text.get_rect()
-                        textpos.x = x*sz + sz//2 - FONT_SZ//4
-                        textpos.y = y*sz + sz//2 - FONT_SZ//4 + MENU_SZ
+                        textpos.x = 0
+                        textpos.y = MENU_SZ // 2
                         self.screen.surface.blit(text, textpos)
-                                
-                #             if ch=='x':
-                #                 root_pos = glm.ivec2(ri,rj)
 
     def draw(self):
         if not GFX:
