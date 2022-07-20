@@ -4,6 +4,7 @@ import os,sys,glm,copy,binascii,struct,math,traceback
 import pygame, pygame.midi, pygame.gfxdraw
 import pygame_gui
 import mido
+from collections import OrderedDict
 
 OFFSET = 12
 BOARD_W = 16
@@ -38,14 +39,46 @@ FONT_SZ = 32
 # ]
 
 OCTAVES = [
-    [3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6],
-    [3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5],
+    [3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6],
+    [3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5],
     [2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5],
     [2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4],
     [1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4],
     [1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4],
     [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3],
     [0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3]
+]
+
+CHORD_SHAPES = OrderedDict()
+CHORD_SHAPES["M7"] = [
+    " o o",
+    "o o "
+]
+CHORD_SHAPES["m7"] = [
+    " o ",
+    "o o",
+    " x "
+]
+CHORD_SHAPES["sus2"] = [
+    " o",
+    "xo "
+]
+CHORD_SHAPES["sus4"] = [
+    "oo",
+    "x "
+]
+CHORD_SHAPES["7"] = [
+    "o  ",
+    " o ",
+    "x o "
+]
+CHORD_SHAPES["M"] = [
+    " o ",
+    "x o"
+]
+CHORD_SHAPES["m"] = [
+    "o o",
+    " x "
 ]
 
 class Object:
@@ -252,7 +285,7 @@ class Core:
             for cell in row:
                 idx = self.get_note_index(x, y)
                 if midinote%12 == idx:
-                    octave = get_octave(x, y)
+                    octave = self.get_octave(x, y)
                     if octave == midinote//12:
                         # print(x,y)
                         self.board[y][x] = state
@@ -353,8 +386,8 @@ class Core:
                 textpos = text.get_rect()
                 textpos.x = x*sz + sz//2 - FONT_SZ//4
                 textpos.y = ry*sz + sz//2 - FONT_SZ//4
-                text = self.font.render(note, True, glm.ivec3(255))
                 self.screen.surface.blit(text, textpos)
+                text = self.font.render(note, True, glm.ivec3(255))
                 textpos = text.get_rect()
                 textpos.x = x*sz + sz//2 - FONT_SZ//4
                 textpos.y = MENU_SZ + y*sz + sz//2 - FONT_SZ//4
@@ -363,6 +396,50 @@ class Core:
                 self.screen.surface.blit(text, textpos)
                 x += 1
             y += 1
+
+        self.render_chords()
+
+    def render_chords(self):
+        return # TEMP: the below code is not yet done
+        
+        sz = SCREEN_W / BOARD_W
+        for y, row in enumerate(self.board):
+            ry = y + MENU_SZ # real y
+            for x, cell in enumerate(row):
+                # root_pos = glm.ivec2(0,0)
+                for name, shape in CHORD_SHAPES.items():
+                    next_chord = False
+                    polygons = []
+                    polygon = []
+                    for rj, chord_row in enumerate(shape):
+                        for ri, ch in enumerate(chord_row):
+                            try:
+                                mark = self.board[y+rj][x+ri]
+                            except:
+                                polygon = []
+                                next_chord = True
+                                break
+                            # mark does not exist (not this chord)
+                            if not mark and ch!=' ':
+                                next_chord=True # double break
+                                polygon = []
+                                break
+                            polygon += [glm.ivec2((x+ri)*sz, (y+rj)*sz+MENU_SZ)]
+                        if next_chord: # double break
+                            break
+                        if polygon:
+                            polygons += [polygon]
+                    if not next_chord:
+                        for poly in polygons:
+                            pygame.draw.polygon(self.screen.surface, glm.ivec3(0,255,0), poly, 2)
+                        text = self.font.render(name, True, glm.ivec3(255))
+                        textpos = text.get_rect()
+                        textpos.x = x*sz + sz//2 - FONT_SZ//4
+                        textpos.y = y*sz + sz//2 - FONT_SZ//4 + MENU_SZ
+                        self.screen.surface.blit(text, textpos)
+                                
+                #             if ch=='x':
+                #                 root_pos = glm.ivec2(ri,rj)
 
     def draw(self):
         if not GFX:
@@ -379,7 +456,8 @@ class Core:
         try:
             self.done = False
             while not self.done:
-                t = self.clock.tick(60)/1000.0
+                # t = self.clock.tick(60)/1000.0
+                t = 0.0
                 self.logic(t)
                 if self.done:
                     break
