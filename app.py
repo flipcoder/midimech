@@ -1,6 +1,8 @@
 #!/usr/bin/python3
+# from tkinter import *
 import os,sys,glm,copy,binascii,struct,math,traceback
 import pygame, pygame.midi, pygame.gfxdraw
+import pygame_gui
 import mido
 
 OFFSET = 12
@@ -8,8 +10,10 @@ BOARD_W = 16
 BOARD_H = 8
 BOARD_SZ = glm.ivec2(BOARD_W, BOARD_H)
 SCALE = glm.vec2(64.0)
+MENU_SZ = 32
 SCREEN_W = BOARD_W * SCALE.x
-SCREEN_H = BOARD_H * SCALE.y
+SCREEN_H = BOARD_H * SCALE.y + MENU_SZ
+BUTTON_SZ = SCREEN_W / BOARD_W
 SCREEN_SZ = glm.ivec2(SCREEN_W, SCREEN_H)
 GFX = True
 TITLE = "Linnstrument Visualizer"
@@ -44,31 +48,6 @@ OCTAVES = [
     [0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3]
 ]
 
-def get_octave(x, y):
-    return OCTAVES[y - BOARD_H][x] + 2
-
-def get_note_index(x, y):
-    base_offset = -4
-    ofs = (BOARD_H - y) // 2 + base_offset
-    step = 2 if WHOLETONE else 1
-    if y%2 == 1:
-        return ((x-ofs)*step)%len(NOTES)
-    else:
-        return ((x-ofs)*step+7)%len(NOTES)
-
-def get_note(x, y):
-    return NOTES[get_note_index(x, y)]
-
-def get_color(x, y):
-    # return NOTE_COLORS[get_note_index(x, y)]
-    note = get_note(x, y)
-    if note in 'FB':
-        return glm.ivec3(64)
-    elif len(note) == 1:
-        return glm.ivec3(127)
-    else:
-        return glm.ivec3(32)
-
 class Object:
    def __init__(self, **kwargs):
         self.game = kwargs.get('game', None)
@@ -92,23 +71,90 @@ class Screen(Object):
     def render(self):
         self.screen.blit(self.surface, (0,0))
 
+def nothing():
+    pass
+
 class Core:
+    def get_octave(self, x, y):
+        return OCTAVES[y - BOARD_H][x] + self.octave
+
+    def get_note_index(self, x, y):
+        x += self.transpose
+        base_offset = -4
+        ofs = (BOARD_H - y) // 2 + base_offset
+        step = 2 if WHOLETONE else 1
+        if y%2 == 1:
+            return ((x-ofs)*step)%len(NOTES)
+        else:
+            return ((x-ofs)*step+7)%len(NOTES)
+
+    def get_note(self, x, y):
+        return NOTES[self.get_note_index(x, y)]
+
+    def get_color(self, x, y):
+        # return NOTE_COLORS[get_note_index(x, y)]
+        note = self.get_note(x, y)
+        if note in 'FB':
+            return glm.ivec3(64)
+        elif len(note) == 1:
+            return glm.ivec3(127)
+        else:
+            return glm.ivec3(32)
+    
     def __init__(self):
 
+        self.octave = 2
+        self.transpose = 0
+        
         self.midi_fn = None
         self.midifile = None
         if len(sys.argv) > 1:
             self.midi_fn = sys.argv[1]
             if self.midi_fn.to_lower().endswith('.mid'):
                 self.midifile = mido.MidiFile(midi_fn)
-
+        
         if GFX:
+            # self.root = Tk()
+            # self.menubar = Menu(self.root)
+            # self.filemenu = Menu(self.menubar, tearoff=0)
+            # self.filemenu.add_command(label="Open", command=nothing)
+            # self.root.config(menu=self.menubar)
+            # self.embed = Frame(self.root, width=SCREEN_W, height=SCREEN_H)
+            # self.embed.pack()
+            # os.environ['SDL_WINDOWID'] = str(self.embed.winfo_id())
+            # self.root.update()
+            # self.menubar.add_cascade(label="File", menu=self.filemenu)
+            # self.root.protocol("WM_DELETE_WINDOW", self.quit)
             pygame.init()
             pygame.display.set_caption(TITLE)
             if FOCUS:
                 pygame.mouse.set_visible(0)
                 pygame.event.set_grab(True)
             self.screen = Screen(pygame.display.set_mode(SCREEN_SZ))
+            
+            bs = glm.ivec2(BUTTON_SZ,32) # button size
+            self.gui = pygame_gui.UIManager(SCREEN_SZ)
+            self.btn_octave_down = pygame_gui.elements.UIButton(
+                relative_rect=pygame.Rect((2,0),bs),
+                text='<OCT',
+                manager=self.gui
+            )
+            self.btn_octave_up = pygame_gui.elements.UIButton(
+                relative_rect=pygame.Rect((bs.x+2,0),bs),
+                text='OCT>',
+                manager=self.gui
+            )
+            self.btn_transpose_down = pygame_gui.elements.UIButton(
+                relative_rect=pygame.Rect((bs.x*2+2,0),bs),
+                text='<TR',
+                manager=self.gui
+            )
+            self.btn_transpose_up = pygame_gui.elements.UIButton(
+                relative_rect=pygame.Rect((bs.x*3+2,0),bs),
+                text='TR>',
+                manager=self.gui
+            )
+
         
         pygame.midi.init()
         
@@ -192,6 +238,10 @@ class Core:
         self.board = [[0 for x in range(w)] for y in range(h)]
 
         self.font = pygame.font.Font(None, FONT_SZ)
+        self.clock = pygame.time.Clock()
+
+    def quit(self):
+        self.done = True
 
     def mark(self, midinote, state):
         y = 0
@@ -200,7 +250,7 @@ class Core:
         for row in self.board:
             x = 0
             for cell in row:
-                idx = get_note_index(x, y)
+                idx = self.get_note_index(x, y)
                 if midinote%12 == idx:
                     octave = get_octave(x, y)
                     if octave == midinote//12:
@@ -219,6 +269,21 @@ class Core:
             elif ev.type == pygame.KEYDOWN:
                 if ev.key == pygame.K_ESCAPE:
                     self.done = True
+            elif ev.type == pygame_gui.UI_BUTTON_PRESSED:
+                if ev.ui_element == self.btn_octave_down:
+                    self.octave -= 1
+                    self.dirty = True
+                elif ev.ui_element == self.btn_octave_up:
+                    self.octave += 1
+                    self.dirty = True
+                elif ev.ui_element == self.btn_transpose_down:
+                    self.transpose -= 1
+                    self.dirty = True
+                elif ev.ui_element == self.btn_transpose_up:
+                    self.transpose += 1
+                    self.dirty = True
+
+            self.gui.process_events(ev)
         
         if self.visualizer:
             while self.visualizer.poll():
@@ -253,6 +318,8 @@ class Core:
                         # print('note off: ', data)
                     else:
                         self.out[0].write([ev])
+        
+        self.gui.update(t)
 
     def render(self):
         if not GFX:
@@ -269,27 +336,28 @@ class Core:
             x = 0
             for cell in row:
                 # write text
-                note = get_note(x, y)
-                # note = str(get_octave(x, y))
+                note = self.get_note(x, y)
+                # note = str(self.get_octave(x, y)) # show octave
 
                 col = None
                 
                 if cell:
                     col = glm.ivec3(255,0,0)
                 else:
-                    col = get_color(x, y)
+                    col = self.get_color(x, y)
                 
-                pygame.gfxdraw.box(self.screen.surface, [x*sz + b, y*sz + b, sz - b, sz - b], col)
+                ry = y + MENU_SZ # real y
+                pygame.gfxdraw.box(self.screen.surface, [x*sz + b, MENU_SZ + y*sz + b, sz - b, sz - b], col)
                 
                 text = self.font.render(note, True, glm.ivec3(0))
                 textpos = text.get_rect()
                 textpos.x = x*sz + sz//2 - FONT_SZ//4
-                textpos.y = y*sz + sz//2 - FONT_SZ//4
+                textpos.y = ry*sz + sz//2 - FONT_SZ//4
                 text = self.font.render(note, True, glm.ivec3(255))
                 self.screen.surface.blit(text, textpos)
                 textpos = text.get_rect()
                 textpos.x = x*sz + sz//2 - FONT_SZ//4
-                textpos.y = y*sz + sz//2 - FONT_SZ//4
+                textpos.y = MENU_SZ + y*sz + sz//2 - FONT_SZ//4
                 textpos.x += 1
                 textpos.y += 1
                 self.screen.surface.blit(text, textpos)
@@ -301,14 +369,17 @@ class Core:
             return
         
         self.screen.render()
+        self.gui.draw_ui(self.screen.surface)
         pygame.display.flip()
+        # self.root.update_idletasks()
+        # self.root.update()
 
     def __call__(self):
         
         try:
             self.done = False
             while not self.done:
-                t = 0.0
+                t = self.clock.tick(60)/1000.0
                 self.logic(t)
                 if self.done:
                     break
@@ -330,6 +401,7 @@ class Core:
         
 
 def main():
+    
     core = None
     try:
         core = Core()
