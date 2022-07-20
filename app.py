@@ -33,8 +33,22 @@ FONT_SZ = 32
 #     glm.ivec3(255, 0, 255) # B
 # ]
 
+OCTAVES = [
+    [3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5],
+    [2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5],
+    [2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4],
+    [2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4],
+    [1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4],
+    [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3],
+    [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3],
+    [0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3]
+]
+
+def get_octave(x, y):
+    return OCTAVES[BOARD_H - y - 1][x]
+
 def get_note_index(x, y):
-    base_offset = -2
+    base_offset = -4
     ofs = (BOARD_H - y) // 2 + base_offset
     step = 2 if WHOLETONE else 1
     if y%2 == 1:
@@ -102,28 +116,33 @@ class Core:
         self.midi = None
         ins = []
         outs = []
+        in_devs = [
+            'impact',
+            'visualizer'
+        ]
         out_devs = [
             'loopmidi'
         ]
         for i in range(pygame.midi.get_count()):
             info = pygame.midi.get_device_info(i)
+            # print(info)
             if info[2]==1:
-                # input
                 ins.append((i,str(info[1])))
             if info[3]==1:
                 outs.append((i,str(info[1])))
 
-        innames = []
-        for inx in ins:
-            innames += [str(inx[1])]
-            print('in: ', inx)
+        # innames = []
+        # for inx in ins:
+        #     innames += [str(inx[1])]
+        #     print('in: ', inx)
 
+        innames = []
         outnames = []
         brk = False
         for outdev in out_devs:
             for out in outs:
                 if outdev.lower() in out[1].lower():
-                    outnames += [out[1]]
+                    outnames += [str(out[1])]
                     o = pygame.midi.Output(out[0])
                     self.out.append(o)
 
@@ -132,15 +151,38 @@ class Core:
             o = pygame.midi.Output(oid)
             self.out.append(o)
 
-        print('outs: ' + ', '.join(outnames))
-        print('ins: ' + ', '.join(innames))
-        
         self.midi = None
-        if ins:
-            try:
-                self.midi = pygame.midi.Input(ins[1][0])
-            except:
-                pass
+        self.visualizer = None
+
+        # print('outs: ' + ', '.join(outnames))
+        # print('ins: ' + ', '.join(innames))
+        
+        for indev in in_devs:
+            i = 0
+            for ini in ins:
+                if indev.lower() in ini[1].lower():
+                    name = str(ini[1])
+                    innames += [name]
+                    if "visualizer" in name:
+                        print("Visualizer MIDI: " + name)
+                        inp = pygame.midi.Input(ini[0])
+                        self.visualizer = inp
+                    elif not 'MIDIIN' in name:
+                        print("Instrument MIDI: " + name)
+                        try:
+                            inp = pygame.midi.Input(ini[0])
+                            self.midi = inp
+                        except:
+                            print("Warning: MIDI DEVICE IN USE")
+                i += 1
+        
+        # self.midi = None
+        # if ins:
+        #     # try:
+        #     print("Using Midi input: ", ins[1])
+        #     self.midi = pygame.midi.Input(ins[1][0])
+        #     # except:
+        #     #     pass
         
         self.done = False
         self.dirty = True
@@ -150,6 +192,20 @@ class Core:
         self.board = [[0 for x in range(w)] for y in range(h)]
 
         self.font = pygame.font.Font(None, FONT_SZ)
+
+    def mark(self, midinote, state):
+        y = 0
+        for row in self.board:
+            x = 0
+            for cell in row:
+                idx = get_note_index(x, y)
+                if midinote%12 == idx:
+                    octave = get_octave(x, y)
+                    if octave == midinote//12:
+                        self.board[y][x] = state
+                x += 1
+            y += 1
+        self.dirty = True
 
     def logic(self, t):
         keys = pygame.key.get_pressed()
@@ -161,6 +217,18 @@ class Core:
                 if ev.key == pygame.K_ESCAPE:
                     self.done = True
         
+        if self.visualizer:
+            while self.visualizer.poll():
+                events = self.visualizer.read(100)
+                for ev in events:
+                    data = ev[0]
+                    ch = data[0] & 0x0f
+                    msg = data[0] >> 4
+                    if msg == 9: # note on
+                        self.mark(data[1], 1)
+                    elif msg == 8: # note off
+                        self.mark(data[1], 0)
+
         if self.midi:
             while self.midi.poll():
                 events = self.midi.read(100)
@@ -169,15 +237,17 @@ class Core:
                     ch = data[0] & 0x0f
                     msg = data[0] >> 4
                     if msg == 9: # note on
-                        data[1] *= 2
-                        data[1] -= OFFSET
+                        if WHOLETONE:
+                            data[1] *= 2
+                            data[1] -= OFFSET
                         self.out[0].write([ev])
-                        print('note on: ', data)
+                        # print('note on: ', data)
                     elif msg == 8: # note off
-                        data[1] *= 2
-                        data[1] -= OFFSET
+                        if WHOLETONE:
+                            data[1] *= 2
+                            data[1] -= OFFSET
                         self.out[0].write([ev])
-                        print('note off: ', data)
+                        # print('note off: ', data)
                     else:
                         self.out[0].write([ev])
 
@@ -197,7 +267,14 @@ class Core:
             for cell in row:
                 # write text
                 note = get_note(x, y)
-                col = get_color(x, y)
+
+                col = None
+                
+                if cell:
+                    col = glm.ivec3(255,0,0)
+                else:
+                    col = get_color(x, y)
+                
                 pygame.gfxdraw.box(self.screen.surface, [x*sz + b, y*sz + b, sz - b, sz - b], col)
                 
                 text = self.font.render(note, True, glm.ivec3(0))
