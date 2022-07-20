@@ -282,7 +282,7 @@ class Core:
         self.board = [[0 for x in range(w)] for y in range(h)]
 
         self.font = pygame.font.Font(None, FONT_SZ)
-        self.retro_font = pygame.font.Font("PressStart2P.ttf", FONT_SZ)
+        # self.retro_font = pygame.font.Font("PressStart2P.ttf", FONT_SZ)
         self.clock = pygame.time.Clock()
 
     def quit(self):
