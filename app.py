@@ -132,9 +132,21 @@ CHORD_SHAPES["dim"] = [
         "o  o",
     ]
 ]
-CHORD_SHAPES["aug"] = [[
-    "x o o"
-]]
+CHORD_SHAPES["aug"] = [
+    [
+        "x o o"
+    ],
+    [
+        "x"
+        "",
+        " o o"
+    ],
+    [
+        "x o"
+        "",
+        "   o"
+    ]
+]
 CHORD_SHAPES["lyd"] = [
     [
         "x oo"
