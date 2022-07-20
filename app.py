@@ -57,34 +57,139 @@ OCTAVES = [
 
 CHORD_SHAPES = OrderedDict()
 CHORD_SHAPES["maj7"] = [
-    " . o",
-    "o o "
+    [
+        " . o",
+        "x o "
+    ],
+    [
+        "x  ",
+        ". o",
+        " o "
+    ],
+    [
+        "x o",
+        ". o",
+    ],
+    [
+        " . ",
+        "x o",
+        "  o"
+    ]
 ]
 CHORD_SHAPES["min7"] = [
-    " o ",
-    "o .",
-    " x "
+    [
+        " o ",
+        "o .",
+        " x "
+    ],
+    [
+        " ox",
+        "o .",
+    ],
+    [
+        " o ",
+        " ox",
+        "  .",
+    ],
+    [
+        "o .",
+        "ox"
+    ]
+
 ]
 CHORD_SHAPES["sus2"] = [
-    " o",
-    "xo "
+    [
+        " o",
+        "xo "
+    ]
 ]
-CHORD_SHAPES["sus4"] = [
+CHORD_SHAPES["Q"] = [
+    [
+        "o",
+        "o",
+        "x"
+    ]
+]
+CHORD_SHAPES["Qt"] = [
+    [
+        "  o",
+        " o",
+        "x"
+    ]
+]
+CHORD_SHAPES["dim"] = [
+    [
+        "o",
+        " o",
+        "  x"
+    ],
+    [
+        "o  x",
+        " o",
+    ],
+    [
+        "  x ",
+        "o  o",
+    ]
+]
+CHORD_SHAPES["aug"] = [[
+    "x o o"
+]]
+CHORD_SHAPES["sus4"] = [[
     "oo",
     "x "
-]
+]]
 CHORD_SHAPES["dom7"] = [
-    "o  ",
-    " . ",
-    "x o "
+    [
+        "o ",
+        " .",
+        "x o"
+    ],
+    [
+        "ox",
+        " .",
+        "  o"
+    ],
+    [
+        "ox o",
+        " .",
+    ],
+    [
+        "  .",
+        "ox o",
+    ]
+
 ]
 CHORD_SHAPES["maj"] = [
-    " o ",
-    "x o"
+    [
+        " o",
+        "x o"
+    ],
+    [
+        " x",
+        " o",
+        "  o"
+    ],
+    [
+        "x o",
+        "o"
+    ]
+
 ]
 CHORD_SHAPES["min"] = [
-    "o o",
-    " x "
+    [
+        "o o",
+        " x "
+    ],
+    [
+        "  x",
+        "o o",
+    ],
+    [
+        " o",
+        "  x",
+        "  o",
+    ]
 ]
 
 class Object:
@@ -419,46 +524,51 @@ class Core:
         self.render_chords()
 
     def render_chords(self):
-        return # TEMP: the below code is not yet done
-        
         sz = SCREEN_W / BOARD_W
+        chords = set()
         for y, row in enumerate(self.board):
             ry = y + MENU_SZ # real y
             for x, cell in enumerate(row):
                 # root_pos = glm.ivec2(0,0)
-                for name, shape in CHORD_SHAPES.items():
-                    next_chord = False
-                    polygons = []
-                    polygon = []
-                    root = None
-                    for rj, chord_row in enumerate(shape):
-                        for ri, ch in enumerate(chord_row):
-                            try:
-                                mark = self.board[y+rj][x+ri]
-                            except:
-                                polygon = []
-                                next_chord = True
+                for name, inversion_list in CHORD_SHAPES.items():
+                    for shape in inversion_list:
+                        next_chord = False
+                        polygons = []
+                        polygon = []
+                        root = None
+                        for rj, chord_row in enumerate(shape):
+                            for ri, ch in enumerate(chord_row):
+                                try:
+                                    mark = self.board[y+rj][x+ri]
+                                except:
+                                    polygon = []
+                                    next_chord = True
+                                    break
+                                # mark does not exist (not this chord)
+                                if ch=='x':
+                                    root = glm.ivec2(x+ri, y+rj)
+                                if not mark and ch in 'ox':
+                                    next_chord=True # double break
+                                    polygon = []
+                                    break
+                                # polygon += [glm.ivec2((x+ri)*sz, (y+rj)*sz+MENU_SZ)]
+                            if next_chord: # double break
                                 break
-                            # mark does not exist (not this chord)
-                            if ch=='x':
-                                root = glm.ivec2(ri, rj)
-                            if not mark and ch in 'ox':
-                                next_chord=True # double break
-                                polygon = []
-                                break
-                            # polygon += [glm.ivec2((x+ri)*sz, (y+rj)*sz+MENU_SZ)]
-                        if next_chord: # double break
-                            break
-                        # if polygon:
-                        #     polygons += [polygon]
-                    if not next_chord:
-                        # for poly in polygons:
-                        #     pygame.draw.polygon(self.screen.surface, glm.ivec3(0,255,0), poly, 2)
-                        text = self.retro_font.render(name, True, glm.ivec3(255))
-                        textpos = text.get_rect()
-                        textpos.x = 0
-                        textpos.y = MENU_SZ // 2
-                        self.screen.surface.blit(text, textpos)
+                            # if polygon:
+                            #     polygons += [polygon]
+                        if not next_chord:
+                            # for poly in polygons:
+                            #     pygame.draw.polygon(self.screen.surface, glm.ivec3(0,255,0), poly, 2)
+                            note = self.get_note_index(*root)
+                            chords.add((note, name))
+
+        if chords:
+            name = ', '.join(NOTES[c[0]] + c[1] for c in chords) # concat names
+            text = self.retro_font.render(name, True, glm.ivec3(255))
+            textpos = text.get_rect()
+            textpos.x = 0
+            textpos.y = MENU_SZ // 2
+            self.screen.surface.blit(text, textpos)
 
     def draw(self):
         if not GFX:
