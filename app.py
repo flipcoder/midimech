@@ -135,6 +135,22 @@ CHORD_SHAPES["dim"] = [
 CHORD_SHAPES["aug"] = [[
     "x o o"
 ]]
+CHORD_SHAPES["lyd"] = [
+    [
+        "x oo"
+    ],
+    [
+        " x  ",
+        "",
+        "  oo"
+    ],
+    [
+        "x o",
+        "",
+        "  o"
+    ]
+
+]
 CHORD_SHAPES["sus4"] = [[
     "oo",
     "x "
@@ -564,7 +580,7 @@ class Core:
 
         if chords:
             name = ', '.join(NOTES[c[0]] + c[1] for c in chords) # concat names
-            text = self.retro_font.render(name, True, glm.ivec3(255))
+            text = self.font.render(name, True, glm.ivec3(255))
             textpos = text.get_rect()
             textpos.x = 0
             textpos.y = MENU_SZ // 2
