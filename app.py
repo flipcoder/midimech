@@ -34,18 +34,18 @@ FONT_SZ = 32
 # ]
 
 OCTAVES = [
-    [3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5],
+    [3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6],
+    [3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5],
     [2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5],
     [2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4],
-    [2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4],
-    [1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4],
-    [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3],
+    [1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4],
+    [1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4],
     [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3],
     [0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3]
 ]
 
 def get_octave(x, y):
-    return OCTAVES[BOARD_H - y - 1][x]
+    return OCTAVES[y - BOARD_H][x]
 
 def get_note_index(x, y):
     base_offset = -4
@@ -195,6 +195,8 @@ class Core:
 
     def mark(self, midinote, state):
         y = 0
+        print('')
+        print("midi note: ", midinote)
         for row in self.board:
             x = 0
             for cell in row:
@@ -202,6 +204,7 @@ class Core:
                 if midinote%12 == idx:
                     octave = get_octave(x, y)
                     if octave == midinote//12:
+                        print(x,y)
                         self.board[y][x] = state
                 x += 1
             y += 1
@@ -267,6 +270,7 @@ class Core:
             for cell in row:
                 # write text
                 note = get_note(x, y)
+                note = str(get_octave(x, y))
 
                 col = None
                 
