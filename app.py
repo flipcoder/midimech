@@ -1,23 +1,29 @@
 #!/usr/bin/python3
 # from tkinter import *
 import os,sys,glm,copy,binascii,struct,math,traceback
-import pygame, pygame.midi, pygame.gfxdraw
+with open(os.devnull, 'w') as devnull:
+    # suppress pygame messages
+    stdout = sys.stdout
+    sys.stdout = devnull
+    import pygame, pygame.midi, pygame.gfxdraw
+    sys.stdout = stdout
 import pygame_gui
 import mido
 from collections import OrderedDict
 
+PANEL = False
+MENU_SZ = 64 if PANEL else 32
 OFFSET = 12
 BOARD_W = 16
 BOARD_H = 8
 BOARD_SZ = glm.ivec2(BOARD_W, BOARD_H)
 SCALE = glm.vec2(64.0)
-MENU_SZ = 32
 SCREEN_W = BOARD_W * SCALE.x
 SCREEN_H = BOARD_H * SCALE.y + MENU_SZ
 BUTTON_SZ = SCREEN_W / BOARD_W
 SCREEN_SZ = glm.ivec2(SCREEN_W, SCREEN_H)
 GFX = True
-TITLE = "Linnstrument Visualizer"
+TITLE = "Whole-tone System for Linnstrument"
 FOCUS = False
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 WHOLETONE = True
@@ -165,29 +171,34 @@ class Core:
                 pygame.event.set_grab(True)
             self.screen = Screen(pygame.display.set_mode(SCREEN_SZ))
             
-            bs = glm.ivec2(BUTTON_SZ,32) # button size
+            bs = glm.ivec2(BUTTON_SZ,MENU_SZ//2 if PANEL else MENU_SZ) # button size
             self.gui = pygame_gui.UIManager(SCREEN_SZ)
+            y = 0
             self.btn_octave_down = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((2,0),bs),
+                relative_rect=pygame.Rect((2,y),bs),
                 text='<OCT',
                 manager=self.gui
             )
             self.btn_octave_up = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((bs.x+2,0),bs),
+                relative_rect=pygame.Rect((bs.x+2,y),bs),
                 text='OCT>',
                 manager=self.gui
             )
             self.btn_transpose_down = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((bs.x*2+2,0),bs),
+                relative_rect=pygame.Rect((bs.x*2+2,y),bs),
                 text='<TR',
                 manager=self.gui
             )
             self.btn_transpose_up = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((bs.x*3+2,0),bs),
+                relative_rect=pygame.Rect((bs.x*3+2,y),bs),
                 text='TR>',
                 manager=self.gui
             )
-
+            self.btn_mode = pygame_gui.elements.UIButton(
+                relative_rect=pygame.Rect((bs.x*4+2,y),bs),
+                text='MODE',
+                manager=self.gui
+            )
         
         pygame.midi.init()
         
@@ -271,6 +282,7 @@ class Core:
         self.board = [[0 for x in range(w)] for y in range(h)]
 
         self.font = pygame.font.Font(None, FONT_SZ)
+        self.retro_font = pygame.font.Font("PressStart2P.ttf", FONT_SZ)
         self.clock = pygame.time.Clock()
 
     def quit(self):
@@ -314,6 +326,9 @@ class Core:
                     self.dirty = True
                 elif ev.ui_element == self.btn_transpose_up:
                     self.transpose += 1
+                    self.dirty = True
+                elif ev.ui_element == self.btn_mode:
+                    # TODO: toggle mode
                     self.dirty = True
 
             self.gui.process_events(ev)
@@ -374,13 +389,18 @@ class Core:
 
                 col = None
                 
-                if cell:
-                    col = glm.ivec3(255,0,0)
-                else:
-                    col = self.get_color(x, y)
+                # if cell:
+                #     col = glm.ivec3(255,0,0)
+                # else:
+                #     col = self.get_color(x, y)
+                lit_col = glm.ivec3(255,0,0)
+                unlit_col = self.get_color(x, y)
                 
                 ry = y + MENU_SZ # real y
-                pygame.gfxdraw.box(self.screen.surface, [x*sz + b, MENU_SZ + y*sz + b, sz - b, sz - b], col)
+                pygame.gfxdraw.box(self.screen.surface, [x*sz + b, MENU_SZ + y*sz + b, sz - b, sz - b], unlit_col)
+                if cell:
+                    pygame.gfxdraw.filled_circle(self.screen.surface, int(x*sz + b/2 + sz/2), int(MENU_SZ + y*sz + b/2 + sz/2), int(sz//2 - 8), lit_col)
+                    pygame.gfxdraw.aacircle(self.screen.surface, int(x*sz + b/2 + sz/2), int(MENU_SZ + y*sz + b/2 + sz/2), int(sz//2 - 8), lit_col)
                 
                 text = self.font.render(note, True, glm.ivec3(0))
                 textpos = text.get_rect()
