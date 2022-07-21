@@ -28,6 +28,9 @@ FOCUS = False
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 WHOLETONE = True
 FONT_SZ = 32
+GRAY = glm.ivec3(64)
+DARK = glm.ivec3(32)
+LIGHT = glm.ivec3(127)
 
 # NOTE_COLORS = [
 #     glm.ivec3(255, 0, 0), # C
@@ -113,6 +116,31 @@ def nothing():
     pass
 
 class Core:
+    
+    def send_cc(self, channel, cc, val):
+        msg = mido.Message('control_change', channel=channel, control=cc, value=val)
+        # if self.midi:
+        #     pass
+        # self.midi.send(msg.bytes())
+
+    def set_light(self, x, y, col): # col is [1,11], 0 resets
+        self.send_cc(0, 20, y)
+        self.send_cc(0, 21, x)
+        self.send_cc(0, 22, col)
+    
+    def setup_lights(self):
+        for y in range(BOARD_H):
+            for x in range(BOARD_W):
+                pg_col = self.get_color(x, y)
+                light_col = 0
+                if pg_col == GRAY:
+                    light_col = 7
+                elif pg_col == DARK:
+                    light_col = 5
+                elif pg_col == LIGHT:
+                    light_col = 8
+                self.set_light(x, y, light_col)
+    
     def get_octave(self, x, y):
         return OCTAVES[y - BOARD_H][x] + self.octave
 
@@ -133,11 +161,11 @@ class Core:
         # return NOTE_COLORS[get_note_index(x, y)]
         note = self.get_note(x, y)
         if note in 'FB':
-            return glm.ivec3(64)
+            return GRAY
         elif len(note) == 1:
-            return glm.ivec3(127)
+            return LIGHT
         else:
-            return glm.ivec3(32)
+            return DARK
     
     def __init__(self):
 
@@ -283,6 +311,8 @@ class Core:
         self.font = pygame.font.Font(None, FONT_SZ)
         self.retro_font = pygame.font.Font("PressStart2P.ttf", FONT_SZ)
         self.clock = pygame.time.Clock()
+
+        self.setup_lights()
 
     def quit(self):
         self.done = True
