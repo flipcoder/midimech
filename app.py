@@ -90,7 +90,6 @@ class Core:
         msg = mido.Message('control_change', channel=channel, control=cc, value=val)
         if not self.linn_out:
             return
-        print(msg.bytes())
         self.linn_out.write([[msg.bytes(),0]])
 
     def set_light(self, x, y, col): # col is [1,11], 0 resets
@@ -358,6 +357,9 @@ class Core:
                     elif msg == 8: # note off
                         self.mark(data[1], 0)
 
+        row_ofs = [
+            0, -5, 0
+        ]
         if self.midi:
             while self.midi.poll():
                 events = self.midi.read(100)
@@ -365,15 +367,29 @@ class Core:
                     data = ev[0]
                     ch = data[0] & 0x0f
                     msg = data[0] >> 4
+                    row = ch % 8
+                    print(row)
                     if msg == 9: # note on
                         if WHOLETONE:
                             data[1] *= 2
+                            if row%2:
+                                try:
+                                    print(row, row_ofs[row])
+                                    data[1] += row_ofs[row]
+                                except IndexError:
+                                    pass
                             data[1] -= OFFSET
                         self.out[0].write([ev])
                         # print('note on: ', data)
                     elif msg == 8: # note off
                         if WHOLETONE:
                             data[1] *= 2
+                            if row%2:
+                                try:
+                                    print(row, row_ofs[row])
+                                    data[1] += row_ofs[row]
+                                except IndexError:
+                                    pass
                             data[1] -= OFFSET
                         self.out[0].write([ev])
                         # print('note off: ', data)
