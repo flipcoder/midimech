@@ -271,7 +271,9 @@ class Core:
         #     #     pass
         
         self.done = False
+        
         self.dirty = True
+        self.dirty_lights = True
             
         w = 16
         h = 8
@@ -315,21 +317,25 @@ class Core:
             elif ev.type == pygame_gui.UI_BUTTON_PRESSED:
                 if ev.ui_element == self.btn_octave_down:
                     self.octave -= 1
-                    self.dirty = True
+                    self.dirty = self.dirty_lights = True
                 elif ev.ui_element == self.btn_octave_up:
                     self.octave += 1
-                    self.dirty = True
+                    self.dirty = self.dirty_lights = True
                 elif ev.ui_element == self.btn_transpose_down:
                     self.transpose -= 1
-                    self.dirty = True
+                    self.dirty = self.dirty_lights = True
                 elif ev.ui_element == self.btn_transpose_up:
                     self.transpose += 1
-                    self.dirty = True
+                    self.dirty = self.dirty_lights = True
                 elif ev.ui_element == self.btn_mode:
                     # TODO: toggle mode
-                    self.dirty = True
+                    self.dirty = self.dirty_lights = True
 
             self.gui.process_events(ev)
+
+        if self.dirty_lights:
+            self.setup_lights()
+            self.dirty_lights = False
         
         if self.visualizer:
             while self.visualizer.poll():
