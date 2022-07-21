@@ -14,7 +14,7 @@ from chords import CHORD_SHAPES
 
 PANEL = True
 MENU_SZ = 64 if PANEL else 32
-OFFSET = 12
+OFFSET = 0
 BOARD_W = 16
 BOARD_H = 8
 BOARD_SZ = glm.ivec2(BOARD_W, BOARD_H)
@@ -138,7 +138,8 @@ class Core:
     
     def __init__(self):
 
-        self.octave = 2
+        self.octave = 0
+        self.octave_base = -2
         self.transpose = 0
         
         self.midi_fn = None
@@ -358,7 +359,7 @@ class Core:
                         self.mark(data[1], 0)
 
         row_ofs = [
-            0, -5, 0
+            0, -5, -10
         ]
         if self.midi:
             while self.midi.poll():
@@ -368,29 +369,24 @@ class Core:
                     ch = data[0] & 0x0f
                     msg = data[0] >> 4
                     row = ch % 8
-                    print(row)
                     if msg == 9: # note on
                         if WHOLETONE:
                             data[1] *= 2
-                            if row%2:
-                                try:
-                                    print(row, row_ofs[row])
-                                    data[1] += row_ofs[row]
-                                except IndexError:
-                                    pass
-                            data[1] -= OFFSET
+                            try:
+                                data[1] -= row * 5
+                            except IndexError:
+                                pass
+                            data[1] += (self.octave + self.octave_base) * 12
                         self.out[0].write([ev])
                         # print('note on: ', data)
                     elif msg == 8: # note off
                         if WHOLETONE:
                             data[1] *= 2
-                            if row%2:
-                                try:
-                                    print(row, row_ofs[row])
-                                    data[1] += row_ofs[row]
-                                except IndexError:
-                                    pass
-                            data[1] -= OFFSET
+                            try:
+                                data[1] -= row * 5
+                            except IndexError:
+                                pass
+                            data[1] += (self.octave + self.octave_base) * 12
                         self.out[0].write([ev])
                         # print('note off: ', data)
                     else:
