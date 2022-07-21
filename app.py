@@ -32,6 +32,8 @@ FONT_SZ = 32
 GRAY = glm.ivec3(64)
 DARK = glm.ivec3(32)
 LIGHT = glm.ivec3(127)
+ONE_CHANNEL = False # send notes to first channel only (midi compat)
+BASE_OFFSET = -4
 
 # NOTE_COLORS = [
 #     glm.ivec3(255, 0, 0), # C
@@ -115,8 +117,7 @@ class Core:
 
     def get_note_index(self, x, y):
         x += self.transpose
-        base_offset = -4
-        ofs = (BOARD_H - y) // 2 + base_offset
+        ofs = (BOARD_H - y) // 2 + BASE_OFFSET
         step = 2 if WHOLETONE else 1
         if y%2 == 1:
             return ((x-ofs)*step)%len(NOTES)
@@ -358,15 +359,18 @@ class Core:
                     elif msg == 8: # note off
                         self.mark(data[1], 0)
 
-        row_ofs = [
-            0, -5, -10
-        ]
+        # row_ofs = [
+        #     0, -5, -10
+        # ]
         if self.midi:
             while self.midi.poll():
                 events = self.midi.read(100)
                 for ev in events:
                     data = ev[0]
-                    ch = data[0] & 0x0f
+                    d0 = data[0]
+                    ch = d0 & 0x0f
+                    if ONE_CHANNEL:
+                        data[0] = d0 & 0xf0 # TEMP: send all to channel 0
                     msg = data[0] >> 4
                     row = ch % 8
                     if msg == 9: # note on
@@ -377,7 +381,9 @@ class Core:
                             except IndexError:
                                 pass
                             data[1] += (self.octave + self.octave_base) * 12
-                        self.out[0].write([ev])
+                        data[1] += BASE_OFFSET
+                        self.mark(data[1] - 24, 1)
+                        self.out[0].write([[data, ev[1]]])
                         # print('note on: ', data)
                     elif msg == 8: # note off
                         if WHOLETONE:
@@ -387,7 +393,10 @@ class Core:
                             except IndexError:
                                 pass
                             data[1] += (self.octave + self.octave_base) * 12
-                        self.out[0].write([ev])
+                        data[1] += BASE_OFFSET
+                        self.mark(data[1] - 24, 0)
+                        # self.out[0].write([ev])
+                        self.out[0].write([[data, ev[1]]])
                         # print('note off: ', data)
                     else:
                         self.out[0].write([ev])
