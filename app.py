@@ -10,6 +10,7 @@ with open(os.devnull, 'w') as devnull:
 import pygame_gui
 import mido
 from collections import OrderedDict
+from chords import CHORD_SHAPES
 
 PANEL = True
 MENU_SZ = 64 if PANEL else 32
@@ -56,171 +57,6 @@ OCTAVES = [
     [1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4],
     [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3],
     [0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3]
-]
-
-CHORD_SHAPES = OrderedDict()
-CHORD_SHAPES["maj7"] = [
-    [
-        " . o",
-        "x o "
-    ],
-    [
-        "x  ",
-        ". o",
-        " o "
-    ],
-    [
-        "x o",
-        ". o",
-    ],
-    [
-        " . ",
-        "x o",
-        "  o"
-    ]
-]
-CHORD_SHAPES["min7"] = [
-    [
-        " o ",
-        "o .",
-        " x "
-    ],
-    [
-        " ox",
-        "o .",
-    ],
-    [
-        " o ",
-        " ox",
-        "  .",
-    ],
-    [
-        "o .",
-        "ox"
-    ]
-
-]
-CHORD_SHAPES["sus2"] = [
-    [
-        " o",
-        "xo "
-    ]
-]
-CHORD_SHAPES["Q"] = [
-    [
-        "o",
-        "o",
-        "x"
-    ]
-]
-CHORD_SHAPES["Qt"] = [
-    [
-        "  o",
-        " o",
-        "x"
-    ]
-]
-CHORD_SHAPES["dim"] = [
-    [
-        "o",
-        " o",
-        "  x"
-    ],
-    [
-        "o  x",
-        " o",
-    ],
-    [
-        "  x ",
-        "o  o",
-    ]
-]
-CHORD_SHAPES["aug"] = [
-    [
-        "x o o"
-    ],
-    [
-        "x"
-        "",
-        " o o"
-    ],
-    [
-        "x o"
-        "",
-        "   o"
-    ]
-]
-CHORD_SHAPES["lyd"] = [
-    [
-        "x oo"
-    ],
-    [
-        " x  ",
-        "",
-        "  oo"
-    ],
-    [
-        "x o",
-        "",
-        "  o"
-    ]
-
-]
-CHORD_SHAPES["sus4"] = [[
-    "oo",
-    "x "
-]]
-CHORD_SHAPES["dom7"] = [
-    [
-        "o ",
-        " .",
-        "x o"
-    ],
-    [
-        "ox",
-        " .",
-        "  o"
-    ],
-    [
-        "ox o",
-        " .",
-    ],
-    [
-        "  .",
-        "ox o",
-    ]
-
-]
-CHORD_SHAPES["maj"] = [
-    [
-        " o",
-        "x o"
-    ],
-    [
-        " x",
-        " o",
-        "  o"
-    ],
-    [
-        "x o",
-        "o"
-    ]
-
-]
-CHORD_SHAPES["min"] = [
-    [
-        "o o",
-        " x "
-    ],
-    [
-        "  x",
-        "o o",
-    ],
-    [
-        " o",
-        "  x",
-        "  o",
-    ]
 ]
 
 class Object:
@@ -444,7 +280,9 @@ class Core:
         #     #     pass
         
         self.done = False
+        
         self.dirty = True
+        self.dirty_lights = True
             
         w = 16
         h = 8
@@ -488,21 +326,25 @@ class Core:
             elif ev.type == pygame_gui.UI_BUTTON_PRESSED:
                 if ev.ui_element == self.btn_octave_down:
                     self.octave -= 1
-                    self.dirty = True
+                    self.dirty = self.dirty_lights = True
                 elif ev.ui_element == self.btn_octave_up:
                     self.octave += 1
-                    self.dirty = True
+                    self.dirty = self.dirty_lights = True
                 elif ev.ui_element == self.btn_transpose_down:
                     self.transpose -= 1
-                    self.dirty = True
+                    self.dirty = self.dirty_lights = True
                 elif ev.ui_element == self.btn_transpose_up:
                     self.transpose += 1
-                    self.dirty = True
+                    self.dirty = self.dirty_lights = True
                 elif ev.ui_element == self.btn_mode:
                     # TODO: toggle mode
-                    self.dirty = True
+                    self.dirty = self.dirty_lights = True
 
             self.gui.process_events(ev)
+
+        if self.dirty_lights:
+            self.setup_lights()
+            self.dirty_lights = False
         
         if self.visualizer:
             while self.visualizer.poll():
