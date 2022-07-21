@@ -1,3 +1,4 @@
 pygame
+pygame_gui
 pyglm
 mido
