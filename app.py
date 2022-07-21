@@ -252,13 +252,14 @@ class Core:
     
     def send_cc(self, channel, cc, val):
         msg = mido.Message('control_change', channel=channel, control=cc, value=val)
-        # if self.midi:
-        #     pass
-        # self.midi.send(msg.bytes())
+        if not self.linn_out:
+            return
+        print(msg.bytes())
+        self.linn_out.write([[msg.bytes(),0]])
 
     def set_light(self, x, y, col): # col is [1,11], 0 resets
-        self.send_cc(0, 20, y)
-        self.send_cc(0, 21, x)
+        self.send_cc(0, 20, x+1)
+        self.send_cc(0, 21, BOARD_H - y - 1)
         self.send_cc(0, 22, col)
     
     def setup_lights(self):
@@ -267,11 +268,11 @@ class Core:
                 pg_col = self.get_color(x, y)
                 light_col = 0
                 if pg_col == GRAY:
-                    light_col = 7
-                elif pg_col == DARK:
                     light_col = 5
+                elif pg_col == DARK:
+                    light_col = 7
                 elif pg_col == LIGHT:
-                    light_col = 8
+                    light_col = 5
                 self.set_light(x, y, light_col)
     
     def get_octave(self, x, y):
@@ -367,10 +368,11 @@ class Core:
         ins = []
         outs = []
         in_devs = [
-            'impact',
+            'linnstrument',
             'visualizer'
         ]
         out_devs = [
+            'linnstrument',
             'loopmidi'
         ]
         for i in range(pygame.midi.get_count()):
@@ -386,15 +388,22 @@ class Core:
         #     innames += [str(inx[1])]
         #     print('in: ', inx)
 
+        self.linn_out = None
+        
         innames = []
         outnames = []
         brk = False
         for outdev in out_devs:
             for out in outs:
                 if outdev.lower() in out[1].lower():
-                    outnames += [str(out[1])]
+                    name = str(out[1])
+                    outnames += [name]
                     o = pygame.midi.Output(out[0])
-                    self.out.append(o)
+                    if 'linnstrument' in name.lower():
+                        print("LinnStrument out: ", name)
+                        self.linn_out = o
+                    else:
+                        self.out.append(o)
 
         if not self.out:
             oid = pygame.midi.get_default_output_id()
