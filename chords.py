@@ -23,6 +23,27 @@ CHORD_SHAPES["min7"] = [
     ]
 
 ]
+CHORD_SHAPES["min7b5"] = [
+    [
+        " o ",
+        "o",
+        " x  o"
+    ],
+    [
+        " ox",
+        "o",
+        "    o"
+    ],
+    [
+        " ox  o",
+        "o",
+    ],
+    [
+        "o"
+        "ox  o",
+    ]
+]
+
 CHORD_SHAPES["sus2"] = [
     [
         " o",
@@ -63,12 +84,12 @@ CHORD_SHAPES["aug"] = [
         "x o o"
     ],
     [
-        "x"
+        "x",
         "",
         " o o"
     ],
     [
-        "x o"
+        "x o",
         "",
         "   o"
     ]
@@ -153,12 +174,12 @@ CHORD_SHAPES["minmaj7"] = [
         "o . o",
     ],
     [
-        "o"
+        "o",
         " x",
         " . o",
     ],
     [
-        "o ."
+        "o .",
         " x",
         "   o",
     ]
