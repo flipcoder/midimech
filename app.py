@@ -39,6 +39,9 @@ DARK = glm.ivec3(0)
 ONE_CHANNEL = False # send notes to first channel only (midi compat)
 BASE_OFFSET = -4
 CHORD_ANALYZER = False
+EPSILON = 0.0001
+# bend the velocity curve up or down range=[-1.0, 1.0], 0=default
+VELOCITY_CURVE_BEND = 0.0
 
 # NOTE_COLORS = [
 #     glm.ivec3(255, 0, 0), # C
@@ -92,6 +95,17 @@ def nothing():
     pass
 
 class Core:
+
+    def has_velocity_curve(self):
+        return abs(VELOCITY_CURVE_BEND) > EPSILON
+
+    def velocity_curve(self, val): # 0-1
+        if self.has_velocity_curve():
+            bend = val**2.0 if VELOCITY_CURVE_BEND < 0.0 else math.sqrt(val)
+            newval = glm.mix(val, bend, abs(VELOCITY_CURVE_BEND))
+            print(val, bend, newval)
+            val = newval
+        return val
     
     def send_cc(self, channel, cc, val):
         msg = mido.Message('control_change', channel=channel, control=cc, value=val)
