@@ -12,17 +12,8 @@ import mido
 from collections import OrderedDict
 from chords import CHORD_SHAPES
 
-PANEL = False
-MENU_SZ = 64 if PANEL else 32
+# self.panel = False
 OFFSET = 0
-BOARD_W = 16
-BOARD_H = 8
-BOARD_SZ = glm.ivec2(BOARD_W, BOARD_H)
-SCALE = glm.vec2(64.0)
-SCREEN_W = BOARD_W * SCALE.x
-SCREEN_H = BOARD_H * SCALE.y + MENU_SZ
-BUTTON_SZ = SCREEN_W / BOARD_W
-SCREEN_SZ = glm.ivec2(SCREEN_W, SCREEN_H)
 GFX = True
 TITLE = "Whole-tone System for Linnstrument"
 FOCUS = False
@@ -44,6 +35,7 @@ EPSILON = 0.0001
 VELOCITY_CURVE_BEND = 0.0
 MIN_VELOCITY = 0
 MAX_VELOCITY = 127
+CORE = None
 
 def clamp(low, high, val):
     return max(low, min(val, high))
@@ -64,14 +56,16 @@ def clamp(low, high, val):
 # ]
 
 OCTAVES = [
-    [3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6],
-    [3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5],
-    [2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5],
-    [2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4],
-    [1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4],
-    [1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4],
-    [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3],
-    [0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3]
+    # 200 size ---------------------------------------------------------------v
+    # 128 size ------------------------------------v
+    [3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7],
+    [3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 7, 7],
+    [2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6],
+    [2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6],
+    [1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5],
+    [1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5],
+    [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5],
+    [0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4]
 ]
 
 class Object:
@@ -87,10 +81,11 @@ class Object:
         self.surface = kwargs.get('surface', None)
 
 class Screen(Object):
-    def __init__(self,screen):
+    def __init__(self,core,screen):
+        self.core = core
         self.pos = glm.vec2(0.0, 0.0)
-        self.sz = glm.vec2(SCREEN_W, SCREEN_H)
-        self.surface = pygame.Surface(SCREEN_SZ).convert()
+        self.sz = glm.vec2(core.screen_w, core.screen_h)
+        self.surface = pygame.Surface(core.screen_sz).convert()
         self.screen = screen
     
     def render(self):
@@ -118,7 +113,7 @@ class Core:
 
     def set_light(self, x, y, col): # col is [1,11], 0 resets
         self.send_cc(0, 20, x+1)
-        self.send_cc(0, 21, BOARD_H - y - 1)
+        self.send_cc(0, 21, self.board_h - y - 1)
         self.send_cc(0, 22, col)
 
     def reset_light(self, x, y):
@@ -140,16 +135,16 @@ class Core:
         self.set_light(x, y, light_col)
     
     def setup_lights(self):
-        for y in range(BOARD_H):
-            for x in range(BOARD_W):
+        for y in range(self.board_h):
+            for x in range(self.max_width):
                 self.reset_light(x, y)
     
     def get_octave(self, x, y):
-        return OCTAVES[y - BOARD_H][x] + self.octave
+        return OCTAVES[y - self.board_h][x] + self.octave
 
     def get_note_index(self, x, y):
         x += self.transpose
-        ofs = (BOARD_H - y) // 2 + BASE_OFFSET
+        ofs = (self.board_h - y) // 2 + BASE_OFFSET
         step = 2 if WHOLETONE else 1
         if y%2 == 1:
             return ((x-ofs)*step)%len(NOTES)
@@ -185,6 +180,22 @@ class Core:
     
     def __init__(self):
 
+        global CORE
+        CORE = self
+        
+        self.panel = False
+        self.menu_sz = 64 if self.panel else 32
+        self.max_width = 25 # MAX WIDTH OF LINNSTRUMENT
+        self.board_h = 8
+        self.scale = glm.vec2(64.0)
+        
+        self.board_w = 16
+        self.board_sz = glm.ivec2(self.board_w, self.board_h)
+        self.screen_w = self.board_w * self.scale.x
+        self.screen_h = self.board_h * self.scale.y + self.menu_sz
+        self.button_sz = self.screen_w / self.board_w
+        self.screen_sz = glm.ivec2(self.screen_w, self.screen_h)
+        
         self.lowest_note = None # x,y location of lowest note currently pressed
         self.lowest_note_midi = None # midi number of lowest note currently pressed
         self.octave = 0
@@ -206,7 +217,7 @@ class Core:
             # self.filemenu = Menu(self.menubar, tearoff=0)
             # self.filemenu.add_command(label="Open", command=nothing)
             # self.root.config(menu=self.menubar)
-            # self.embed = Frame(self.root, width=SCREEN_W, height=SCREEN_H)
+            # self.embed = Frame(self.root, width=self.screen_w, height=self.screen_h)
             # self.embed.pack()
             # os.environ['SDL_WINDOWID'] = str(self.embed.winfo_id())
             # self.root.update()
@@ -217,10 +228,10 @@ class Core:
             if FOCUS:
                 pygame.mouse.set_visible(0)
                 pygame.event.set_grab(True)
-            self.screen = Screen(pygame.display.set_mode(SCREEN_SZ))
+            self.screen = Screen(self,pygame.display.set_mode(self.screen_sz))
             
-            bs = glm.ivec2(BUTTON_SZ,MENU_SZ//2 if PANEL else MENU_SZ) # button size
-            self.gui = pygame_gui.UIManager(SCREEN_SZ)
+            bs = glm.ivec2(self.button_sz,self.menu_sz//2 if self.panel else self.menu_sz) # button size
+            self.gui = pygame_gui.UIManager(self.screen_sz)
             y = 0
             self.btn_octave_down = pygame_gui.elements.UIButton(
                 relative_rect=pygame.Rect((2,y),bs),
@@ -242,9 +253,9 @@ class Core:
                 text='TR>',
                 manager=self.gui
             )
-            self.btn_mode = pygame_gui.elements.UIButton(
+            self.btn_size = pygame_gui.elements.UIButton(
                 relative_rect=pygame.Rect((bs.x*4+2,y),bs),
-                text='MODE',
+                text='SIZE',
                 manager=self.gui
             )
         
@@ -335,8 +346,8 @@ class Core:
         self.dirty = True
         self.dirty_lights = True
             
-        w = 16
-        h = 8
+        w = self.max_width
+        h = self.board_h
         self.board = [[0 for x in range(w)] for y in range(h)]
 
         self.font = pygame.font.Font(None, FONT_SZ)
@@ -365,6 +376,14 @@ class Core:
             y += 1
         self.dirty = True
 
+    def resize(self):
+        self.board_sz = glm.ivec2(self.board_w, self.board_h)
+        self.screen_w = self.board_w * self.scale.x
+        self.screen_h = self.board_h * self.scale.y + self.menu_sz
+        self.button_sz = self.screen_w / self.board_w
+        self.screen_sz = glm.ivec2(self.screen_w, self.screen_h)
+        self.screen = Screen(self,pygame.display.set_mode(self.screen_sz))
+
     def logic(self, t):
         keys = pygame.key.get_pressed()
         for ev in pygame.event.get():
@@ -387,9 +406,17 @@ class Core:
                 elif ev.ui_element == self.btn_transpose_up:
                     self.transpose += 1
                     self.dirty = self.dirty_lights = True
-                elif ev.ui_element == self.btn_mode:
-                    # TODO: toggle mode
-                    self.dirty = self.dirty_lights = True
+                # elif ev.ui_element == self.btn_mode:
+                #     # TODO: toggle mode
+                #     self.dirty = True
+                elif ev.ui_element == self.btn_size:
+                    if self.board_w == 16:
+                        self.board_w = 25
+                        self.resize()
+                    else:
+                        self.board_w = 16
+                        self.resize()
+                    self.dirty = True
 
             self.gui.process_events(ev)
 
@@ -504,7 +531,7 @@ class Core:
         
         self.screen.surface.fill((0,0,0))
         b = 2 # border
-        sz = SCREEN_W / BOARD_W
+        sz = self.screen_w / self.board_w
         y = 0
         for row in self.board:
             x = 0
@@ -522,11 +549,11 @@ class Core:
                 lit_col = glm.ivec3(255,0,0)
                 unlit_col = self.get_color(x, y)
                 
-                ry = y + MENU_SZ # real y
-                pygame.gfxdraw.box(self.screen.surface, [x*sz + b, MENU_SZ + y*sz + b, sz - b, sz - b], unlit_col)
+                ry = y + self.menu_sz # real y
+                pygame.gfxdraw.box(self.screen.surface, [x*sz + b, self.menu_sz + y*sz + b, sz - b, sz - b], unlit_col)
                 if cell:
-                    pygame.gfxdraw.filled_circle(self.screen.surface, int(x*sz + b/2 + sz/2), int(MENU_SZ + y*sz + b/2 + sz/2), int(sz//2 - 8), lit_col)
-                    pygame.gfxdraw.aacircle(self.screen.surface, int(x*sz + b/2 + sz/2), int(MENU_SZ + y*sz + b/2 + sz/2), int(sz//2 - 8), lit_col)
+                    pygame.gfxdraw.filled_circle(self.screen.surface, int(x*sz + b/2 + sz/2), int(self.menu_sz + y*sz + b/2 + sz/2), int(sz//2 - 8), lit_col)
+                    pygame.gfxdraw.aacircle(self.screen.surface, int(x*sz + b/2 + sz/2), int(self.menu_sz + y*sz + b/2 + sz/2), int(sz//2 - 8), lit_col)
                 
                 text = self.font.render(note, True, glm.ivec3(0))
                 textpos = text.get_rect()
@@ -536,7 +563,7 @@ class Core:
                 text = self.font.render(note, True, glm.ivec3(255))
                 textpos = text.get_rect()
                 textpos.x = x*sz + sz//2 - FONT_SZ//4
-                textpos.y = MENU_SZ + y*sz + sz//2 - FONT_SZ//4
+                textpos.y = self.menu_sz + y*sz + sz//2 - FONT_SZ//4
                 textpos.x += 1
                 textpos.y += 1
                 self.screen.surface.blit(text, textpos)
@@ -547,10 +574,10 @@ class Core:
             self.render_chords()
 
     def render_chords(self):
-        sz = SCREEN_W / BOARD_W
+        sz = self.screen_w / self.board_w
         chords = set()
         for y, row in enumerate(self.board):
-            ry = y + MENU_SZ # real y
+            ry = y + self.menu_sz # real y
             for x, cell in enumerate(row):
                 # root_pos = glm.ivec2(0,0)
                 for name, inversion_list in CHORD_SHAPES.items():
@@ -574,7 +601,7 @@ class Core:
                                     next_chord=True # double break
                                     polygon = []
                                     break
-                                # polygon += [glm.ivec2((x+ri)*sz, (y+rj)*sz+MENU_SZ)]
+                                # polygon += [glm.ivec2((x+ri)*sz, (y+rj)*sz+self.menu_sz)]
                             if next_chord: # double break
                                 break
                             # if polygon:
@@ -590,7 +617,7 @@ class Core:
             text = self.font.render(name, True, glm.ivec3(255))
             textpos = text.get_rect()
             textpos.x = 0
-            textpos.y = MENU_SZ // 2
+            textpos.y = self.menu_sz // 2
             self.screen.surface.blit(text, textpos)
 
     def draw(self):
