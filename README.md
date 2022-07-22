@@ -2,7 +2,7 @@
 
 An interleaved wholetone tuning system and visualizer for the Linnstrument.
 
-This is still a work-in-progress so some things are only partially working or completely broken.  It currently only works for the 128, but if I get a tester who has the bigger one I can try to make it work.
+This is still a work-in-progress so some things are only partially working or completely broken.
 
 License: MIT
 
