@@ -34,6 +34,7 @@ DARK = glm.ivec3(32)
 LIGHT = glm.ivec3(127)
 ONE_CHANNEL = False # send notes to first channel only (midi compat)
 BASE_OFFSET = -4
+BASE_NOTE = None # x,y location of lowest note pressed
 
 # NOTE_COLORS = [
 #     glm.ivec3(255, 0, 0), # C
@@ -98,19 +99,27 @@ class Core:
         self.send_cc(0, 20, x+1)
         self.send_cc(0, 21, BOARD_H - y - 1)
         self.send_cc(0, 22, col)
+
+    def reset_light(self, x, y):
+        note = self.get_note(x, y)
+        pg_col = self.get_color(x, y)
+        light_col = 0
+        if note == "C":
+            light_col = 3
+        elif note == "G#":
+            light_col = 2
+        elif pg_col == GRAY:
+            light_col = 5
+        elif pg_col == DARK:
+            light_col = 7
+        elif pg_col == LIGHT:
+            light_col = 5
+        self.set_light(x, y, light_col)
     
     def setup_lights(self):
         for y in range(BOARD_H):
             for x in range(BOARD_W):
-                pg_col = self.get_color(x, y)
-                light_col = 0
-                if pg_col == GRAY:
-                    light_col = 5
-                elif pg_col == DARK:
-                    light_col = 7
-                elif pg_col == LIGHT:
-                    light_col = 5
-                self.set_light(x, y, light_col)
+                self.reset_light(x, y)
     
     def get_octave(self, x, y):
         return OCTAVES[y - BOARD_H][x] + self.octave
@@ -140,6 +149,7 @@ class Core:
     def __init__(self):
 
         self.octave = 0
+        self.out_octave = 0
         self.octave_base = -2
         self.transpose = 0
         
@@ -383,6 +393,7 @@ class Core:
                             data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
                         self.mark(data[1] - 24, 1)
+                        data[1] += self.out_octave * 12
                         self.out[0].write([[data, ev[1]]])
                         # print('note on: ', data)
                     elif msg == 8: # note off
@@ -395,9 +406,14 @@ class Core:
                             data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
                         self.mark(data[1] - 24, 0)
+                        data[1] += self.out_octave * 12
                         # self.out[0].write([ev])
                         self.out[0].write([[data, ev[1]]])
                         # print('note off: ', data)
+                    elif msg == 14: # pitch bend
+                        # val = (data[2]-64)/64 + data[1]/127/64
+                        # val *= 2
+                        self.out[0].write([ev])
                     else:
                         self.out[0].write([ev])
         
