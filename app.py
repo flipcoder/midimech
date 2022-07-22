@@ -12,7 +12,7 @@ import mido
 from collections import OrderedDict
 from chords import CHORD_SHAPES
 
-PANEL = True
+PANEL = False
 MENU_SZ = 64 if PANEL else 32
 OFFSET = 0
 BOARD_W = 16
@@ -29,12 +29,16 @@ FOCUS = False
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 WHOLETONE = True
 FONT_SZ = 32
-GRAY = glm.ivec3(64)
-DARK = glm.ivec3(32)
-LIGHT = glm.ivec3(127)
+C_COLOR = glm.ivec3(0,32,0)
+YELLOW = glm.ivec3(32,32,0)
+LIGHT = glm.ivec3(0,0,32)
+ALT = glm.ivec3(16)
+GRAY = glm.ivec3(16)
+DARK = glm.ivec3(0)
+# LIGHT = glm.ivec3(127)
 ONE_CHANNEL = False # send notes to first channel only (midi compat)
 BASE_OFFSET = -4
-BASE_NOTE = None # x,y location of lowest note pressed
+CHORD_ANALYZER = False
 
 # NOTE_COLORS = [
 #     glm.ivec3(255, 0, 0), # C
@@ -104,16 +108,18 @@ class Core:
         note = self.get_note(x, y)
         pg_col = self.get_color(x, y)
         light_col = 0
-        if note == "C":
+        if pg_col is C_COLOR:
             light_col = 3
-        elif note == "G#":
+        elif pg_col is YELLOW:
             light_col = 2
-        elif pg_col == GRAY:
+        elif pg_col is GRAY:
             light_col = 5
-        elif pg_col == DARK:
+        elif pg_col is DARK:
             light_col = 7
-        elif pg_col == LIGHT:
+        elif pg_col is LIGHT:
             light_col = 5
+        elif pg_col is ALT:
+            light_col = 8
         self.set_light(x, y, light_col)
     
     def setup_lights(self):
@@ -139,15 +145,31 @@ class Core:
     def get_color(self, x, y):
         # return NOTE_COLORS[get_note_index(x, y)]
         note = self.get_note(x, y)
-        if note in 'FB':
-            return GRAY
-        elif len(note) == 1:
-            return LIGHT
-        else:
-            return DARK
+        if note == "C":
+            return C_COLOR
+        # if note == "G#":
+        #     return GSHARP_COLOR
+        elif note == "G#":
+            return YELLOW
+        elif len(note) == 1: # white key
+            if y%2==0:
+                return ALT
+            else:
+                return LIGHT
+        # # if note in 'FB':
+        # #     return GRAY
+        # elif len(note) == 1:
+        #     if y%2==0:
+        #         return LIGHT
+        #     else:
+        #         return ALT
+        # else:
+        return DARK
     
     def __init__(self):
 
+        self.lowest_note = None # x,y location of lowest note currently pressed
+        self.lowest_note_midi = None # midi number of lowest note currently pressed
         self.octave = 0
         self.out_octave = 0
         self.octave_base = -2
@@ -353,10 +375,41 @@ class Core:
 
             self.gui.process_events(ev)
 
+        # figure out the lowest note to highlight it
+        old_lowest_note = self.lowest_note
+        old_lowest_note_midi = self.lowest_note_midi
+        self.lowest_note = None
+        self.lowest_note_midi = None
+        note_count = 0
+        for y, row in enumerate(self.board):
+            for x, cell in enumerate(row):
+                if cell:
+                    note_idx = self.get_note_index(x,y)
+                    note_num = note_idx + 12*OCTAVES[y][x]
+                    if not self.lowest_note_midi or note_num < self.lowest_note_midi:
+                        self.lowest_note = NOTES[note_idx]
+                        self.lowest_note_midi = note_num
+                    note_count+=1
+
         if self.dirty_lights:
             self.setup_lights()
             self.dirty_lights = False
-        
+
+        # lowest note changed?
+        if self.lowest_note != old_lowest_note:
+            if old_lowest_note:
+                # reset lights for previous lowest note
+                for y, row in enumerate(self.board):
+                    for x, cell in enumerate(row):
+                        if self.get_note(x,y) == old_lowest_note:
+                            self.reset_light(x,y)
+            if self.lowest_note:
+                # set lights for new lowest note
+                for y, row in enumerate(self.board):
+                    for x, cell in enumerate(row):
+                        if self.get_note(x,y) == self.lowest_note:
+                            self.set_light(x,y,1)
+
         if self.visualizer:
             while self.visualizer.poll():
                 events = self.visualizer.read(100)
@@ -467,7 +520,8 @@ class Core:
                 x += 1
             y += 1
 
-        self.render_chords()
+        if CHORD_ANALYZER:
+            self.render_chords()
 
     def render_chords(self):
         sz = SCREEN_W / BOARD_W
