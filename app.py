@@ -37,6 +37,23 @@ MIN_VELOCITY = 0
 MAX_VELOCITY = 127
 CORE = None
 
+def sign(val):
+    if type(val) is int:
+        if val > 0:
+            return 1
+        elif val == 0:
+            return 0
+        else:
+            return -1
+    elif type(val) is float:
+        if val >= EPSILON:
+            return 1.0
+        elif abs(val) < EPSILON:
+            return 0.0
+        else:
+            return -1.0
+    assert False
+
 def clamp(low, high, val):
     return max(low, min(val, high))
 
@@ -54,19 +71,6 @@ def clamp(low, high, val):
 #     glm.ivec3(128/2, 0, 128/2), # A#
 #     glm.ivec3(255, 0, 255) # B
 # ]
-
-OCTAVES = [
-    # 200 size ---------------------------------------------------------------v
-    # 128 size ------------------------------------v
-    [3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7],
-    [3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 7, 7],
-    [2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6],
-    [2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6],
-    [1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5],
-    [1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5],
-    [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5],
-    [0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4]
-]
 
 class Object:
    def __init__(self, **kwargs):
@@ -140,7 +144,7 @@ class Core:
                 self.reset_light(x, y)
     
     def get_octave(self, x, y):
-        return OCTAVES[y - self.board_h][x] + self.octave
+        return self.octaves[y - self.board_h][x] + self.octave
 
     def get_note_index(self, x, y):
         x += self.transpose
@@ -177,12 +181,38 @@ class Core:
         #         return ALT
         # else:
         return DARK
+
+    # Given an x,y position, find the octave
+    #  (used to initialize octaves 2D array)
+    def init_octave(self, x, y):
+        return int((x+4+self.transpose+y*2.5)//6)
+    
+    def init_octaves(self):
+        # self.octaves = [
+        #     # 200 size ---------------------------------------------------------------v
+        #     # 128 size ------------------------------------v
+        #     [3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7],
+        #     [3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 7, 7],
+        #     [2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6],
+        #     [2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6],
+        #     [1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5],
+        #     [1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5],
+        #     [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5],
+        #     [0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4]
+        # ]
+        # generate grid of octaves like above
+        self.octaves = []
+        for y in range(self.board_h):
+            self.octaves.append([])
+            for x in range(self.max_width):
+                self.octaves[y].append(self.init_octave(x, y))
+        self.octaves = list(reversed(self.octaves))
     
     def __init__(self):
 
         global CORE
         CORE = self
-        
+
         self.panel = False
         self.menu_sz = 64 if self.panel else 32
         self.max_width = 25 # MAX WIDTH OF LINNSTRUMENT
@@ -203,13 +233,16 @@ class Core:
         self.vis_octave = -2
         self.octave_base = -2
         self.transpose = 0
+
+        self.init_octaves()
         
-        self.midi_fn = None
-        self.midifile = None
-        if len(sys.argv) > 1:
-            self.midi_fn = sys.argv[1]
-            if self.midi_fn.to_lower().endswith('.mid'):
-                self.midifile = mido.MidiFile(midi_fn)
+        # load midi file from command line (playiung it is not yet impl)
+        # self.midi_fn = None
+        # self.midifile = None
+        # if len(sys.argv) > 1:
+        #     self.midi_fn = sys.argv[1]
+        #     if self.midi_fn.to_lower().endswith('.mid'):
+        #         self.midifile = mido.MidiFile(midi_fn)
         
         if GFX:
             # self.root = Tk()
@@ -243,18 +276,18 @@ class Core:
                 text='OCT>',
                 manager=self.gui
             )
-            # self.btn_transpose_down = pygame_gui.elements.UIButton(
-            #     relative_rect=pygame.Rect((bs.x*2+2,y),bs),
-            #     text='<TR',
-            #     manager=self.gui
-            # )
-            # self.btn_transpose_up = pygame_gui.elements.UIButton(
-            #     relative_rect=pygame.Rect((bs.x*3+2,y),bs),
-            #     text='TR>',
-            #     manager=self.gui
-            # )
-            self.btn_size = pygame_gui.elements.UIButton(
+            self.btn_transpose_down = pygame_gui.elements.UIButton(
                 relative_rect=pygame.Rect((bs.x*2+2,y),bs),
+                text='<TR',
+                manager=self.gui
+            )
+            self.btn_transpose_up = pygame_gui.elements.UIButton(
+                relative_rect=pygame.Rect((bs.x*3+2,y),bs),
+                text='TR>',
+                manager=self.gui
+            )
+            self.btn_size = pygame_gui.elements.UIButton(
+                relative_rect=pygame.Rect((bs.x*4+2,y),bs),
                 text='SIZE',
                 manager=self.gui
             )
@@ -356,13 +389,28 @@ class Core:
 
         self.setup_lights()
 
+    def transpose_board(self, val):
+        aval = abs(val)
+        if aval > 1: # more than one shift
+            sval = sign(val)
+            for rpt in range(aval):
+                self.transpose_board(sval)
+                self.tranpose += sval
+        elif val==1: # shift right (add column left)
+            for y in range(len(self.board)):
+                self.board[y] = [0] + self.board[y][:-1]
+            self.transpose += val
+        elif val==-1: # shift left (add column right)
+            for y in range(len(self.board)):
+                self.board[y] = self.board[y][1:] + [0]
+            self.transpose += val
+
     def quit(self):
         self.done = True
 
     def mark(self, midinote, state):
         y = 0
         # print('')
-        # print("midi note: ", midinote)
         for row in self.board:
             x = 0
             for cell in row:
@@ -401,12 +449,12 @@ class Core:
                 elif ev.ui_element == self.btn_octave_up:
                     self.octave += 1
                     self.dirty = self.dirty_lights = True
-                # elif ev.ui_element == self.btn_transpose_down:
-                #     self.transpose -= 1
-                #     self.dirty = self.dirty_lights = True
-                # elif ev.ui_element == self.btn_transpose_up:
-                #     self.transpose += 1
-                #     self.dirty = self.dirty_lights = True
+                elif ev.ui_element == self.btn_transpose_down:
+                    self.transpose_board(-1)
+                    self.dirty = self.dirty_lights = True
+                elif ev.ui_element == self.btn_transpose_up:
+                    self.transpose_board(1)
+                    self.dirty = self.dirty_lights = True
                 # elif ev.ui_element == self.btn_mode:
                 #     # TODO: toggle mode
                 #     self.dirty = True
@@ -431,12 +479,15 @@ class Core:
             for x, cell in enumerate(row):
                 if cell:
                     note_idx = self.get_note_index(x,y)
-                    note_num = note_idx + 12*OCTAVES[y][x]
+                    note_num = note_idx + 12*self.octaves[y][x]
                     if not self.lowest_note_midi or note_num < self.lowest_note_midi:
                         self.lowest_note = NOTES[note_idx]
                         self.lowest_note_midi = note_num
                     note_count+=1
 
+        if self.dirty:
+            self.init_octaves()
+        
         if self.dirty_lights:
             self.setup_lights()
             self.dirty_lights = False
@@ -491,12 +542,13 @@ class Core:
                                 pass
                             data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
-                        self.mark(data[1] - 24, 1)
-                        data[1] += self.out_octave * 12
+                        self.mark(data[1] - 24 + self.transpose*2, 1)
+                        data[1] += self.out_octave * 12 + self.transpose*2
                         
                         # apply velocity curve
-                        vel = self.velocity_curve(data[2]/127)
-                        data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
+                        if self.has_velocity_curve():
+                            vel = self.velocity_curve(data[2]/127)
+                            data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
                         
                         self.out[0].write([[data, ev[1]]])
                         # print('note on: ', data)
@@ -509,8 +561,8 @@ class Core:
                                 pass
                             data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
-                        self.mark(data[1] - 24, 0)
-                        data[1] += self.out_octave * 12
+                        self.mark(data[1] - 24 + self.transpose*2, 0)
+                        data[1] += self.out_octave * 12 + self.transpose*2
                         # self.out[0].write([ev])
                         self.out[0].write([[data, ev[1]]])
                         # print('note off: ', data)
