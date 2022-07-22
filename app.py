@@ -42,6 +42,11 @@ CHORD_ANALYZER = False
 EPSILON = 0.0001
 # bend the velocity curve up or down range=[-1.0, 1.0], 0=default
 VELOCITY_CURVE_BEND = 0.0
+MIN_VELOCITY = 0
+MAX_VELOCITY = 127
+
+def clamp(low, high, val):
+    return max(low, min(val, high))
 
 # NOTE_COLORS = [
 #     glm.ivec3(255, 0, 0), # C
@@ -102,9 +107,7 @@ class Core:
     def velocity_curve(self, val): # 0-1
         if self.has_velocity_curve():
             bend = val**2.0 if VELOCITY_CURVE_BEND < 0.0 else math.sqrt(val)
-            newval = glm.mix(val, bend, abs(VELOCITY_CURVE_BEND))
-            print(val, bend, newval)
-            val = newval
+            val = glm.mix(val, bend, abs(VELOCITY_CURVE_BEND))
         return val
     
     def send_cc(self, channel, cc, val):
@@ -462,6 +465,11 @@ class Core:
                         data[1] += BASE_OFFSET
                         self.mark(data[1] - 24, 1)
                         data[1] += self.out_octave * 12
+                        
+                        # apply velocity curve
+                        vel = self.velocity_curve(data[2]/127)
+                        data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
+                        
                         self.out[0].write([[data, ev[1]]])
                         # print('note on: ', data)
                     elif msg == 8: # note off
