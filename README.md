@@ -2,7 +2,7 @@
 
 An interleaved wholetone tuning system and visualizer for the Linnstrument.
 
-This is still a work-in-progress so some things are only partially working or completely broken.  It currently only works for the 128, but if I get a tester who has the bigger one I can try to make it work.
+This is still a work-in-progress so some things are only partially working or completely broken.
 
 License: MIT
 
@@ -10,12 +10,21 @@ License: MIT
 
 ## Setup
 
-- First create a virtual midi device with LoopMidi.  Then set your DAW to use loopmidi instead of the linnstrument.
+- First create a virtual midi device with LoopMidi.  Then set your DAW to use loopmidi instead of the linnstrument.  Make sure the virtual device you set up has "loopmidi" in its device name, since this is how its detected by the program.
 
 - Set your LinnStrument to use ChPerRow mode.
 
-- Install python3, then install the dependencies.  Get the dependencies by running this in terminal in the program's directory:
+- Download the project by typing the following commands in terminal:
+```
+git clone https://github.com/flipcoder/linnstrument-wholetone
+```
 
+- Switch to the new project folder:
+```
+cd linnstrument-wholetone
+```
+
+- Install the dependencies:
 ```
 pip install -r requirements.txt
 ```

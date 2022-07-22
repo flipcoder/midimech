@@ -243,18 +243,18 @@ class Core:
                 text='OCT>',
                 manager=self.gui
             )
-            self.btn_transpose_down = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((bs.x*2+2,y),bs),
-                text='<TR',
-                manager=self.gui
-            )
-            self.btn_transpose_up = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((bs.x*3+2,y),bs),
-                text='TR>',
-                manager=self.gui
-            )
+            # self.btn_transpose_down = pygame_gui.elements.UIButton(
+            #     relative_rect=pygame.Rect((bs.x*2+2,y),bs),
+            #     text='<TR',
+            #     manager=self.gui
+            # )
+            # self.btn_transpose_up = pygame_gui.elements.UIButton(
+            #     relative_rect=pygame.Rect((bs.x*3+2,y),bs),
+            #     text='TR>',
+            #     manager=self.gui
+            # )
             self.btn_size = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((bs.x*4+2,y),bs),
+                relative_rect=pygame.Rect((bs.x*2+2,y),bs),
                 text='SIZE',
                 manager=self.gui
             )
@@ -401,12 +401,12 @@ class Core:
                 elif ev.ui_element == self.btn_octave_up:
                     self.octave += 1
                     self.dirty = self.dirty_lights = True
-                elif ev.ui_element == self.btn_transpose_down:
-                    self.transpose -= 1
-                    self.dirty = self.dirty_lights = True
-                elif ev.ui_element == self.btn_transpose_up:
-                    self.transpose += 1
-                    self.dirty = self.dirty_lights = True
+                # elif ev.ui_element == self.btn_transpose_down:
+                #     self.transpose -= 1
+                #     self.dirty = self.dirty_lights = True
+                # elif ev.ui_element == self.btn_transpose_up:
+                #     self.transpose += 1
+                #     self.dirty = self.dirty_lights = True
                 # elif ev.ui_element == self.btn_mode:
                 #     # TODO: toggle mode
                 #     self.dirty = True
