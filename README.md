@@ -10,7 +10,7 @@ License: MIT
 
 ## Setup
 
-- First create a virtual midi device with LoopMidi.  Then set your DAW to use loopmidi instead of the linnstrument.
+- First create a virtual midi device with LoopMidi.  Then set your DAW to use loopmidi instead of the linnstrument.  Make sure the virtual device you set up has "loopmidi" in its device name, since this is how its detected by the program.
 
 - Set your LinnStrument to use ChPerRow mode.
 
