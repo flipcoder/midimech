@@ -136,7 +136,7 @@ class Core:
     
     def setup_lights(self):
         for y in range(self.board_h):
-            for x in range(self.max_width):
+            for x in range(self.board_w):
                 self.reset_light(x, y)
     
     def get_octave(self, x, y):
@@ -383,6 +383,7 @@ class Core:
         self.button_sz = self.screen_w / self.board_w
         self.screen_sz = glm.ivec2(self.screen_w, self.screen_h)
         self.screen = Screen(self,pygame.display.set_mode(self.screen_sz))
+        self.dirty_lights = True
 
     def logic(self, t):
         keys = pygame.key.get_pressed()
