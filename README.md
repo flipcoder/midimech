@@ -14,8 +14,17 @@ License: MIT
 
 - Set your LinnStrument to use ChPerRow mode.
 
-- Install python3, then install the dependencies.  Get the dependencies by running this in terminal in the program's directory:
+- Download the project by typing the following commands in terminal:
+```
+git clone https://github.com/flipcoder/linnstrument-wholetone
+```
 
+- Switch to the new project folder:
+```
+cd linnstrument-wholetone
+```
+
+- Install the dependencies:
 ```
 pip install -r requirements.txt
 ```
