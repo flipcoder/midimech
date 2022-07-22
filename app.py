@@ -172,6 +172,7 @@ class Core:
         self.lowest_note_midi = None # midi number of lowest note currently pressed
         self.octave = 0
         self.out_octave = 0
+        self.vis_octave = -2
         self.octave_base = -2
         self.transpose = 0
         
@@ -418,9 +419,9 @@ class Core:
                     ch = data[0] & 0x0f
                     msg = data[0] >> 4
                     if msg == 9: # note on
-                        self.mark(data[1], 1)
+                        self.mark(data[1] + self.vis_octave*12, 1)
                     elif msg == 8: # note off
-                        self.mark(data[1], 0)
+                        self.mark(data[1] + self.vis_octave*12, 0)
 
         # row_ofs = [
         #     0, -5, -10
