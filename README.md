@@ -6,6 +6,8 @@ This is still a work-in-progress so some things are only partially working or co
 
 License: MIT
 
+![Screenshot](https://i.imgur.com/NX34ddB.png)
+
 ## Setup
 
 - First create a virtual midi device with LoopMidi.  Then set your DAW to use loopmidi instead of the linnstrument.
