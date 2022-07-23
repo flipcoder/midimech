@@ -111,11 +111,13 @@ class Core:
     
     def send_cc(self, channel, cc, val):
         msg = mido.Message('control_change', channel=channel, control=cc, value=val)
+        # print(msg)
         if not self.linn_out:
             return
         self.linn_out.write([[msg.bytes(),0]])
 
     def set_light(self, x, y, col): # col is [1,11], 0 resets
+        # self.red_lights[y][x] = (col==1)
         self.send_cc(0, 20, x+1)
         self.send_cc(0, 21, self.board_h - y - 1)
         self.send_cc(0, 22, col)
@@ -123,7 +125,7 @@ class Core:
     def reset_light(self, x, y):
         note = self.get_note(x, y)
         pg_col = self.get_color(x, y)
-        light_col = 0
+        # light_col = 0
         if pg_col is C_COLOR:
             light_col = 3
         elif pg_col is YELLOW:
@@ -137,10 +139,15 @@ class Core:
         elif pg_col is ALT:
             light_col = 8
         self.set_light(x, y, light_col)
+        # self.red_lights[y][x] = False
     
     def setup_lights(self):
+        print('setup lights')
         for y in range(self.board_h):
             for x in range(self.board_w):
+                # if self.red_lights[y][x]:
+                #     self.set_light(x, y, 1)
+                # else:
                 self.reset_light(x, y)
     
     def get_octave(self, x, y):
@@ -237,11 +244,11 @@ class Core:
         self.init_octaves()
         
         # load midi file from command line (playiung it is not yet impl)
-        # self.midi_fn = None
+        # self.midi_in_fn = None
         # self.midifile = None
         # if len(sys.argv) > 1:
-        #     self.midi_fn = sys.argv[1]
-        #     if self.midi_fn.to_lower().endswith('.mid'):
+        #     self.midi_in_fn = sys.argv[1]
+        #     if self.midi_in_fn.to_lower().endswith('.mid'):
         #         self.midifile = mido.MidiFile(midi_fn)
         
         if GFX:
@@ -295,7 +302,7 @@ class Core:
         pygame.midi.init()
         
         self.out = []
-        self.midi = None
+        self.midi_in = None
         ins = []
         outs = []
         in_devs = [
@@ -321,56 +328,59 @@ class Core:
 
         self.linn_out = None
         
-        innames = []
-        outnames = []
+        # innames = []
+        # outnames = []
         brk = False
-        for outdev in out_devs:
-            for out in outs:
-                if outdev.lower() in out[1].lower():
-                    name = str(out[1])
-                    outnames += [name]
-                    o = pygame.midi.Output(out[0])
-                    if 'linnstrument' in name.lower():
-                        print("LinnStrument out: ", name)
-                        self.linn_out = o
-                    else:
-                        self.out.append(o)
+        # for outdev in out_devs:
+        for out in outs:
+            name = str(out[1])
+            name_lower = name.lower()
+            if 'linnstrument' in name_lower:
+                print("Instrument Output: ", name)
+                self.linn_out = pygame.midi.Output(out[0])
+            elif 'loopmidi' in name_lower:
+                print("MIDI Output: ", name)
+                self.midi_out = pygame.midi.Output(out[0])
 
-        if not self.out:
-            oid = pygame.midi.get_default_output_id()
-            o = pygame.midi.Output(oid)
-            self.out.append(o)
+        if not self.linn_out:
+            print("No LinnStrument output device detected. (Can't control lights)")
+        if not self.midi_out:
+            print("No MIDI output device detected. (Did you install LoopMidi?)")
 
-        self.midi = None
+        # if not self.out:
+        #     oid = pygame.midi.get_default_output_id()
+        #     o = pygame.midi.Output(oid)
+        #     self.out.append(o)
+
+        self.midi_in = None
         self.visualizer = None
 
         # print('outs: ' + ', '.join(outnames))
         # print('ins: ' + ', '.join(innames))
         
-        for indev in in_devs:
-            i = 0
-            for ini in ins:
-                if indev.lower() in ini[1].lower():
-                    name = str(ini[1])
-                    innames += [name]
-                    if "visualizer" in name:
-                        print("Visualizer MIDI: " + name)
-                        inp = pygame.midi.Input(ini[0])
-                        self.visualizer = inp
-                    elif not 'MIDIIN' in name:
-                        print("Instrument MIDI: " + name)
-                        try:
-                            inp = pygame.midi.Input(ini[0])
-                            self.midi = inp
-                        except:
-                            print("Warning: MIDI DEVICE IN USE")
-                i += 1
+        # for indev in in_devs:
+            # i = 0
+        for ini in ins:
+            # if indev.lower() in ini[1].lower():
+            name = str(ini[1])
+            # innames += [name]
+            if "visualizer" in name:
+                print("Visualizer Input: " + name)
+                inp = pygame.midi.Input(ini[0])
+                self.visualizer = inp
+            elif 'linnstrument' in name.lower():
+                print("Instrument Input: " + name)
+                try:
+                    self.midi_in = pygame.midi.Input(ini[0])
+                except:
+                    print("Warning: MIDI DEVICE IN USE")
+            i += 1
         
-        # self.midi = None
+        # self.midi_in = None
         # if ins:
         #     # try:
         #     print("Using Midi input: ", ins[1])
-        #     self.midi = pygame.midi.Input(ins[1][0])
+        #     self.midi_in = pygame.midi.Input(ins[1][0])
         #     # except:
         #     #     pass
         
@@ -382,12 +392,13 @@ class Core:
         w = self.max_width
         h = self.board_h
         self.board = [[0 for x in range(w)] for y in range(h)]
+        # self.red_lights = [[False for x in range(w)] for y in range(h)]
 
         self.font = pygame.font.Font(None, FONT_SZ)
         # self.retro_font = pygame.font.Font("PressStart2P.ttf", FONT_SZ)
         self.clock = pygame.time.Clock()
 
-        self.setup_lights()
+        # self.setup_lights()
 
     def transpose_board(self, val):
         aval = abs(val)
@@ -420,6 +431,10 @@ class Core:
                     if octave == midinote//12:
                         # print(x,y)
                         self.board[y][x] = state
+                        # if state:
+                            # self.set_light(x, y, 1)
+                        # else:
+                        #     self.reset_light(x, y)
                 x += 1
             y += 1
         self.dirty = True
@@ -505,7 +520,7 @@ class Core:
                 for y, row in enumerate(self.board):
                     for x, cell in enumerate(row):
                         if self.get_note(x,y) == self.lowest_note:
-                            self.set_light(x,y,1)
+                            self.set_light(x,y,9)
 
         if self.visualizer:
             while self.visualizer.poll():
@@ -522,9 +537,9 @@ class Core:
         # row_ofs = [
         #     0, -5, -10
         # ]
-        if self.midi:
-            while self.midi.poll():
-                events = self.midi.read(100)
+        if self.midi_in:
+            while self.midi_in.poll():
+                events = self.midi_in.read(100)
                 for ev in events:
                     data = ev[0]
                     d0 = data[0]
@@ -546,11 +561,11 @@ class Core:
                         data[1] += self.out_octave * 12 + self.transpose*2
                         
                         # apply velocity curve
-                        if self.has_velocity_curve():
+                        if MIN_VELOCITY > 0 or MAX_VELOCITY < 127 or self.has_velocity_curve():
                             vel = self.velocity_curve(data[2]/127)
                             data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
                         
-                        self.out[0].write([[data, ev[1]]])
+                        self.midi_out.write([[data, ev[1]]])
                         # print('note on: ', data)
                     elif msg == 8: # note off
                         if WHOLETONE:
@@ -563,15 +578,15 @@ class Core:
                         data[1] += BASE_OFFSET
                         self.mark(data[1] - 24 + self.transpose*2, 0)
                         data[1] += self.out_octave * 12 + self.transpose*2
-                        # self.out[0].write([ev])
-                        self.out[0].write([[data, ev[1]]])
+                        # self.midi_out.write([ev])
+                        self.midi_out.write([[data, ev[1]]])
                         # print('note off: ', data)
                     elif msg == 14: # pitch bend
                         # val = (data[2]-64)/64 + data[1]/127/64
                         # val *= 2
-                        self.out[0].write([ev])
+                        self.midi_out.write([ev])
                     else:
-                        self.out[0].write([ev])
+                        self.midi_out.write([ev])
         
         self.gui.update(t)
 
