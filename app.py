@@ -36,6 +36,7 @@ VELOCITY_CURVE_BEND = 0.0
 MIN_VELOCITY = 0
 MAX_VELOCITY = 127
 CORE = None
+SHOW_LOWEST_NOTE = False
 
 def sign(val):
     if type(val) is int:
@@ -117,7 +118,7 @@ class Core:
         self.linn_out.write([[msg.bytes(),0]])
 
     def set_light(self, x, y, col): # col is [1,11], 0 resets
-        # self.red_lights[y][x] = (col==1)
+        self.red_lights[y][x] = (col==1)
         self.send_cc(0, 20, x+1)
         self.send_cc(0, 21, self.board_h - y - 1)
         self.send_cc(0, 22, col)
@@ -139,16 +140,21 @@ class Core:
         elif pg_col is ALT:
             light_col = 8
         self.set_light(x, y, light_col)
-        # self.red_lights[y][x] = False
+        self.red_lights[y][x] = False
     
     def setup_lights(self):
-        print('setup lights')
         for y in range(self.board_h):
             for x in range(self.board_w):
-                # if self.red_lights[y][x]:
-                #     self.set_light(x, y, 1)
-                # else:
-                self.reset_light(x, y)
+                if self.red_lights[y][x]:
+                    self.set_light(x, y, 1)
+                else:
+                    self.reset_light(x, y)
+    
+
+    def reset_lights(self):
+        for y in range(self.board_h):
+            for x in range(self.board_w):
+                self.set_light(x, y, 0)
     
     def get_octave(self, x, y):
         return self.octaves[y - self.board_h][x] + self.octave
@@ -237,7 +243,7 @@ class Core:
         self.lowest_note_midi = None # midi number of lowest note currently pressed
         self.octave = 0
         self.out_octave = 0
-        self.vis_octave = -2
+        self.vis_octave = -3
         self.octave_base = -2
         self.transpose = 0
 
@@ -392,7 +398,7 @@ class Core:
         w = self.max_width
         h = self.board_h
         self.board = [[0 for x in range(w)] for y in range(h)]
-        # self.red_lights = [[False for x in range(w)] for y in range(h)]
+        self.red_lights = [[False for x in range(w)] for y in range(h)]
 
         self.font = pygame.font.Font(None, FONT_SZ)
         # self.retro_font = pygame.font.Font("PressStart2P.ttf", FONT_SZ)
@@ -417,9 +423,10 @@ class Core:
             self.transpose += val
 
     def quit(self):
+        self.reset_lights()
         self.done = True
 
-    def mark(self, midinote, state):
+    def mark(self, midinote, state, use_lights=False):
         y = 0
         # print('')
         for row in self.board:
@@ -431,10 +438,11 @@ class Core:
                     if octave == midinote//12:
                         # print(x,y)
                         self.board[y][x] = state
-                        # if state:
-                            # self.set_light(x, y, 1)
-                        # else:
-                        #     self.reset_light(x, y)
+                        if use_lights:
+                            if state:
+                                self.set_light(x, y, 1)
+                            else:
+                                self.reset_light(x, y)
                 x += 1
             y += 1
         self.dirty = True
@@ -452,11 +460,11 @@ class Core:
         keys = pygame.key.get_pressed()
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT:
-                self.done = True
+                self.quit()
                 break
             elif ev.type == pygame.KEYDOWN:
                 if ev.key == pygame.K_ESCAPE:
-                    self.done = True
+                    self.quit()
             elif ev.type == pygame_gui.UI_BUTTON_PRESSED:
                 if ev.ui_element == self.btn_octave_down:
                     self.octave -= 1
@@ -485,20 +493,21 @@ class Core:
             self.gui.process_events(ev)
 
         # figure out the lowest note to highlight it
-        old_lowest_note = self.lowest_note
-        old_lowest_note_midi = self.lowest_note_midi
-        self.lowest_note = None
-        self.lowest_note_midi = None
-        note_count = 0
-        for y, row in enumerate(self.board):
-            for x, cell in enumerate(row):
-                if cell:
-                    note_idx = self.get_note_index(x,y)
-                    note_num = note_idx + 12*self.octaves[y][x]
-                    if not self.lowest_note_midi or note_num < self.lowest_note_midi:
-                        self.lowest_note = NOTES[note_idx]
-                        self.lowest_note_midi = note_num
-                    note_count+=1
+        if SHOW_LOWEST_NOTE:
+            old_lowest_note = self.lowest_note
+            old_lowest_note_midi = self.lowest_note_midi
+            self.lowest_note = None
+            self.lowest_note_midi = None
+            note_count = 0
+            for y, row in enumerate(self.board):
+                for x, cell in enumerate(row):
+                    if cell:
+                        note_idx = self.get_note_index(x,y)
+                        note_num = note_idx + 12*self.octaves[y][x]
+                        if not self.lowest_note_midi or note_num < self.lowest_note_midi:
+                            self.lowest_note = NOTES[note_idx]
+                            self.lowest_note_midi = note_num
+                        note_count+=1
 
         if self.dirty:
             self.init_octaves()
@@ -508,19 +517,20 @@ class Core:
             self.dirty_lights = False
 
         # lowest note changed?
-        if self.lowest_note != old_lowest_note:
-            if old_lowest_note:
-                # reset lights for previous lowest note
-                for y, row in enumerate(self.board):
-                    for x, cell in enumerate(row):
-                        if self.get_note(x,y) == old_lowest_note:
-                            self.reset_light(x,y)
-            if self.lowest_note:
-                # set lights for new lowest note
-                for y, row in enumerate(self.board):
-                    for x, cell in enumerate(row):
-                        if self.get_note(x,y) == self.lowest_note:
-                            self.set_light(x,y,9)
+        if SHOW_LOWEST_NOTE:
+            if self.lowest_note != old_lowest_note:
+                if old_lowest_note:
+                    # reset lights for previous lowest note
+                    for y, row in enumerate(self.board):
+                        for x, cell in enumerate(row):
+                            if self.get_note(x,y) == old_lowest_note:
+                                self.reset_light(x,y)
+                if self.lowest_note:
+                    # set lights for new lowest note
+                    for y, row in enumerate(self.board):
+                        for x, cell in enumerate(row):
+                            if self.get_note(x,y) == self.lowest_note:
+                                self.set_light(x,y,9)
 
         if self.visualizer:
             while self.visualizer.poll():
@@ -530,9 +540,9 @@ class Core:
                     ch = data[0] & 0x0f
                     msg = data[0] >> 4
                     if msg == 9: # note on
-                        self.mark(data[1] + self.vis_octave*12, 1)
+                        self.mark(data[1] + self.vis_octave*12, 1, True)
                     elif msg == 8: # note off
-                        self.mark(data[1] + self.vis_octave*12, 0)
+                        self.mark(data[1] + self.vis_octave*12, 0, True)
 
         # row_ofs = [
         #     0, -5, -10
