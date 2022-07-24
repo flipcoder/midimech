@@ -2,7 +2,7 @@
 
 An interleaved wholetone tuning system and visualizer for the Linnstrument.
 
-This is still a work-in-progress so some things are only partially working or completely broken.
+This is still a work-in-progress so some things are only partially working.
 
 License: MIT
 
@@ -35,11 +35,9 @@ pip install -r requirements.txt
 
 ## Visualizer
 
-You can visualize midi input from your DAW back onto the screen to figure out how to play certain parts.
+Using this program, you can visualize the midi playing in your DAW on both the screen and LinnStrument.
 You do this by creating another device in LoopMidi called "visualizer" then use a Midi Out plugin
-on the track you want to visualize and set the plugin to use the visualizer virtual midi device.
-
-This mode only visualizes on the screen for now, but I'll eventually have it set the lights on the instrument as well.
+on the track you want to visualize and set the plugin to use the visualizer midi device.
 
 ## Chord Anazlyer
 
