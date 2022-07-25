@@ -106,7 +106,7 @@ o
 o o
 ```
 
-Another interesting thing about this layout on the Linnstrument is you can walk up and down major and minor 3rd intervals without lifting your fingers.
+Another interesting thing about this layout on the Linnstrument is you can walk up and down the major and minor 3rd intervals within a scale without lifting your fingers.
 This technique is most useful for a piano sound or something where pitch shifting is disabled.
 
 So there's a quick rundown.  There's a lot more fun shapes to learn but this will get you started.  Hope you enjoy!
