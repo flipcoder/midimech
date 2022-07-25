@@ -43,7 +43,7 @@ Here's what it looks like
 123
 ```
 
-All the modes for this, (such as lydian, dorian, etc.) a re accessible by picking a different starting note.
+All the modes for this, (such as lydian, dorian, etc.) are accessible by picking a different starting note.
 
 Similarly, the penatonic scale has the "2-3" pattern:
 
@@ -89,7 +89,7 @@ oo
 
 Sus4:
 oo
- o
+o
  
 Maj7:
  o o
