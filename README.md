@@ -45,7 +45,7 @@ Here's what it looks like:
 
 All the modes for this, (such as lydian, dorian, etc.) are accessible by picking a different starting note.
 
-Similarly, the penatonic scale modes fit the "2-3" pattern:
+Similarly, the pentatonic scale modes fit the "2-3" pattern:
 
 ```
 345
