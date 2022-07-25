@@ -35,8 +35,8 @@ pip install -r requirements.txt
 
 ## Playing Scales
 
-The major/minor scales are shaped with the "3-4" pattern.  3 notes on first row, then 4 notes on next row, then repeat moving over 1 space.
-Here's what it looks like
+The major/minor scales are shaped with the "3-4" pattern.  3 notes on first row, then 4 notes on next row, then repeat moving over 1 space, making runs fit across the fingers easily.
+Here's what it looks like:
 
 ```
 4567
