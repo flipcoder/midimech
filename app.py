@@ -15,16 +15,17 @@ from chords import CHORD_SHAPES
 # self.panel = False
 OFFSET = 0
 GFX = True
-TITLE = "Whole-tone System for Linnstrument"
+TITLE = "Alternating Whole-Tone System for Linnstrument"
 FOCUS = False
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 WHOLETONE = True
 FONT_SZ = 32
-C_COLOR = glm.ivec3(0,32,0)
-YELLOW = glm.ivec3(32,32,0)
-LIGHT = glm.ivec3(0,0,32)
-ALT = glm.ivec3(16)
+C_COLOR = glm.ivec3(0,128,0)
+YELLOW = glm.ivec3(205,127,0)
+LIGHT = glm.ivec3(0,0,128)
+FGAB = glm.ivec3(64)
 GRAY = glm.ivec3(16)
+BORDER_COLOR = glm.ivec3(32)
 DARK = glm.ivec3(0)
 # LIGHT = glm.ivec3(127)
 ONE_CHANNEL = False # send notes to first channel only (midi compat)
@@ -137,7 +138,7 @@ class Core:
             light_col = 7
         elif pg_col is LIGHT:
             light_col = 5
-        elif pg_col is ALT:
+        elif pg_col is FGAB:
             light_col = 8
         self.set_light(x, y, light_col)
         self.red_lights[y][x] = False
@@ -182,7 +183,7 @@ class Core:
             return YELLOW
         elif len(note) == 1: # white key
             if y%2==0:
-                return ALT
+                return FGAB
             else:
                 return LIGHT
         # # if note in 'FB':
@@ -191,7 +192,7 @@ class Core:
         #     if y%2==0:
         #         return LIGHT
         #     else:
-        #         return ALT
+        #         return FGAB
         # else:
         return DARK
 
@@ -333,6 +334,7 @@ class Core:
         #     print('in: ', inx)
 
         self.linn_out = None
+        self.midi_out = None
         
         # innames = []
         # outnames = []
@@ -628,23 +630,36 @@ class Core:
                 unlit_col = self.get_color(x, y)
                 
                 ry = y + self.menu_sz # real y
-                pygame.gfxdraw.box(self.screen.surface, [x*sz + b, self.menu_sz + y*sz + b, sz - b, sz - b], unlit_col)
+                # pygame.gfxdraw.box(self.screen.surface, [x*sz + b, self.menu_sz + y*sz + b, sz - b, sz - b], unlit_col)
+                rect = [x*sz + b, self.menu_sz + y*sz + b, sz - b, sz - b]
+                pygame.draw.rect(self.screen.surface, unlit_col, rect, border_radius=8)
+                pygame.draw.rect(self.screen.surface, BORDER_COLOR, rect, width=2, border_radius=8)
                 if cell:
                     pygame.gfxdraw.filled_circle(self.screen.surface, int(x*sz + b/2 + sz/2), int(self.menu_sz + y*sz + b/2 + sz/2), int(sz//2 - 8), lit_col)
                     pygame.gfxdraw.aacircle(self.screen.surface, int(x*sz + b/2 + sz/2), int(self.menu_sz + y*sz + b/2 + sz/2), int(sz//2 - 8), lit_col)
                 
-                text = self.font.render(note, True, glm.ivec3(0))
+                text = self.font.render(note, True, (0,0,0))
                 textpos = text.get_rect()
                 textpos.x = x*sz + sz//2 - FONT_SZ//4
-                textpos.y = ry*sz + sz//2 - FONT_SZ//4
+                textpos.y = self.menu_sz + y*sz + sz//2 - FONT_SZ//4
+                textpos.x -= 1
+                textpos.y += 1
                 self.screen.surface.blit(text, textpos)
+
                 text = self.font.render(note, True, glm.ivec3(255))
                 textpos = text.get_rect()
                 textpos.x = x*sz + sz//2 - FONT_SZ//4
                 textpos.y = self.menu_sz + y*sz + sz//2 - FONT_SZ//4
                 textpos.x += 1
-                textpos.y += 1
+                textpos.y -= 1
                 self.screen.surface.blit(text, textpos)
+                
+                text = self.font.render(note, True, glm.ivec3(200))
+                textpos = text.get_rect()
+                textpos.x = x*sz + sz//2 - FONT_SZ//4
+                textpos.y = self.menu_sz + y*sz + sz//2 - FONT_SZ//4
+                self.screen.surface.blit(text, textpos)
+
                 x += 1
             y += 1
 
