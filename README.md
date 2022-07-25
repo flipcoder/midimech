@@ -84,7 +84,7 @@ Aug:
 o o o
 
 Sus2:
-o
+ o
 oo
 
 Sus4:
