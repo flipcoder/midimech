@@ -6,7 +6,7 @@ This program is a work-in-progress so some things are only partially working.
 
 License: MIT
 
-![Screenshot](https://i.imgur.com/NX34ddB.png)
+![Screenshot](https://i.imgur.com/F0VQU4F.png)
 
 ## Setup
 
