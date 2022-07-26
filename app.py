@@ -33,11 +33,11 @@ BASE_OFFSET = -4
 CHORD_ANALYZER = False
 EPSILON = 0.0001
 # bend the velocity curve up or down range=[-1.0, 1.0], 0=default
-VELOCITY_CURVE_BEND = 0.0
+VELOCITY_CURVE_BEND = 1.0
 MIN_VELOCITY = 0
 MAX_VELOCITY = 127
 CORE = None
-SHOW_LOWEST_NOTE = False
+SHOW_LOWEST_NOTE = True
 
 def sign(val):
     if type(val) is int:
@@ -428,24 +428,27 @@ class Core:
         self.reset_lights()
         self.done = True
 
-    def mark(self, midinote, state, use_lights=False):
-        y = 0
-        # print('')
-        for row in self.board:
+    def mark(self, midinote, state, use_lights=False, only_row=None):
+        if only_row is not None:
+            only_row = self.board_h - only_row - 1 #flip
+            rows = [self.board[only_row]]
+            y = only_row
+        else:
+            rows = self.board
+            y = 0
+        for row in rows:
             x = 0
-            for cell in row:
+            for x in range(len(row)):
                 idx = self.get_note_index(x, y)
                 if midinote%12 == idx:
                     octave = self.get_octave(x, y)
                     if octave == midinote//12:
-                        # print(x,y)
                         self.board[y][x] = state
                         if use_lights:
                             if state:
                                 self.set_light(x, y, 1)
                             else:
                                 self.reset_light(x, y)
-                x += 1
             y += 1
         self.dirty = True
 
@@ -569,7 +572,7 @@ class Core:
                                 pass
                             data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
-                        self.mark(data[1] - 24 + self.transpose*2, 1)
+                        self.mark(data[1] - 24 + self.transpose*2, 1, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
                         
                         # apply velocity curve
@@ -588,7 +591,7 @@ class Core:
                                 pass
                             data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
-                        self.mark(data[1] - 24 + self.transpose*2, 0)
+                        self.mark(data[1] - 24 + self.transpose*2, 0, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
                         # self.midi_out.write([ev])
                         self.midi_out.write([[data, ev[1]]])
@@ -613,6 +616,8 @@ class Core:
         b = 2 # border
         sz = self.screen_w / self.board_w
         y = 0
+        rad = int(sz//2 - 8)
+        
         for row in self.board:
             x = 0
             for cell in row:
@@ -635,8 +640,18 @@ class Core:
                 pygame.draw.rect(self.screen.surface, unlit_col, rect, border_radius=8)
                 pygame.draw.rect(self.screen.surface, BORDER_COLOR, rect, width=2, border_radius=8)
                 if cell:
-                    pygame.gfxdraw.filled_circle(self.screen.surface, int(x*sz + b/2 + sz/2), int(self.menu_sz + y*sz + b/2 + sz/2), int(sz//2 - 8), lit_col)
-                    pygame.gfxdraw.aacircle(self.screen.surface, int(x*sz + b/2 + sz/2), int(self.menu_sz + y*sz + b/2 + sz/2), int(sz//2 - 8), lit_col)
+                    circ = glm.ivec2(int(x*sz + b/2 + sz/2), int(self.menu_sz + y*sz + b/2 + sz/2))
+                    pygame.gfxdraw.aacircle(self.screen.surface, circ.x+1, circ.y-1, rad, glm.ivec3(255,0,0))
+                    pygame.gfxdraw.filled_circle(self.screen.surface, circ.x+1, circ.y-1, rad, glm.ivec3(255,0,0))
+
+                    pygame.gfxdraw.aacircle(self.screen.surface, circ.x-1, circ.y+1, rad, glm.ivec3(0))
+                    pygame.gfxdraw.filled_circle(self.screen.surface, circ.x-1, circ.y+1, rad, glm.ivec3(0))
+
+                    pygame.gfxdraw.filled_circle(self.screen.surface, circ.x, circ.y, rad, lit_col)
+                    pygame.gfxdraw.aacircle(self.screen.surface, circ.x, circ.y, rad, lit_col)
+
+                    pygame.gfxdraw.filled_circle(self.screen.surface, circ.x, circ.y, int(rad*0.9), glm.ivec3(200,0,0))
+                    pygame.gfxdraw.aacircle(self.screen.surface, circ.x, circ.y, int(rad*0.9), glm.ivec3(200,0,0))
                 
                 text = self.font.render(note, True, (0,0,0))
                 textpos = text.get_rect()
