@@ -11,10 +11,30 @@ import pygame_gui
 import mido
 from collections import OrderedDict
 from chords import CHORD_SHAPES
+from configparser import ConfigParser
+
+def get_option(section, option, default):
+    if section is None: return default
+    typ = type(default)
+    if typ is bool:
+        return section.get(option, 'true' if default else 'false').lower() in ['true','yes','on']
+    if typ is int:
+        return int(section.get(option, default))
+    if typ is float:
+        return float(section.get(option, default))
+    if typ is str:
+        return section.get(option, default)
+    print('Invalid option value for', option)
+
+cfg = ConfigParser(allow_no_value=True)
+cfg.read('settings.ini')
+try:
+    opts = cfg['general']
+except KeyError:
+    opts = None
 
 # self.panel = False
 OFFSET = 0
-GFX = True
 TITLE = "Alternating Whole-Tone System for Linnstrument"
 FOCUS = False
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
@@ -28,16 +48,16 @@ GRAY = glm.ivec3(16)
 BORDER_COLOR = glm.ivec3(32)
 DARK = glm.ivec3(0)
 # LIGHT = glm.ivec3(127)
-ONE_CHANNEL = False # send notes to first channel only (midi compat)
+ONE_CHANNEL = get_option(opts,'one_channel',False)
 BASE_OFFSET = -4
-CHORD_ANALYZER = False
+CHORD_ANALYZER = get_option(opts,'chord_analyzer',False)
 EPSILON = 0.0001
 # bend the velocity curve up or down range=[-1.0, 1.0], 0=default
-VELOCITY_CURVE_BEND = 0.0
-MIN_VELOCITY = 0
-MAX_VELOCITY = 127
+VELOCITY_CURVE_BEND = get_option(opts,'velocity_curve_bend',0.0)
+MIN_VELOCITY = get_option(opts,'min_velocity',0)
+MAX_VELOCITY = get_option(opts,'max_velocity',127)
 CORE = None
-SHOW_LOWEST_NOTE = True
+SHOW_LOWEST_NOTE = get_option(opts,'show_lowest_note',True)
 
 def sign(val):
     if type(val) is int:
@@ -227,7 +247,7 @@ class Core:
         global CORE
         CORE = self
 
-        self.panel = False
+        self.panel = CHORD_ANALYZER
         self.menu_sz = 64 if self.panel else 32
         self.max_width = 25 # MAX WIDTH OF LINNSTRUMENT
         self.board_h = 8
@@ -258,53 +278,52 @@ class Core:
         #     if self.midi_in_fn.to_lower().endswith('.mid'):
         #         self.midifile = mido.MidiFile(midi_fn)
         
-        if GFX:
-            # self.root = Tk()
-            # self.menubar = Menu(self.root)
-            # self.filemenu = Menu(self.menubar, tearoff=0)
-            # self.filemenu.add_command(label="Open", command=nothing)
-            # self.root.config(menu=self.menubar)
-            # self.embed = Frame(self.root, width=self.screen_w, height=self.screen_h)
-            # self.embed.pack()
-            # os.environ['SDL_WINDOWID'] = str(self.embed.winfo_id())
-            # self.root.update()
-            # self.menubar.add_cascade(label="File", menu=self.filemenu)
-            # self.root.protocol("WM_DELETE_WINDOW", self.quit)
-            pygame.init()
-            pygame.display.set_caption(TITLE)
-            if FOCUS:
-                pygame.mouse.set_visible(0)
-                pygame.event.set_grab(True)
-            self.screen = Screen(self,pygame.display.set_mode(self.screen_sz))
-            
-            bs = glm.ivec2(self.button_sz,self.menu_sz//2 if self.panel else self.menu_sz) # button size
-            self.gui = pygame_gui.UIManager(self.screen_sz)
-            y = 0
-            self.btn_octave_down = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((2,y),bs),
-                text='<OCT',
-                manager=self.gui
-            )
-            self.btn_octave_up = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((bs.x+2,y),bs),
-                text='OCT>',
-                manager=self.gui
-            )
-            self.btn_transpose_down = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((bs.x*2+2,y),bs),
-                text='<TR',
-                manager=self.gui
-            )
-            self.btn_transpose_up = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((bs.x*3+2,y),bs),
-                text='TR>',
-                manager=self.gui
-            )
-            self.btn_size = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((bs.x*4+2,y),bs),
-                text='SIZE',
-                manager=self.gui
-            )
+        # self.root = Tk()
+        # self.menubar = Menu(self.root)
+        # self.filemenu = Menu(self.menubar, tearoff=0)
+        # self.filemenu.add_command(label="Open", command=nothing)
+        # self.root.config(menu=self.menubar)
+        # self.embed = Frame(self.root, width=self.screen_w, height=self.screen_h)
+        # self.embed.pack()
+        # os.environ['SDL_WINDOWID'] = str(self.embed.winfo_id())
+        # self.root.update()
+        # self.menubar.add_cascade(label="File", menu=self.filemenu)
+        # self.root.protocol("WM_DELETE_WINDOW", self.quit)
+        pygame.init()
+        pygame.display.set_caption(TITLE)
+        if FOCUS:
+            pygame.mouse.set_visible(0)
+            pygame.event.set_grab(True)
+        self.screen = Screen(self,pygame.display.set_mode(self.screen_sz))
+        
+        bs = glm.ivec2(self.button_sz,self.menu_sz//2 if self.panel else self.menu_sz) # button size
+        self.gui = pygame_gui.UIManager(self.screen_sz)
+        y = 0
+        self.btn_octave_down = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((2,y),bs),
+            text='<OCT',
+            manager=self.gui
+        )
+        self.btn_octave_up = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x+2,y),bs),
+            text='OCT>',
+            manager=self.gui
+        )
+        self.btn_transpose_down = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x*2+2,y),bs),
+            text='<TR',
+            manager=self.gui
+        )
+        self.btn_transpose_up = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x*3+2,y),bs),
+            text='TR>',
+            manager=self.gui
+        )
+        self.btn_size = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x*4+2,y),bs),
+            text='SIZE',
+            manager=self.gui
+        )
         
         pygame.midi.init()
         
@@ -403,6 +422,7 @@ class Core:
         self.red_lights = [[False for x in range(w)] for y in range(h)]
 
         self.font = pygame.font.Font(None, FONT_SZ)
+            
         # self.retro_font = pygame.font.Font("PressStart2P.ttf", FONT_SZ)
         self.clock = pygame.time.Clock()
 
@@ -606,8 +626,6 @@ class Core:
         self.gui.update(t)
 
     def render(self):
-        if not GFX:
-            return
         if not self.dirty:
             return
         self.dirty = False
@@ -729,9 +747,6 @@ class Core:
             self.screen.surface.blit(text, textpos)
 
     def draw(self):
-        if not GFX:
-            return
-        
         self.screen.render()
         self.gui.draw_ui(self.screen.surface)
         pygame.display.flip()

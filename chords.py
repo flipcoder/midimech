@@ -246,17 +246,17 @@ CHORD_SHAPES["sus4b5"] = [
 ]
 CHORD_SHAPES["phryg"] = [
     [
-        "o  .",
+        "o  o",
         "  x",
     ],
     [
         "   x",
-        "o  .",
+        "o  o",
     ],
     [
         "o  ",
         "  x",
-        "  .",
+        "  o",
     ]
 ]
 CHORD_SHAPES["loc"] = [

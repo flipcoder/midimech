@@ -117,8 +117,3 @@ Using this program, you can visualize the midi playing in your DAW on both the s
 You do this by creating another device in LoopMidi called "visualizer" then use a Midi Out plugin
 on the track you want to visualize and set the plugin to use the visualizer midi device.
 
-## Chord Anazlyer
-
-There is a very basic chord analyzer but its disabled by default to improve latency.  You can enable it by
-setting `CHORD_ANALYZER = True` in the app.py file.
-
