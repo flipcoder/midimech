@@ -33,7 +33,7 @@ BASE_OFFSET = -4
 CHORD_ANALYZER = False
 EPSILON = 0.0001
 # bend the velocity curve up or down range=[-1.0, 1.0], 0=default
-VELOCITY_CURVE_BEND = 1.0
+VELOCITY_CURVE_BEND = 0.0
 MIN_VELOCITY = 0
 MAX_VELOCITY = 127
 CORE = None
