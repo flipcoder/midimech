@@ -4,6 +4,9 @@
 
 This program is a work-in-progress so some things are only partially working.
 
+Note: So far, this has only been tested on the LinnStrument 128 version.  If you own the 200-note version,
+please let me know how this works for you and if there are any issues.
+
 License: MIT
 
 ![Screenshot](https://i.imgur.com/F0VQU4F.png)
@@ -12,7 +15,7 @@ License: MIT
 
 - First create a virtual midi device with LoopMidi.  Then set your DAW to use loopmidi instead of the linnstrument.  Make sure the virtual device you set up has "loopmidi" in its device name, since this is how its detected by the program.
 
-- Set your LinnStrument to use ChPerRow mode.
+- Set your LinnStrument to use ChPerRow mode.  (Or alternatively, see the section *MPE* for getting the full MPE mode working).
 
 - Download the project by typing the following commands in terminal:
 ```
@@ -32,6 +35,8 @@ pip install -r requirements.txt
 - Run app.py.  You should see a window pop up with the layout.
 
 - If this works, your linnstrument will show the colors of the wholetone layout and be playable in your DAW.
+
+- If you're using the larger (200-note) version of the LinnStrument, click "SIZE" to use the full layout (experimental).
 
 ## Playing Scales
 
@@ -116,4 +121,11 @@ So there's a quick rundown.  There's a lot more fun shapes to learn but this wil
 Using this program, you can visualize the midi playing in your DAW on both the screen and LinnStrument.
 You do this by creating another device in LoopMidi called "visualizer" then use a Midi Out plugin
 on the track you want to visualize and set the plugin to use the visualizer midi device.
+
+## MPE
+
+To use ChPerNote/MPE mode, set your LinnStrument to "NO OVERLAP" with a transposition of -3 octaves and +6 pitch.
+Then, set `no_overlap=true` in your settings.ini file (if you don't have one, copy it from settings.ini.example).
+For some reason, these settings are required to get note 0 to be the lower left pad and the upper right to be 127.
+This has only been tested on the LinnStrument 128.
 

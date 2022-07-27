@@ -58,6 +58,7 @@ MIN_VELOCITY = get_option(opts,'min_velocity',0)
 MAX_VELOCITY = get_option(opts,'max_velocity',127)
 CORE = None
 SHOW_LOWEST_NOTE = get_option(opts,'show_lowest_note',True)
+NO_OVERLAP = get_option(opts,'no_overlap',False)
 
 def sign(val):
     if type(val) is int:
@@ -124,6 +125,9 @@ class Core:
 
     def has_velocity_curve(self):
         return abs(VELOCITY_CURVE_BEND) > EPSILON
+
+    def has_velocity_settings(self):
+        return MIN_VELOCITY > 0 or MAX_VELOCITY < 127 or self.has_velocity_curve()
 
     def velocity_curve(self, val): # 0-1
         if self.has_velocity_curve():
@@ -580,40 +584,57 @@ class Core:
                     d0 = data[0]
                     ch = d0 & 0x0f
                     if ONE_CHANNEL:
-                        data[0] = d0 & 0xf0 # TEMP: send all to channel 0
+                        data[0] = d0 & 0xf0 # send all to channel 0 if enabled
                     msg = data[0] >> 4
-                    row = ch % 8
+                    row = None
+                    if not NO_OVERLAP:
+                        row = ch % 8
                     if msg == 9: # note on
-                        if WHOLETONE:
+                        # if WHOLETONE:
+                        if NO_OVERLAP:
+                            row = data[1] // self.board_w
+                            data[1] = data[1] % self.board_w + 30 + 2.5*row
+                            data[1] *= 2
+                            data[1] = int(data[1])
+                        else:
                             data[1] *= 2
                             try:
                                 data[1] -= row * 5
                             except IndexError:
                                 pass
-                            data[1] += (self.octave + self.octave_base) * 12
+                        
+                        data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
                         self.mark(data[1] - 24 + self.transpose*2, 1, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
-                        
+                            
                         # apply velocity curve
-                        if MIN_VELOCITY > 0 or MAX_VELOCITY < 127 or self.has_velocity_curve():
+                        if self.has_velocity_settings():
                             vel = self.velocity_curve(data[2]/127)
                             data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
-                        
+                            
                         self.midi_out.write([[data, ev[1]]])
+                        
                         # print('note on: ', data)
                     elif msg == 8: # note off
-                        if WHOLETONE:
+                        # if WHOLETONE:
+                        if NO_OVERLAP:
+                            row = data[1] // self.board_w
+                            data[1] = data[1] % self.board_w + 30 + 2.5*row
+                            data[1] *= 2
+                            data[1] = int(data[1])
+                        else:
                             data[1] *= 2
                             try:
                                 data[1] -= row * 5
                             except IndexError:
                                 pass
-                            data[1] += (self.octave + self.octave_base) * 12
+                        
+                        data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
                         self.mark(data[1] - 24 + self.transpose*2, 0, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
-                        # self.midi_out.write([ev])
+                    
                         self.midi_out.write([[data, ev[1]]])
                         # print('note off: ', data)
                     elif msg == 14: # pitch bend
