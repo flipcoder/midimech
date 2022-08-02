@@ -180,7 +180,7 @@ Or:
   12
 ```
 
-You might prefer to think about this as a mode of Ionian Augmented intead, which the 3-4 shape but with a sharp 5:
+You might prefer to think about this as a mode of Ionian Augmented intead, which is the 3-4 shape but with a sharp 5:
 
 ```
 5
