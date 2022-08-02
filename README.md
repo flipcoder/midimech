@@ -38,6 +38,8 @@ pip install -r requirements.txt
 
 - If you're using the larger (200-note) version of the LinnStrument, click "SIZE" to use the full layout (experimental).
 
+- Set your virtual instruments' pitch bend range to double the LinnStrument's value.
+
 ## Playing Scales
 
 The major/minor scales are shaped with the "3-4" pattern.  3 notes on first row, then 4 notes on next row, then repeat moving over 1 space, making runs fit across the fingers easily.
