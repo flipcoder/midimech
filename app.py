@@ -182,9 +182,10 @@ class Core:
                 self.set_light(x, y, 0)
     
     def get_octave(self, x, y):
-        return self.octaves[y - self.board_h][x] + self.octave
+        return self.octaves[y - self.board_h + self.flipped][x] + self.octave
 
     def get_note_index(self, x, y):
+        y += self.flipped
         x += self.transpose
         ofs = (self.board_h - y) // 2 + BASE_OFFSET
         step = 2 if WHOLETONE else 1
@@ -206,7 +207,7 @@ class Core:
         elif note == "G#":
             return YELLOW
         elif len(note) == 1: # white key
-            if y%2==0:
+            if y%2==self.flipped:
                 return FGAB
             else:
                 return LIGHT
@@ -240,7 +241,7 @@ class Core:
         # ]
         # generate grid of octaves like above
         self.octaves = []
-        for y in range(self.board_h):
+        for y in range(self.board_h+1): # make an extra mode for flipping
             self.octaves.append([])
             for x in range(self.max_width):
                 self.octaves[y].append(self.init_octave(x, y))
@@ -271,6 +272,8 @@ class Core:
         self.vis_octave = -3
         self.octave_base = -2
         self.transpose = 0
+        self.rotated = False # transpose -3 whole steps
+        self.flipped = False # vertically shift +1
 
         self.init_octaves()
         
@@ -326,6 +329,16 @@ class Core:
         self.btn_size = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x*4+2,y),bs),
             text='SIZE',
+            manager=self.gui
+        )
+        self.btn_rotate = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x*5+2,y),bs),
+            text='ROT',
+            manager=self.gui
+        )
+        self.btn_flip = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x*6+2,y),bs),
+            text='FLIP',
             manager=self.gui
         )
         
@@ -518,6 +531,17 @@ class Core:
                         self.board_w = 16
                         self.resize()
                     self.dirty = True
+                elif ev.ui_element == self.btn_rotate:
+                    if self.rotated:
+                        self.transpose += 3
+                        self.rotated = False
+                    else:
+                        self.transpose -= 3
+                        self.rotated = True
+                    self.dirty = self.dirty_lights = True
+                elif ev.ui_element == self.btn_flip:
+                    self.flipped = not self.flipped
+                    self.dirty = self.dirty_lights = True
 
             self.gui.process_events(ev)
 
@@ -590,6 +614,7 @@ class Core:
                     if not NO_OVERLAP:
                         row = ch % 8
                     if msg == 9: # note on
+                        # print(data[1])
                         # if WHOLETONE:
                         if NO_OVERLAP:
                             row = data[1] // self.board_w
@@ -607,7 +632,9 @@ class Core:
                         data[1] += BASE_OFFSET
                         self.mark(data[1] - 24 + self.transpose*2, 1, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
-                            
+                        if self.flipped:
+                            data[1] += 7
+                        
                         # apply velocity curve
                         if self.has_velocity_settings():
                             vel = self.velocity_curve(data[2]/127)
@@ -634,6 +661,8 @@ class Core:
                         data[1] += BASE_OFFSET
                         self.mark(data[1] - 24 + self.transpose*2, 0, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
+                        if self.flipped:
+                            data[1] += 7
                     
                         self.midi_out.write([[data, ev[1]]])
                         # print('note off: ', data)
