@@ -13,7 +13,7 @@ License: MIT
 
 ## Setup
 
-- First create a virtual midi device with LoopMidi.  Then set your DAW to use loopmidi instead of the linnstrument.  Make sure the virtual device you set up has "loopmidi" in its device name, since this is how its detected by the program.
+- First create a midi loopback device.  You can do this easily with LoopMidi on Windows or using "Audio MIDI Setup / MIDI Studio" on Mac.  Then set your DAW to use this device instead of the linnstrument.  Make sure the virtual device you set up has "loopmidi" in its device name, since this is how its detected by the program.
 
 - Set your LinnStrument to use ChPerRow mode.  (Or alternatively, see the section *MPE* for getting the full MPE mode working).
 
@@ -111,7 +111,7 @@ o
 o o
 ```
 
-Another interesting thing about this layout on the Linnstrument is you can walk up and down the major and minor 3rd intervals within a scale without lifting your fingers.
+Another interesting thing about this layout on the Linnstrument is you can walk up and down while holding major and minor 3rd intervals within a scale without lifting your fingers.
 This technique is most useful for a piano sound or something where pitch shifting is disabled.
 
 So there's a quick rundown.  There's a lot more fun shapes to learn but this will get you started.  Hope you enjoy!
@@ -124,8 +124,14 @@ on the track you want to visualize and set the plugin to use the visualizer midi
 
 ## MPE
 
+(Note: This mode currently only works on LinnStrument 128)
+
 To use ChPerNote/MPE mode, set your LinnStrument to "NO OVERLAP" with a transposition of -3 octaves and +6 pitch.
 Then, set `no_overlap=true` in your settings.ini file (if you don't have one, copy it from settings.ini.example).
 For some reason, these settings are required to get note 0 to be the lower left pad and the upper right to be 127.
-This has only been tested on the LinnStrument 128.
+Due to the midi note range being 0-127, this only works for the LinnStrument 128.  If you know of a workaround to this limitation, let me know.
 
+## Pitch Bend
+
+To get pitch bending working properly, you'll need to set your virtual instruments' pitch bend range to exactly double the amount
+of the LinnStrument's range.
