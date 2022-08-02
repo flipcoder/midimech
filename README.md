@@ -2,10 +2,10 @@
 
 "Alternating Whole-tone" layout and visualizer for the Linnstrument.  I consider this to be one of the most accessible and playable musical note layouts, and once you learn how it works, you'll realize why I've made it my primary layout.
 
-This program is a work-in-progress so some things are only partially working.
-
 Note: So far, this has only been tested on the LinnStrument 128 version.  If you own the 200-note version,
 please let me know how this works for you and if there are any issues.
+
+This program is a work-in-progress so some things might be a bit buggy.  Let me know if you run into any issues!
 
 License: MIT
 
