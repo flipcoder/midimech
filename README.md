@@ -40,7 +40,9 @@ pip install -r requirements.txt
 
 - Set your virtual instruments' pitch bend range to double the LinnStrument's value.
 
-## Playing Scales
+## How to Play
+
+### Basic Scales
 
 The major/minor scales are shaped with the "3-4" pattern.  3 notes on first row, then 4 notes on next row, then repeat moving over 1 space, making runs fit across the fingers easily.
 Here's what it looks like:
@@ -52,12 +54,18 @@ Here's what it looks like:
 
 All the modes for this, (such as lydian, dorian, etc.) are accessible by picking a different starting note.
 
+For example, if you start the scale on 6, it becomes a minor scale.
+
+### Pentatonic Scales
+
 Similarly, the pentatonic scale modes fit the "2-3" pattern:
 
 ```
 345
 12
 ```
+
+### Melodic Minor Scale
 
 Melodic minor has a "2-5" pattern:
 
@@ -116,7 +124,76 @@ o o
 Another interesting thing about this layout on the Linnstrument is you can walk up and down while holding major and minor 3rd intervals within a scale without lifting your fingers.
 This technique is most useful for a piano sound or something where pitch shifting is disabled.
 
-So there's a quick rundown.  There's a lot more fun shapes to learn but this will get you started.  Hope you enjoy!
+## More Scales
+
+Once you become comfortable with this layout, you can introduce the harder scales into your playing:
+
+### Blues Scale
+
+```
+4 6
+ 235
+  1
+```
+
+Or:
+
+```
+ 6
+235
+ 1  4
+```
+
+### Harmonic Major Scale
+
+This is the same 3-4 pattern, but the 6th note is flat:
+
+```
+6
+ 45 7
+ 123
+```
+
+Or:
+
+```
+ 45 7
+ 123  6
+```
+
+### Harmonic Minor Scale
+
+This one is a little tricky at first:
+
+```
+ 6
+345 7
+ 12
+```
+
+Or:
+
+```
+7
+ 6
+ 345
+  12
+```
+
+You might prefer to think about this as a mode of Ionian Augmented intead, which the 3-4 shape but with a sharp 5:
+
+```
+5
+ 4 67
+ 123
+```
+
+Or:
+
+```
+ 4 67
+ 123 5
+```
 
 ## Visualizer
 
