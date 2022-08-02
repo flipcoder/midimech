@@ -1,6 +1,6 @@
 # linnstrument-wholetone
 
-"Alternating Whole-tone" layout and visualizer for the Linnstrument.  I've always considered this the easiest musical layout possible, and once you learn the chords and scales you'll understand why I've made this my primary layout.
+"Alternating Whole-tone" layout and visualizer for the Linnstrument.  I consider this to be one of the most accessible and playable musical note layouts, and once you learn how it works, you'll realize why I've made it my primary layout.
 
 This program is a work-in-progress so some things are only partially working.
 
@@ -41,6 +41,10 @@ pip install -r requirements.txt
 - Set your virtual instruments' pitch bend range to double the LinnStrument's value.
 
 ## How to Play
+
+### Layout
+
+Each row consists of a whole tone scale, separated by 4ths, which cause the rows to alternate.  It sounds strange at first but because of the layout's relation to the circle of 5ths, it makes a number of things easier to play and remember than the default chromatic layout.  It's much easier to demonstrate than it is to explain, so let's begin!
 
 ### Basic Scales
 
