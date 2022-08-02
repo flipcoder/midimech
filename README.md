@@ -218,3 +218,10 @@ Due to the midi note range being 0-127, this only works for the LinnStrument 128
 
 To get pitch bending working properly, you'll need to set your virtual instruments' pitch bend range to exactly double the amount
 of the LinnStrument's range.
+
+## Future Plans
+
+- Find a way to adjust vibrato sensitivity without affecting slides.  Roger Linn has indicated that this is probably impossible, but I have a few ideas to try.
+- Better velocity curve settings (right now its only basic options in the settings.ini).
+- Better GUI and integration with the settings file.
+- Make custom firmware so the layout can be played without this program.
