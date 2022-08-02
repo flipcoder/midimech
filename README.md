@@ -1,6 +1,6 @@
 # linnstrument-wholetone
 
-"Alternating Whole-tone" layout and visualizer for the Linnstrument.  I've always considered this the easiest musical layout possible, and once you learn the chords and scales you'll understand why.
+"Alternating Whole-tone" layout and visualizer for the Linnstrument.  I've always considered this the easiest musical layout possible, and once you learn the chords and scales you'll understand why I've made this my primary layout.
 
 This program is a work-in-progress so some things are only partially working.
 
