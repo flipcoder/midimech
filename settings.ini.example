@@ -1,8 +1,9 @@
 [general]
 one_channel=false
 chord_analyzer=false
-velocity_curve_bend=0.0
+velocity_curve=1.0
 min_velocity=0
 max_velocity=127
-show_lowest_note=true
+show_lowest_note=false
 no_overlap=false
+hardware_split=false

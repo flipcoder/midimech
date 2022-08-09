@@ -124,16 +124,21 @@ Using this program, you can visualize the midi playing in your DAW on both the s
 You do this by creating another device in LoopMidi called "visualizer" then use a Midi Out plugin
 on the track you want to visualize and set the plugin to use the visualizer midi device.
 
-## MPE
+## Full MPE
 
-(Note: This mode currently only works on LinnStrument 128)
+### 128 Key
 
-To use ChPerNote/MPE mode, set your LinnStrument to "NO OVERLAP" with a transposition of -3 octaves and +6 pitch.
+To use ChPerNote/MPE mode, set your LinnStrument 128 to "NO OVERLAP" with a transposition of -3 octaves and +6 pitch.
 Then, set `no_overlap=true` in your settings.ini file (if you don't have one, copy it from settings.ini.example).
-For some reason, these settings are required to get note 0 to be the lower left pad and the upper right to be 127.
-Due to the midi note range being 0-127, this only works for the LinnStrument 128.  If you know of a workaround to this limitation, let me know.
+
+### 200 Key
+
+Note: This workaround has not been tested on the 200 but it should work.
+
+To use ChPerNote/MPE mode, first enable SPLIT.  Then, set your LinnStrument to "NO OVERLAP" with a transposition on both splits of -3 octaves and +6 pitch.  Make sure ChPerNote mode is also set on both splits.
+Then, set `no_overlap=true` and `hardware_split=true` in your settings.ini file (if you don't have one, copy it from settings.ini.example).
 
 ## Pitch Bend
 
-To get pitch bending working properly, you'll need to set your virtual instruments' pitch bend range to exactly double the amount
-of the LinnStrument's range.
+To get pitch bending working properly, you'll need to set your virtual instruments' pitch bend range to exactly double the amount of the LinnStrument's range.
+

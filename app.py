@@ -48,27 +48,32 @@ GRAY = glm.ivec3(16)
 BORDER_COLOR = glm.ivec3(32)
 DARK = glm.ivec3(0)
 # LIGHT = glm.ivec3(127)
+LIGHTS = get_option(opts,'lights',True)
 ONE_CHANNEL = get_option(opts,'one_channel',False)
 BASE_OFFSET = -4
 CHORD_ANALYZER = get_option(opts,'chord_analyzer',False)
 EPSILON = 0.0001
-# bend the velocity curve up or down range=[-1.0, 1.0], 0=default
-VELOCITY_CURVE_BEND = get_option(opts,'velocity_curve_bend',0.0)
+# bend the velocity curve, examples: 0.5=sqrt, 1.0=default, 2.0=squared
+VELOCITY_CURVE = get_option(opts,'velocity_curve',1.0)
+if VELOCITY_CURVE < EPSILON: # if its near zero, set default
+    VELOCITY_CURVE = 1.0 # default
 MIN_VELOCITY = get_option(opts,'min_velocity',0)
 MAX_VELOCITY = get_option(opts,'max_velocity',127)
 CORE = None
 SHOW_LOWEST_NOTE = get_option(opts,'show_lowest_note',True)
 NO_OVERLAP = get_option(opts,'no_overlap',False)
+HARDWARE_SPLIT = get_option(opts,'hardware_split',False)
 
 def sign(val):
-    if type(val) is int:
+    tv = type(val)
+    if tv is int:
         if val > 0:
             return 1
         elif val == 0:
             return 0
         else:
             return -1
-    elif type(val) is float:
+    elif tv is float:
         if val >= EPSILON:
             return 1.0
         elif abs(val) < EPSILON:
@@ -124,15 +129,14 @@ def nothing():
 class Core:
 
     def has_velocity_curve(self):
-        return abs(VELOCITY_CURVE_BEND) > EPSILON
+        return abs(VELOCITY_CURVE - 1.0) > EPSILON
 
     def has_velocity_settings(self):
         return MIN_VELOCITY > 0 or MAX_VELOCITY < 127 or self.has_velocity_curve()
 
     def velocity_curve(self, val): # 0-1
         if self.has_velocity_curve():
-            bend = val**2.0 if VELOCITY_CURVE_BEND < 0.0 else math.sqrt(val)
-            val = glm.mix(val, bend, abs(VELOCITY_CURVE_BEND))
+            val = val**VELOCITY_CURVE
         return val
     
     def send_cc(self, channel, cc, val):
@@ -146,24 +150,23 @@ class Core:
         self.red_lights[y][x] = (col==1)
         self.send_cc(0, 20, x+1)
         self.send_cc(0, 21, self.board_h - y - 1)
-        self.send_cc(0, 22, col)
+        if LIGHTS:
+            self.send_cc(0, 22, col)
+        else:
+            self.send_cc(0, 22, 7) # no light
 
     def reset_light(self, x, y):
         note = self.get_note(x, y)
-        pg_col = self.get_color(x, y)
-        # light_col = 0
-        if pg_col is C_COLOR:
-            light_col = 3
-        elif pg_col is YELLOW:
+        if note == 'G#':
             light_col = 2
-        elif pg_col is GRAY:
-            light_col = 5
-        elif pg_col is DARK:
-            light_col = 7
-        elif pg_col is LIGHT:
-            light_col = 5
-        elif pg_col is FGAB:
+        elif len(note) == 2: # sharps/flats
+            light_col = 7 # blank
+        elif note in 'FGAB':
             light_col = 8
+        elif note in 'DE':
+            light_col = 5
+        else: # C
+            light_col = 3
         self.set_light(x, y, light_col)
         self.red_lights[y][x] = False
     
@@ -613,14 +616,16 @@ class Core:
                     row = None
                     if not NO_OVERLAP:
                         row = ch % 8
+                    width = self.board_w//2 if HARDWARE_SPLIT else self.board_w
                     if msg == 9: # note on
-                        # print(data[1])
                         # if WHOLETONE:
                         if NO_OVERLAP:
-                            row = data[1] // self.board_w
-                            data[1] = data[1] % self.board_w + 30 + 2.5*row
+                            row = data[1] // width
+                            data[1] = data[1] % width + 30 + 2.5*row
                             data[1] *= 2
                             data[1] = int(data[1])
+                            if HARDWARE_SPLIT and ch >= 8:
+                                data[1] += width * 2
                         else:
                             data[1] *= 2
                             try:
@@ -646,10 +651,12 @@ class Core:
                     elif msg == 8: # note off
                         # if WHOLETONE:
                         if NO_OVERLAP:
-                            row = data[1] // self.board_w
-                            data[1] = data[1] % self.board_w + 30 + 2.5*row
+                            row = data[1] // width
+                            data[1] = data[1] % width + 30 + 2.5*row
                             data[1] *= 2
                             data[1] = int(data[1])
+                            if HARDWARE_SPLIT and ch >= 8:
+                                data[1] += width * 2
                         else:
                             data[1] *= 2
                             try:
