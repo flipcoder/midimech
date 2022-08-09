@@ -1,11 +1,11 @@
 # linnstrument-wholetone
 
-"Alternating Whole-tone" layout and visualizer for the Linnstrument.  I've always considered this the easiest musical layout possible, and once you learn the chords and scales you'll understand why.
-
-This program is a work-in-progress so some things are only partially working.
+"Alternating Whole-tone" layout and visualizer for the Linnstrument.  I consider this to be one of the most accessible and playable musical note layouts, and once you learn how it works, you'll realize why I've made it my primary layout.
 
 Note: So far, this has only been tested on the LinnStrument 128 version.  If you own the 200-note version,
 please let me know how this works for you and if there are any issues.
+
+This program is a work-in-progress so some things might be a bit buggy.  Let me know if you run into any issues!
 
 License: MIT
 
@@ -40,7 +40,13 @@ pip install -r requirements.txt
 
 - Set your virtual instruments' pitch bend range to double the LinnStrument's value.
 
-## Playing Scales
+## How to Play
+
+### Layout
+
+Each row consists of a whole tone scale, separated by 4ths, which cause the rows to alternate.  It sounds strange at first but because of the layout's relation to the circle of 5ths, it makes a number of things easier to play and remember than the default chromatic layout.  It's much easier to demonstrate than it is to explain, so let's begin!
+
+### Basic Scales
 
 The major/minor scales are shaped with the "3-4" pattern.  3 notes on first row, then 4 notes on next row, then repeat moving over 1 space, making runs fit across the fingers easily.
 Here's what it looks like:
@@ -52,12 +58,18 @@ Here's what it looks like:
 
 All the modes for this, (such as lydian, dorian, etc.) are accessible by picking a different starting note.
 
+For example, if you start the scale on 6, it becomes a minor scale.
+
+### Pentatonic Scales
+
 Similarly, the pentatonic scale modes fit the "2-3" pattern:
 
 ```
 345
 12
 ```
+
+### Melodic Minor Scale
 
 Melodic minor has a "2-5" pattern:
 
@@ -116,7 +128,91 @@ o o
 Another interesting thing about this layout on the Linnstrument is you can walk up and down while holding major and minor 3rd intervals within a scale without lifting your fingers.
 This technique is most useful for a piano sound or something where pitch shifting is disabled.
 
-So there's a quick rundown.  There's a lot more fun shapes to learn but this will get you started.  Hope you enjoy!
+## More Scales
+
+Once you become comfortable with this layout, you can introduce the harder scales into your playing:
+
+### Blues Scale
+
+Here's a fun one.  Depending on the virtual instrument used, I prefer to visualize the blues scale as a 2-3 pattern and bending into the "blue note".
+
+The shape in that case is this:
+
+```
+345
+12
+```
+
+The '2' in this shape is the tonic of the blues scale and the blue note is accessed by bending between 4 and 5.  When playing the scale, start on the note position labeled '2' above.  Note that the numbers here are just the numbers inside the shape in order, so they do not correspond with actual intervals.
+
+To hold the blue note, simply wiggle your finger between 4 and 5 in the shape above or bend up from 4.  That usually sounds cool.
+
+If you're playing an instrument without bend, the blues scale looks like this:
+
+```
+4 6
+ 235
+  1
+```
+
+Or:
+
+```
+ 6
+235
+ 1  4
+```
+
+### Harmonic Major Scale
+
+This is the same 3-4 pattern, but the 6th note is flat:
+
+```
+6
+ 45 7
+ 123
+```
+
+Or:
+
+```
+ 45 7
+ 123  6
+```
+
+### Harmonic Minor Scale
+
+This one is a little tricky at first:
+
+```
+ 6
+345 7
+ 12
+```
+
+Or:
+
+```
+7
+ 6
+ 345
+  12
+```
+
+You might prefer to think about this as a mode of Ionian Augmented intead, which is the 3-4 shape but with a sharp 5:
+
+```
+5
+ 4 67
+ 123
+```
+
+Or:
+
+```
+ 4 67
+ 123 5
+```
 
 ## Visualizer
 
@@ -141,4 +237,11 @@ Then, set `no_overlap=true` and `hardware_split=true` in your settings.ini file 
 ## Pitch Bend
 
 To get pitch bending working properly, you'll need to set your virtual instruments' pitch bend range to exactly double the amount of the LinnStrument's range.
+
+## Future Plans
+
+- Find a way to adjust vibrato sensitivity without affecting slides.  Roger Linn has indicated that this is probably impossible, but I have a few ideas to try.
+- Better velocity curve settings (right now its only basic options in the settings.ini).
+- Better GUI and integration with the settings file.
+- Make custom firmware so the layout can be played without this program.
 
