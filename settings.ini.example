@@ -7,3 +7,5 @@ max_velocity=127
 show_lowest_note=false
 no_overlap=false
 hardware_split=false
+midi_out=loopmidi
+split_out=loopmidi2

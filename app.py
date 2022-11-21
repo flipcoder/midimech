@@ -33,7 +33,6 @@ try:
 except KeyError:
     opts = None
 
-# self.panel = False
 OFFSET = 0
 TITLE = "Alternating Whole-Tone System for Linnstrument"
 FOCUS = False
@@ -48,7 +47,9 @@ GRAY = glm.ivec3(16)
 BORDER_COLOR = glm.ivec3(32)
 DARK = glm.ivec3(0)
 # LIGHT = glm.ivec3(127)
-LIGHTS = get_option(opts,'lights',True)
+LIGHTS = get_option(opts,'lights','3,7,5,7,5,8,7,8,2,8,7,8')
+if LIGHTS:
+    LIGHTS = list(map(lambda x: int(x), LIGHTS.split(',')))
 ONE_CHANNEL = get_option(opts,'one_channel',False)
 BASE_OFFSET = -4
 CHORD_ANALYZER = get_option(opts,'chord_analyzer',False)
@@ -63,6 +64,8 @@ CORE = None
 SHOW_LOWEST_NOTE = get_option(opts,'show_lowest_note',True)
 NO_OVERLAP = get_option(opts,'no_overlap',False)
 HARDWARE_SPLIT = get_option(opts,'hardware_split',False)
+MIDI_OUT = get_option(opts,'midi_out','loopmidi')
+SPLIT_OUT = get_option(opts,'split_out','loopmidi2')
 
 def sign(val):
     tv = type(val)
@@ -150,23 +153,15 @@ class Core:
         self.red_lights[y][x] = (col==1)
         self.send_cc(0, 20, x+1)
         self.send_cc(0, 21, self.board_h - y - 1)
-        if LIGHTS:
-            self.send_cc(0, 22, col)
-        else:
-            self.send_cc(0, 22, 7) # no light
+        # if LIGHTS:
+        self.send_cc(0, 22, col)
+        # else:
+        #     self.send_cc(0, 22, 7) # no light
 
     def reset_light(self, x, y):
-        note = self.get_note(x, y)
-        if note == 'G#':
-            light_col = 2
-        elif len(note) == 2: # sharps/flats
-            light_col = 7 # blank
-        elif note in 'FGAB':
-            light_col = 8
-        elif note in 'DE':
-            light_col = 5
-        else: # C
-            light_col = 3
+        if not LIGHTS: return
+        note = self.get_note_index(x, y) % 12
+        light_col = LIGHTS[note]
         self.set_light(x, y, light_col)
         self.red_lights[y][x] = False
     
@@ -357,6 +352,7 @@ class Core:
         ]
         out_devs = [
             'linnstrument',
+            MIDI_OUT,
             'loopmidi'
         ]
         for i in range(pygame.midi.get_count()):
@@ -374,6 +370,7 @@ class Core:
 
         self.linn_out = None
         self.midi_out = None
+        self.split_out = None
         
         # innames = []
         # outnames = []
@@ -385,7 +382,10 @@ class Core:
             if 'linnstrument' in name_lower:
                 print("Instrument Output: ", name)
                 self.linn_out = pygame.midi.Output(out[0])
-            elif 'loopmidi' in name_lower:
+            elif SPLIT_OUT in name_lower:
+                print("MIDI Output (Split): ", name)
+                self.split_out = pygame.midi.Output(out[0])
+            elif MIDI_OUT in name_lower:
                 print("MIDI Output: ", name)
                 self.midi_out = pygame.midi.Output(out[0])
 
