@@ -10,7 +10,7 @@ with open(os.devnull, 'w') as devnull:
 import pygame_gui
 import mido
 from collections import OrderedDict
-from chords import CHORD_SHAPES
+# from chords import CHORD_SHAPES
 from configparser import ConfigParser
 
 def get_option(section, option, default):
@@ -52,7 +52,7 @@ if LIGHTS:
     LIGHTS = list(map(lambda x: int(x), LIGHTS.split(',')))
 ONE_CHANNEL = get_option(opts,'one_channel',False)
 BASE_OFFSET = -4
-CHORD_ANALYZER = get_option(opts,'chord_analyzer',False)
+# CHORD_ANALYZER = get_option(opts,'chord_analyzer',False)
 EPSILON = 0.0001
 # bend the velocity curve, examples: 0.5=sqrt, 1.0=default, 2.0=squared
 VELOCITY_CURVE = get_option(opts,'velocity_curve',1.0)
@@ -66,6 +66,7 @@ NO_OVERLAP = get_option(opts,'no_overlap',False)
 HARDWARE_SPLIT = get_option(opts,'hardware_split',False)
 MIDI_OUT = get_option(opts,'midi_out','loopmidi')
 SPLIT_OUT = get_option(opts,'split_out','loopmidi2')
+FPS = get_option(opts,'fps',60)
 
 def sign(val):
     tv = type(val)
@@ -250,7 +251,8 @@ class Core:
         global CORE
         CORE = self
 
-        self.panel = CHORD_ANALYZER
+        # self.panel = CHORD_ANALYZER
+        self.panel = False
         self.menu_sz = 64 if self.panel else 32
         self.max_width = 25 # MAX WIDTH OF LINNSTRUMENT
         self.board_h = 8
@@ -502,6 +504,7 @@ class Core:
         self.dirty_lights = True
 
     def logic(self, t):
+
         keys = pygame.key.get_pressed()
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT:
@@ -753,55 +756,55 @@ class Core:
                 x += 1
             y += 1
 
-        if CHORD_ANALYZER:
-            self.render_chords()
+        # if CHORD_ANALYZER:
+        #     self.render_chords()
 
-    def render_chords(self):
-        sz = self.screen_w / self.board_w
-        chords = set()
-        for y, row in enumerate(self.board):
-            ry = y + self.menu_sz # real y
-            for x, cell in enumerate(row):
-                # root_pos = glm.ivec2(0,0)
-                for name, inversion_list in CHORD_SHAPES.items():
-                    for shape in inversion_list:
-                        next_chord = False
-                        polygons = []
-                        polygon = []
-                        root = None
-                        for rj, chord_row in enumerate(shape):
-                            for ri, ch in enumerate(chord_row):
-                                try:
-                                    mark = self.board[y+rj][x+ri]
-                                except:
-                                    polygon = []
-                                    next_chord = True
-                                    break
-                                # mark does not exist (not this chord)
-                                if ch=='x':
-                                    root = glm.ivec2(x+ri, y+rj)
-                                if not mark and ch in 'ox':
-                                    next_chord=True # double break
-                                    polygon = []
-                                    break
-                                # polygon += [glm.ivec2((x+ri)*sz, (y+rj)*sz+self.menu_sz)]
-                            if next_chord: # double break
-                                break
-                            # if polygon:
-                            #     polygons += [polygon]
-                        if not next_chord:
-                            # for poly in polygons:
-                            #     pygame.draw.polygon(self.screen.surface, glm.ivec3(0,255,0), poly, 2)
-                            note = self.get_note_index(*root)
-                            chords.add((note, name))
+    # def render_chords(self):
+    #     sz = self.screen_w / self.board_w
+    #     chords = set()
+    #     for y, row in enumerate(self.board):
+    #         ry = y + self.menu_sz # real y
+    #         for x, cell in enumerate(row):
+    #             # root_pos = glm.ivec2(0,0)
+    #             for name, inversion_list in CHORD_SHAPES.items():
+    #                 for shape in inversion_list:
+    #                     next_chord = False
+    #                     polygons = []
+    #                     polygon = []
+    #                     root = None
+    #                     for rj, chord_row in enumerate(shape):
+    #                         for ri, ch in enumerate(chord_row):
+    #                             try:
+    #                                 mark = self.board[y+rj][x+ri]
+    #                             except:
+    #                                 polygon = []
+    #                                 next_chord = True
+    #                                 break
+    #                             # mark does not exist (not this chord)
+    #                             if ch=='x':
+    #                                 root = glm.ivec2(x+ri, y+rj)
+    #                             if not mark and ch in 'ox':
+    #                                 next_chord=True # double break
+    #                                 polygon = []
+    #                                 break
+    #                             # polygon += [glm.ivec2((x+ri)*sz, (y+rj)*sz+self.menu_sz)]
+    #                         if next_chord: # double break
+    #                             break
+    #                         # if polygon:
+    #                         #     polygons += [polygon]
+    #                     if not next_chord:
+    #                         # for poly in polygons:
+    #                         #     pygame.draw.polygon(self.screen.surface, glm.ivec3(0,255,0), poly, 2)
+    #                         note = self.get_note_index(*root)
+    #                         chords.add((note, name))
 
-        if chords:
-            name = ', '.join(NOTES[c[0]] + c[1] for c in chords) # concat names
-            text = self.font.render(name, True, glm.ivec3(255))
-            textpos = text.get_rect()
-            textpos.x = 0
-            textpos.y = self.menu_sz // 2
-            self.screen.surface.blit(text, textpos)
+        # if chords:
+        #     name = ', '.join(NOTES[c[0]] + c[1] for c in chords) # concat names
+        #     text = self.font.render(name, True, glm.ivec3(255))
+        #     textpos = text.get_rect()
+        #     textpos.x = 0
+        #     textpos.y = self.menu_sz // 2
+        #     self.screen.surface.blit(text, textpos)
 
     def draw(self):
         self.screen.render()
@@ -815,8 +818,7 @@ class Core:
         try:
             self.done = False
             while not self.done:
-                # t = self.clock.tick(60)/1000.0
-                t = 0.0
+                t = self.clock.tick(FPS)/1000.0
                 self.logic(t)
                 if self.done:
                     break
