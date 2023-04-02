@@ -33,9 +33,10 @@ try:
 except KeyError:
     opts = None
 
+default_lights = '3,7,5,7,5,8,7,8,2,8,7,8'
 OFFSET = 0
 TITLE = "Alternating Whole-Tone System for Linnstrument"
-FOCUS = False
+# FOCUS = False
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 WHOLETONE = True
 FONT_SZ = 32
@@ -47,7 +48,7 @@ GRAY = glm.ivec3(16)
 BORDER_COLOR = glm.ivec3(32)
 DARK = glm.ivec3(0)
 # LIGHT = glm.ivec3(127)
-LIGHTS = get_option(opts,'lights','3,7,5,7,5,8,7,8,2,8,7,8')
+LIGHTS = get_option(opts,'lights',default_lights)
 if LIGHTS:
     LIGHTS = list(map(lambda x: int(x), LIGHTS.split(',')))
 ONE_CHANNEL = get_option(opts,'one_channel',False)
@@ -67,7 +68,28 @@ HARDWARE_SPLIT = get_option(opts,'hardware_split',False)
 MIDI_OUT = get_option(opts,'midi_out','loopmidi')
 SPLIT_OUT = get_option(opts,'split_out','loopmidi2')
 FPS = get_option(opts,'fps',60)
+SPLIT = get_option(opts,'split',False)
 
+def save():
+    cfg = ConfigParser(allow_no_value=True)
+    general = cfg['general'] = {}
+    if LIGHTS:
+        general['lights'] = ','.join(map(str,LIGHTS))
+    general['one_channel'] = ONE_CHANNEL
+    general['velocity_curve'] = VELOCITY_CURVE
+    general['min_velocity'] = MIN_VELOCITY
+    general['max_velocity'] = MAX_VELOCITY
+    general['no_overlap'] = NO_OVERLAP
+    general['hardware_split'] = HARDWARE_SPLIT
+    general['show_lowest_note'] = SHOW_LOWEST_NOTE
+    general['midi_out'] = MIDI_OUT
+    general['split_out'] = SPLIT_OUT
+    general['split'] = SPLIT
+    general['fps'] = FPS
+    cfg['general'] = general
+    with open('settings_temp.ini', 'w') as configfile:
+        cfg.write(configfile)
+    
 def sign(val):
     tv = type(val)
     if tv is int:
@@ -252,8 +274,7 @@ class Core:
         CORE = self
 
         # self.panel = CHORD_ANALYZER
-        self.panel = False
-        self.menu_sz = 64 if self.panel else 32
+        self.menu_sz = 32 # 64
         self.max_width = 25 # MAX WIDTH OF LINNSTRUMENT
         self.board_h = 8
         self.scale = glm.vec2(64.0)
@@ -274,6 +295,7 @@ class Core:
         self.transpose = 0
         self.rotated = False # transpose -3 whole steps
         self.flipped = False # vertically shift +1
+        self.config_save_timer = 1.0
 
         self.init_octaves()
         
@@ -298,12 +320,12 @@ class Core:
         # self.root.protocol("WM_DELETE_WINDOW", self.quit)
         pygame.init()
         pygame.display.set_caption(TITLE)
-        if FOCUS:
-            pygame.mouse.set_visible(0)
-            pygame.event.set_grab(True)
-        self.screen = Screen(self,pygame.display.set_mode(self.screen_sz))
+        # if FOCUS:
+        #     pygame.mouse.set_visible(0)
+        #     pygame.event.set_grab(True)
+        self.screen = Screen(self,pygame.display.set_mode(self.screen_sz,pygame.DOUBLEBUF))
         
-        bs = glm.ivec2(self.button_sz,self.menu_sz//2 if self.panel else self.menu_sz) # button size
+        bs = glm.ivec2(self.button_sz,self.menu_sz) # self.menu_sz//2) <- for double menu bar
         self.gui = pygame_gui.UIManager(self.screen_sz)
         y = 0
         self.btn_octave_down = pygame_gui.elements.UIButton(
@@ -341,6 +363,17 @@ class Core:
             text='FLIP',
             manager=self.gui
         )
+        # self.slider_label = pygame_gui.elements.UILabel(
+        #     relative_rect=pygame.Rect((0,y+bs.y),(bs.x*2,bs.y)),
+        #     text='Velocity Curve',
+        #     manager=self.gui
+        # )
+        # self.slider_velocity = pygame_gui.elements.UIHorizontalSlider (
+        #     relative_rect=pygame.Rect((bs.x*2+2,y+bs.y),(bs.x*2,bs.y)),
+        #     start_value=VELOCITY_CURVE,
+        #     value_range=[0,1],
+        #     manager=self.gui
+        # )
         
         pygame.midi.init()
         
@@ -503,7 +536,16 @@ class Core:
         self.screen = Screen(self,pygame.display.set_mode(self.screen_sz))
         self.dirty_lights = True
 
-    def logic(self, t):
+    def channel_from_split(self, row, col):
+        if not SPLIT:
+            return 0
+        w = self.board_w
+        col += 1 # move start point from C to A#
+        col -= ((row+1)//2) # make the split line diagonal
+        ch = 0 if col < w // 2 else 1 # channel 0 to 1 depending on split
+        return ch
+    
+    def logic(self, dt):
 
         keys = pygame.key.get_pressed()
         for ev in pygame.event.get():
@@ -548,7 +590,12 @@ class Core:
                 elif ev.ui_element == self.btn_flip:
                     self.flipped = not self.flipped
                     self.dirty = self.dirty_lights = True
-
+            # elif ev.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
+            #     if ev.ui_element == self.slider_velocity:
+            #         global VELOCITY_CURVE
+            #         VELOCITY_CURVE = ev.value
+            #         self.config_save_timer = 1.0
+                
             self.gui.process_events(ev)
 
         # figure out the lowest note to highlight it
@@ -624,6 +671,7 @@ class Core:
                         # if WHOLETONE:
                         if NO_OVERLAP:
                             row = data[1] // width
+                            col = data[1] % width
                             data[1] = data[1] % width + 30 + 2.5*row
                             data[1] *= 2
                             data[1] = int(data[1])
@@ -638,7 +686,9 @@ class Core:
                         
                         data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
-                        self.mark(data[1] - 24 + self.transpose*2, 1, only_row=row)
+                        midinote = data[1] - 24 + self.transpose*2
+                        chan = self.channel_from_split(row, col)
+                        self.mark(midinote, 1, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
                         if self.flipped:
                             data[1] += 7
@@ -648,13 +698,21 @@ class Core:
                             vel = self.velocity_curve(data[2]/127)
                             data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
                             
-                        self.midi_out.write([[data, ev[1]]])
+                        if SPLIT_OUT:
+                            if chan == 0:
+                                self.midi_out.write([[data, ev[1]]])
+                            else:
+                                self.split_out.write([[data, ev[1]]])
+                        else:
+                            data[0] |= chan
+                            self.midi_out.write([[data, ev[1]]])
                         
                         # print('note on: ', data)
                     elif msg == 8: # note off
                         # if WHOLETONE:
                         if NO_OVERLAP:
                             row = data[1] // width
+                            col = data[1] % width
                             data[1] = data[1] % width + 30 + 2.5*row
                             data[1] *= 2
                             data[1] = int(data[1])
@@ -669,21 +727,39 @@ class Core:
                         
                         data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
-                        self.mark(data[1] - 24 + self.transpose*2, 0, only_row=row)
+                        midinote = data[1] - 24 + self.transpose*2
+                        chan = self.channel_from_split(row, col)
+                        self.mark(midinote, 0, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
                         if self.flipped:
                             data[1] += 7
                     
-                        self.midi_out.write([[data, ev[1]]])
+                        if SPLIT_OUT:
+                            if chan == 0:
+                                self.midi_out.write([[data, ev[1]]])
+                            else:
+                                self.split_out.write([[data, ev[1]]])
+                        else:
+                            data[0] |= chan
+                            self.midi_out.write([[data, ev[1]]])
                         # print('note off: ', data)
                     elif msg == 14: # pitch bend
                         # val = (data[2]-64)/64 + data[1]/127/64
                         # val *= 2
+                        if self.split_out:
+                            self.split_out.write([ev])
                         self.midi_out.write([ev])
                     else:
+                        # if self.split_out:
+                        #     self.split_out.write([ev])
                         self.midi_out.write([ev])
+
+        if self.config_save_timer > 0.0:
+            self.config_save_timer -= dt
+            if self.config_save_timer <= 0.0:
+                save()
         
-        self.gui.update(t)
+        self.gui.update(dt)
 
     def render(self):
         if not self.dirty:
@@ -818,8 +894,8 @@ class Core:
         try:
             self.done = False
             while not self.done:
-                t = self.clock.tick(FPS)/1000.0
-                self.logic(t)
+                dt = self.clock.tick(FPS)/1000.0
+                self.logic(dt)
                 if self.done:
                     break
                 self.render()
