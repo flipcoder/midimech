@@ -325,7 +325,7 @@ class Core:
         #     pygame.event.set_grab(True)
         self.screen = Screen(self,pygame.display.set_mode(self.screen_sz,pygame.DOUBLEBUF))
         
-        bs = glm.ivec2(self.button_sz,self.menu_sz) # self.menu_sz//2) <- for double menu bar
+        bs = glm.ivec2(self.button_sz,self.menu_sz) # // 2
         self.gui = pygame_gui.UIManager(self.screen_sz)
         y = 0
         self.btn_octave_down = pygame_gui.elements.UIButton(
@@ -704,7 +704,7 @@ class Core:
                             else:
                                 self.split_out.write([[data, ev[1]]])
                         else:
-                            data[0] |= chan
+                            # data[0] |= chan
                             self.midi_out.write([[data, ev[1]]])
                         
                         # print('note on: ', data)
@@ -740,7 +740,7 @@ class Core:
                             else:
                                 self.split_out.write([[data, ev[1]]])
                         else:
-                            data[0] |= chan
+                            # data[0] |= chan
                             self.midi_out.write([[data, ev[1]]])
                         # print('note off: ', data)
                     elif msg == 14: # pitch bend
