@@ -35,7 +35,7 @@ except KeyError:
 
 default_lights = '3,7,5,7,5,8,7,8,2,8,7,8'
 OFFSET = 0
-TITLE = "Alternating Whole-Tone System for Linnstrument"
+TITLE = "Linnstrument-Wholetone"
 # FOCUS = False
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 WHOLETONE = True
@@ -66,9 +66,10 @@ SHOW_LOWEST_NOTE = get_option(opts,'show_lowest_note',True)
 NO_OVERLAP = get_option(opts,'no_overlap',False)
 HARDWARE_SPLIT = get_option(opts,'hardware_split',False)
 MIDI_OUT = get_option(opts,'midi_out','loopmidi')
-SPLIT_OUT = get_option(opts,'split_out','loopmidi2')
+SPLIT_OUT = get_option(opts,'split_out','split')
 FPS = get_option(opts,'fps',60)
 SPLIT = get_option(opts,'split',False)
+SUSTAIN = get_option(opts,'sustain',1.0) # sustain scale
 
 def save():
     cfg = ConfigParser(allow_no_value=True)
@@ -86,6 +87,7 @@ def save():
     general['split_out'] = SPLIT_OUT
     general['split'] = SPLIT
     general['fps'] = FPS
+    general['sustain'] = SUSTAIN
     cfg['general'] = general
     with open('settings_temp.ini', 'w') as configfile:
         cfg.write(configfile)
@@ -417,7 +419,7 @@ class Core:
             if 'linnstrument' in name_lower:
                 print("Instrument Output: ", name)
                 self.linn_out = pygame.midi.Output(out[0])
-            elif SPLIT_OUT in name_lower:
+            elif not SPLIT_OUT is None and SPLIT_OUT in name_lower:
                 print("MIDI Output (Split): ", name)
                 self.split_out = pygame.midi.Output(out[0])
             elif MIDI_OUT in name_lower:
@@ -687,7 +689,8 @@ class Core:
                         data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
                         midinote = data[1] - 24 + self.transpose*2
-                        chan = self.channel_from_split(row, col)
+                        if SPLIT_OUT:
+                            split_chan = self.channel_from_split(row, col)
                         self.mark(midinote, 1, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
                         if self.flipped:
@@ -699,12 +702,11 @@ class Core:
                             data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
                             
                         if SPLIT_OUT:
-                            if chan == 0:
+                            if split_chan == 0:
                                 self.midi_out.write([[data, ev[1]]])
                             else:
                                 self.split_out.write([[data, ev[1]]])
                         else:
-                            # data[0] |= chan
                             self.midi_out.write([[data, ev[1]]])
                         
                         # print('note on: ', data)
@@ -728,36 +730,44 @@ class Core:
                         data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
                         midinote = data[1] - 24 + self.transpose*2
-                        chan = self.channel_from_split(row, col)
+                        if SPLIT_OUT:
+                            split_chan = self.channel_from_split(row, col)
                         self.mark(midinote, 0, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
                         if self.flipped:
                             data[1] += 7
                     
                         if SPLIT_OUT:
-                            if chan == 0:
+                            if split_chan == 0:
                                 self.midi_out.write([[data, ev[1]]])
                             else:
                                 self.split_out.write([[data, ev[1]]])
                         else:
-                            # data[0] |= chan
                             self.midi_out.write([[data, ev[1]]])
                         # print('note off: ', data)
+                    elif msg == 11: # sustain pedal
+                        if SUSTAIN is not None:
+                            sus = ev[0][2]
+                            ev[0][2] = int(round(clamp(0, 127, sus*SUSTAIN)))
+                            self.midi_out.write([[data, ev[1]]])
+                        else:
+                            self.midi_out.write([ev])
                     elif msg == 14: # pitch bend
                         # val = (data[2]-64)/64 + data[1]/127/64
                         # val *= 2
-                        if self.split_out:
+                        if SPLIT_OUT and self.split_out:
                             self.split_out.write([ev])
                         self.midi_out.write([ev])
                     else:
                         # if self.split_out:
                         #     self.split_out.write([ev])
+                        # print(ch, msg)
                         self.midi_out.write([ev])
 
-        if self.config_save_timer > 0.0:
-            self.config_save_timer -= dt
-            if self.config_save_timer <= 0.0:
-                save()
+        # if self.config_save_timer > 0.0:
+        #     self.config_save_timer -= dt
+        #     if self.config_save_timer <= 0.0:
+        #         save()
         
         self.gui.update(dt)
 
