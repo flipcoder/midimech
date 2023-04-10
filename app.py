@@ -689,7 +689,7 @@ class Core:
                         data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
                         midinote = data[1] - 24 + self.transpose*2
-                        if SPLIT_OUT:
+                        if SPLIT_OUT and self.split_out:
                             split_chan = self.channel_from_split(row, col)
                         self.mark(midinote, 1, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
@@ -701,7 +701,7 @@ class Core:
                             vel = self.velocity_curve(data[2]/127)
                             data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
                             
-                        if SPLIT_OUT:
+                        if SPLIT_OUT and self.split_out:
                             if split_chan == 0:
                                 self.midi_out.write([[data, ev[1]]])
                             else:
@@ -730,14 +730,14 @@ class Core:
                         data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
                         midinote = data[1] - 24 + self.transpose*2
-                        if SPLIT_OUT:
+                        if SPLIT_OUT and self.split_out:
                             split_chan = self.channel_from_split(row, col)
                         self.mark(midinote, 0, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
                         if self.flipped:
                             data[1] += 7
                     
-                        if SPLIT_OUT:
+                        if SPLIT_OUT and self.split_out:
                             if split_chan == 0:
                                 self.midi_out.write([[data, ev[1]]])
                             else:
