@@ -62,7 +62,7 @@ if VELOCITY_CURVE < EPSILON: # if its near zero, set default
 MIN_VELOCITY = get_option(opts,'min_velocity',0)
 MAX_VELOCITY = get_option(opts,'max_velocity',127)
 CORE = None
-SHOW_LOWEST_NOTE = get_option(opts,'show_lowest_note',True)
+SHOW_LOWEST_NOTE = get_option(opts,'show_lowest_note',False)
 NO_OVERLAP = get_option(opts,'no_overlap',False)
 HARDWARE_SPLIT = get_option(opts,'hardware_split',False)
 MIDI_OUT = get_option(opts,'midi_out','loopmidi')
@@ -689,7 +689,7 @@ class Core:
                         data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
                         midinote = data[1] - 24 + self.transpose*2
-                        if SPLIT_OUT and self.split_out:
+                        if NO_OVERLAP and SPLIT_OUT and self.split_out:
                             split_chan = self.channel_from_split(row, col)
                         self.mark(midinote, 1, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
@@ -701,7 +701,7 @@ class Core:
                             vel = self.velocity_curve(data[2]/127)
                             data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
                             
-                        if SPLIT_OUT and self.split_out:
+                        if NO_OVERLAP and SPLIT_OUT and self.split_out:
                             if split_chan == 0:
                                 self.midi_out.write([[data, ev[1]]])
                             else:
@@ -730,14 +730,14 @@ class Core:
                         data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
                         midinote = data[1] - 24 + self.transpose*2
-                        if SPLIT_OUT and self.split_out:
+                        if NO_OVERLAP and SPLIT_OUT and self.split_out:
                             split_chan = self.channel_from_split(row, col)
                         self.mark(midinote, 0, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
                         if self.flipped:
                             data[1] += 7
                     
-                        if SPLIT_OUT and self.split_out:
+                        if NO_OVERLAP and SPLIT_OUT and self.split_out:
                             if split_chan == 0:
                                 self.midi_out.write([[data, ev[1]]])
                             else:
