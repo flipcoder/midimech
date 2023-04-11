@@ -220,6 +220,9 @@ Using this program, you can visualize the midi playing in your DAW on both the s
 You do this by creating another device in LoopMidi called "visualizer" then use a Midi Out plugin
 on the track you want to visualize and set the plugin to use the visualizer midi device.
 
+It can be used as a visualizer for the music program Synthesia but I haven't written instructions for the setup yet
+as it is a bit involved.  That should be coming soon.
+
 ## Full MPE
 
 ### 128 Key
