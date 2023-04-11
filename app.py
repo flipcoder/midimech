@@ -292,7 +292,7 @@ class Core:
         self.lowest_note_midi = None # midi number of lowest note currently pressed
         self.octave = 0
         self.out_octave = 0
-        self.vis_octave = -3
+        self.vis_octave = -2
         self.octave_base = -2
         self.transpose = 0
         self.rotated = False # transpose -3 whole steps
