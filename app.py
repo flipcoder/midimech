@@ -828,6 +828,8 @@ class Core:
                                     self.split_out.write([ev])
                                 else:
                                     self.midi_out.write([ev])
+                            else:
+                                self.midi_out.write([ev])
                         else:
                             self.midi_out.write([ev])
                     # else: # sysex
