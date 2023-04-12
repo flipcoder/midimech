@@ -237,6 +237,17 @@ Note: This workaround has not been tested on the 200 but it should work.
 To use ChPerNote/MPE mode, first enable SPLIT.  Then, set your LinnStrument to "NO OVERLAP" with a transposition on both splits of -3 octaves and +6 pitch.  Make sure ChPerNote mode is also set on both splits.
 Then, set `no_overlap=true` and `hardware_split=true` in your settings.ini file (if you don't have one, copy it from settings.ini.example).
 
+## Split
+
+Because of the diagonal nature of the layout, the split is diagonal as well (through G# in the center).
+To use a split, create another midi loopback port called "split" and set `split=true` in your settings.ini.
+At the moment this requires using full MPE mode to work (see section `Full MPE`).
+The split creates a second virtual instrument you can access in your DAW called "split".
+
+Note: If you use the 128, do not set the split on your linnstrument.  The program will make its own split.
+However, if you use the 200, you will need to enable to split in order to have all the notes come through.
+(This is to work around a limitation with no overlap mode.)
+
 ## Pitch Bend
 
 To get pitch bending working properly, you'll need to set your virtual instruments' pitch bend range to exactly double the amount of the LinnStrument's range.
@@ -248,3 +259,6 @@ To get pitch bending working properly, you'll need to set your virtual instrumen
 - Better GUI and integration with the settings file.
 - Make custom firmware so the layout can be played without this program.
 
+## Contact / Questions
+
+I'm on the LinnStrument Discord at https://discord.gg/h2BcrzmTXe.  Come hang out!
