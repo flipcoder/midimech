@@ -71,6 +71,7 @@ SPLIT_OUT = get_option(opts,'split_out','split')
 FPS = get_option(opts,'fps',60)
 SPLIT = get_option(opts,'split',False)
 SUSTAIN = get_option(opts,'sustain',1.0) # sustain scale
+FADE_SPEED = 4.0
 
 def save():
     cfg = ConfigParser(allow_no_value=True)
@@ -155,8 +156,30 @@ class Screen(Object):
 def nothing():
     pass
 
-class Core:
+class Note:
+    def __init__(self):
+        self.bend = 0.0
+        self.pressed = False
+        self.intensity = 0.0 # how much to light marker up
+        self.pressure = 0.0 # how much the note is being pressed
+        self.dirty = False
+        self.location: glm.ivec2 = None # on board
+    def logic(self, dt):
+        if self.pressed: # pressed, fade to pressure value
+            if self.intensity != self.pressure:
+                self.dirty = True
+                if self.intensity < self.pressure:
+                    self.intensity = min(pressure, self.intensity + dt * FADE_SPEED)
+                else:
+                    self.intensity = max(pressure, self.intensity - dt * FADE_SPEED)
+        else: # not pressed, fade out
+            if self.intensity > 0.0:
+                self.dirty = True
+                self.pressure  = 0.0
+                self.intensity = max(0.0, self.intensity - dt * FADE_SPEED)
 
+class Core:
+    
     def has_velocity_curve(self):
         return abs(VELOCITY_CURVE - 1.0) > EPSILON
 
@@ -271,11 +294,9 @@ class Core:
                 self.octaves[y].append(self.init_octave(x, y))
         self.octaves = list(reversed(self.octaves))
 
-        self.markers = []
-        for y in range(self.board_h):
-            self.markers.append([])
-            for x in range(self.max_width):
-                self.markers[y].append(None)
+        self.notes = [None] * 16
+        for i in range(len(self.notes)):
+            self.notes[i] = Note()
     
     def __init__(self):
 
@@ -553,6 +574,10 @@ class Core:
         col -= ((row+1)//2) # make the split line diagonal
         ch = 0 if col < w // 2 else 1 # channel 0 to 1 depending on split
         return ch
+
+    def is_split(self):
+        # TODO: make this work with hardware overlap (non-mpe)
+        return NO_OVERLAP and SPLIT_OUT and self.split_out
     
     def logic(self, dt):
 
@@ -675,6 +700,7 @@ class Core:
                     row = None
                     if not NO_OVERLAP:
                         row = ch % 8
+                        col = ch // 8
                     width = self.board_w//2 if HARDWARE_SPLIT else self.board_w
                     if msg == 9: # note on
                         # if WHOLETONE:
@@ -696,7 +722,7 @@ class Core:
                         data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
                         midinote = data[1] - 24 + self.transpose*2
-                        if NO_OVERLAP and SPLIT_OUT and self.split_out:
+                        if self.is_split():
                             split_chan = self.channel_from_split(row, col)
                         self.mark(midinote, 1, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
@@ -704,11 +730,19 @@ class Core:
                             data[1] += 7
                         
                         # apply velocity curve
+                        vel = data[2]/127
                         if self.has_velocity_settings():
                             vel = self.velocity_curve(data[2]/127)
                             data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
-                            
-                        if NO_OVERLAP and SPLIT_OUT and self.split_out:
+
+                        note = self.notes[ch]
+                        if note.location is None:
+                            note.location = glm.ivec2(0)
+                        self.notes[ch].location.x = col
+                        self.notes[ch].location.y = row
+                        self.notes[ch].pressure = vel
+                        
+                        if self.is_split():
                             if split_chan == 0:
                                 self.midi_out.write([[data, ev[1]]])
                             else:
@@ -737,14 +771,14 @@ class Core:
                         data[1] += (self.octave + self.octave_base) * 12
                         data[1] += BASE_OFFSET
                         midinote = data[1] - 24 + self.transpose*2
-                        if NO_OVERLAP and SPLIT_OUT and self.split_out:
+                        if self.is_split():
                             split_chan = self.channel_from_split(row, col)
                         self.mark(midinote, 0, only_row=row)
                         data[1] += self.out_octave * 12 + self.transpose*2
                         if self.flipped:
                             data[1] += 7
                     
-                        if NO_OVERLAP and SPLIT_OUT and self.split_out:
+                        if self.is_split():
                             if split_chan == 0:
                                 self.midi_out.write([[data, ev[1]]])
                             else:
@@ -752,20 +786,29 @@ class Core:
                         else:
                             self.midi_out.write([[data, ev[1]]])
                         # print('note off: ', data)
-                    elif msg == 11: # sustain pedal
-                        if SUSTAIN is not None:
-                            sus = ev[0][2]
-                            ev[0][2] = int(round(clamp(0, 127, sus*SUSTAIN)))
-                            self.midi_out.write([[data, ev[1]]])
+                    # expression pedal
+                    # elif msg == 11: # sustain pedal
+                    #     if SUSTAIN is not None:
+                    #         sus = ev[0][2]
+                    #         ev[0][2] = int(round(clamp(0, 127, sus*SUSTAIN)))
+                    #         self.midi_out.write([[data, ev[1]]])
+                    #     else:
+                    #         self.midi_out.write([ev])
+                    elif msg in (11,13,14):
+                        if self.is_split():
+                            note = self.notes[ch]
+                            if note.location:
+                                col = self.notes[ch].location.x
+                                row = self.notes[ch].location.y
+                                split_chan = self.channel_from_split(row, col)
+                                if split_chan:
+                                    self.split_out.write([ev])
+                                else:
+                                    self.midi_out.write([ev])
                         else:
                             self.midi_out.write([ev])
-                    elif msg == 14: # pitch bend
-                        # val = (data[2]-64)/64 + data[1]/127/64
-                        # val *= 2
-                        if SPLIT_OUT and self.split_out:
-                            self.split_out.write([ev])
-                        self.midi_out.write([ev])
                     else:
+                        print(msg)
                         # if self.split_out:
                         #     self.split_out.write([ev])
                         # print(ch, msg)
