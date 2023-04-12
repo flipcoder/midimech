@@ -1,6 +1,6 @@
 # linnstrument-wholetone
 
-"Alternating Whole-tone" layout and visualizer for the Linnstrument.  I consider this to be one of the most accessible and playable musical note layouts, and once you learn how it works, you'll realize why I've made it my primary layout.
+Wholetone layout system and visualizer for the Linnstrument.  I consider this to be one of the most accessible and playable musical note layouts, and once you learn how it works, you'll realize why I've made it my primary layout.
 
 Note: So far, this has only been tested on the LinnStrument 128 version.  If you own the 200-note version,
 please let me know how this works for you and if there are any issues.
@@ -9,7 +9,11 @@ This program is a work-in-progress so some things might be a bit buggy.  Let me 
 
 License: MIT
 
-![Screenshot](https://i.imgur.com/F0VQU4F.png)
+LinnStrument Discord Chat: https://discord.gg/h2BcrzmTXe
+
+## Video
+
+[![Video](https://img.youtube.com/vi/GbkhwpPsbPo/0.jpg)](https://www.youtube.com/watch?v=GbkhwpPsbPo)
 
 ## Setup
 
@@ -216,12 +220,16 @@ Or:
 
 ## Visualizer
 
+### DAW visualization
+
 Using this program, you can visualize the midi playing in your DAW on both the screen and LinnStrument.
 You do this by creating another device in LoopMidi called "visualizer" then use a Midi Out plugin
 on the track you want to visualize and set the plugin to use the visualizer midi device.
 
-It can be used as a visualizer for the music program Synthesia but I haven't written instructions for the setup yet
-as it is a bit involved.  That should be coming soon.
+### Synthesia
+
+To use the visualizer with Synthesia, create a new MIDI loopback device called "visualizer".
+In Synthesia settings, set it as an output device for note lights.
 
 ## Full MPE
 
@@ -237,6 +245,17 @@ Note: This workaround has not been tested on the 200 but it should work.
 To use ChPerNote/MPE mode, first enable SPLIT.  Then, set your LinnStrument to "NO OVERLAP" with a transposition on both splits of -3 octaves and +6 pitch.  Make sure ChPerNote mode is also set on both splits.
 Then, set `no_overlap=true` and `hardware_split=true` in your settings.ini file (if you don't have one, copy it from settings.ini.example).
 
+## Split
+
+Because of the diagonal nature of the layout, the split is diagonal as well (through G# in the center).
+To use a split, create another midi loopback port called "split" and set `split=true` in your settings.ini.
+At the moment this requires using full MPE mode to work (see section `Full MPE`).
+The split creates a second virtual instrument you can access in your DAW called "split".
+
+Note: If you use the 128, do not set the split on your linnstrument.  The program will make its own split.
+However, if you use the 200, you will need to enable to split in order to have all the notes come through.
+(This is to work around a limitation with no overlap mode.)
+
 ## Pitch Bend
 
 To get pitch bending working properly, you'll need to set your virtual instruments' pitch bend range to exactly double the amount of the LinnStrument's range.
@@ -248,3 +267,6 @@ To get pitch bending working properly, you'll need to set your virtual instrumen
 - Better GUI and integration with the settings file.
 - Make custom firmware so the layout can be played without this program.
 
+## Contact / Questions
+
+I'm on the LinnStrument Discord at https://discord.gg/h2BcrzmTXe.  Come hang out!
