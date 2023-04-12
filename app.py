@@ -156,6 +156,13 @@ class Screen(Object):
 def nothing():
     pass
 
+# def invert_color(col): # ivec 255
+#     r = glm.vec3(col) / 255.0
+#     for i in range(3):
+#         r[i] = 1.0 - r[i]
+#         r[i] *= 255
+#     return glm.ivec3(r)
+
 class Note:
     def __init__(self):
         self.bend = 0.0
@@ -393,6 +400,14 @@ class Core:
             text='FLIP',
             manager=self.gui
         )
+        
+        if NO_OVERLAP: # split only works with no overlap for now
+            self.btn_split = pygame_gui.elements.UIButton(
+                relative_rect=pygame.Rect((bs.x*7+2,y),(bs.x*2,bs.y)),
+                text='SPLIT: ' + ('ON' if SPLIT else 'OFF'),
+                manager=self.gui
+            )
+
         # self.slider_label = pygame_gui.elements.UILabel(
         #     relative_rect=pygame.Rect((0,y+bs.y),(bs.x*2,bs.y)),
         #     text='Velocity Curve',
@@ -577,7 +592,7 @@ class Core:
 
     def is_split(self):
         # TODO: make this work with hardware overlap (non-mpe)
-        return NO_OVERLAP and SPLIT_OUT and self.split_out
+        return NO_OVERLAP and SPLIT and self.split_out
     
     def logic(self, dt):
 
@@ -624,6 +639,11 @@ class Core:
                 elif ev.ui_element == self.btn_flip:
                     self.flipped = not self.flipped
                     self.dirty = self.dirty_lights = True
+                elif ev.ui_element == self.btn_split:
+                    global SPLIT
+                    SPLIT = not SPLIT
+                    self.btn_split.set_text("SPLIT: " + ("ON" if SPLIT else "OFF"))
+                    self.dirty = True
             # elif ev.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
             #     if ev.ui_element == self.slider_velocity:
             #         global VELOCITY_CURVE
@@ -694,9 +714,9 @@ class Core:
                     data = ev[0]
                     d0 = data[0]
                     ch = d0 & 0x0f
+                    msg = (data[0] & 0xf0) >> 4
                     if ONE_CHANNEL:
                         data[0] = d0 & 0xf0 # send all to channel 0 if enabled
-                    msg = data[0] >> 4
                     row = None
                     if not NO_OVERLAP:
                         row = ch % 8
@@ -794,7 +814,10 @@ class Core:
                     #         self.midi_out.write([[data, ev[1]]])
                     #     else:
                     #         self.midi_out.write([ev])
-                    elif msg in (11,13,14):
+                    elif 0xf0 <= msg <= 0xf7: # sysex
+                        self.midi_out.write([ev])
+                    else:
+                        # control change, aftertouch, pitch bend, etc...
                         if self.is_split():
                             note = self.notes[ch]
                             if note.location:
@@ -807,12 +830,11 @@ class Core:
                                     self.midi_out.write([ev])
                         else:
                             self.midi_out.write([ev])
-                    else:
-                        print(msg)
-                        # if self.split_out:
-                        #     self.split_out.write([ev])
-                        # print(ch, msg)
-                        self.midi_out.write([ev])
+                    # else: # sysex
+                    #     # if self.split_out:
+                    #     #     self.split_out.write([ev])
+                    #     # print(ch, msg)
+                    #     self.midi_out.write([ev])
 
         # if self.config_save_timer > 0.0:
         #     self.config_save_timer -= dt
@@ -837,6 +859,9 @@ class Core:
             for cell in row:
                 # write text
                 note = self.get_note(x, y)
+
+                split_chan = self.channel_from_split(y, x) # !
+                
                 # note = str(self.get_octave(x, y)) # show octave
                 brightness = 1.0 if cell else 0.5
 
