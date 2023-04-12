@@ -40,12 +40,13 @@ TITLE = "Linnstrument-Wholetone"
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 WHOLETONE = True
 FONT_SZ = 32
-C_COLOR = glm.ivec3(0,128,0)
-YELLOW = glm.ivec3(205,127,0)
-LIGHT = glm.ivec3(0,0,128)
-FGAB = glm.ivec3(64)
-GRAY = glm.ivec3(16)
-BORDER_COLOR = glm.ivec3(32)
+brightness = 0.4
+C_COLOR = glm.ivec3(0,128 * brightness,0)
+YELLOW = glm.ivec3(205 * brightness,127 * brightness,0)
+LIGHT = glm.ivec3(0,0,128 * brightness)
+FGAB = glm.ivec3(64 * brightness)
+GRAY = glm.ivec3(16 * brightness)
+BORDER_COLOR = glm.ivec3(32 * brightness)
 DARK = glm.ivec3(0)
 # LIGHT = glm.ivec3(127)
 LIGHTS = get_option(opts,'lights',default_lights)
@@ -249,7 +250,7 @@ class Core:
     def init_octave(self, x, y):
         return int((x+4+self.transpose+y*2.5)//6)
     
-    def init_octaves(self):
+    def init_board(self):
         # self.octaves = [
         #     # 200 size ---------------------------------------------------------------v
         #     # 128 size ------------------------------------v
@@ -264,11 +265,17 @@ class Core:
         # ]
         # generate grid of octaves like above
         self.octaves = []
-        for y in range(self.board_h+1): # make an extra mode for flipping
+        for y in range(self.board_h):
             self.octaves.append([])
             for x in range(self.max_width):
                 self.octaves[y].append(self.init_octave(x, y))
         self.octaves = list(reversed(self.octaves))
+
+        self.markers = []
+        for y in range(self.board_h):
+            self.markers.append([])
+            for x in range(self.max_width):
+                self.markers[y].append(None)
     
     def __init__(self):
 
@@ -299,7 +306,7 @@ class Core:
         self.flipped = False # vertically shift +1
         self.config_save_timer = 1.0
 
-        self.init_octaves()
+        self.init_board()
         
         # load midi file from command line (playiung it is not yet impl)
         # self.midi_in_fn = None
@@ -618,7 +625,7 @@ class Core:
                         note_count+=1
 
         if self.dirty:
-            self.init_octaves()
+            self.init_board()
         
         if self.dirty_lights:
             self.setup_lights()
@@ -788,6 +795,7 @@ class Core:
                 # write text
                 note = self.get_note(x, y)
                 # note = str(self.get_octave(x, y)) # show octave
+                brightness = 1.0 if cell else 0.5
 
                 col = None
                 
@@ -825,7 +833,7 @@ class Core:
                 textpos.y += 1
                 self.screen.surface.blit(text, textpos)
 
-                text = self.font.render(note, True, glm.ivec3(255))
+                text = self.font.render(note, True, glm.ivec3(255*brightness))
                 textpos = text.get_rect()
                 textpos.x = x*sz + sz//2 - FONT_SZ//4
                 textpos.y = self.menu_sz + y*sz + sz//2 - FONT_SZ//4
@@ -833,7 +841,7 @@ class Core:
                 textpos.y -= 1
                 self.screen.surface.blit(text, textpos)
                 
-                text = self.font.render(note, True, glm.ivec3(200))
+                text = self.font.render(note, True, glm.ivec3(200*brightness))
                 textpos = text.get_rect()
                 textpos.x = x*sz + sz//2 - FONT_SZ//4
                 textpos.y = self.menu_sz + y*sz + sz//2 - FONT_SZ//4
@@ -893,8 +901,8 @@ class Core:
         #     self.screen.surface.blit(text, textpos)
 
     def draw(self):
-        self.screen.render()
         self.gui.draw_ui(self.screen.surface)
+        self.screen.render()
         pygame.display.flip()
         # self.root.update_idletasks()
         # self.root.update()
@@ -904,7 +912,11 @@ class Core:
         try:
             self.done = False
             while not self.done:
-                dt = self.clock.tick(FPS)/1000.0
+                try:
+                    dt = self.clock.tick(FPS)/1000.0
+                except:
+                    self.deinit()
+                    break
                 self.logic(dt)
                 if self.done:
                     break
