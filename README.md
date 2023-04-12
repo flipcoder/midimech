@@ -218,12 +218,16 @@ Or:
 
 ## Visualizer
 
+### DAW visualization
+
 Using this program, you can visualize the midi playing in your DAW on both the screen and LinnStrument.
 You do this by creating another device in LoopMidi called "visualizer" then use a Midi Out plugin
 on the track you want to visualize and set the plugin to use the visualizer midi device.
 
-It can be used as a visualizer for the music program Synthesia but I haven't written instructions for the setup yet
-as it is a bit involved.  That should be coming soon.
+### Synthesia
+
+To use the visualizer with Synthesia, create a new MIDI loopback device called "visualizer".
+In Synthesia settings, set it as an output device for note lights.
 
 ## Full MPE
 
