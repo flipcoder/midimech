@@ -73,6 +73,30 @@ SPLIT = get_option(opts,'split',False)
 SUSTAIN = get_option(opts,'sustain',1.0) # sustain scale
 FADE_SPEED = 4.0
 
+# simulator keys
+KEYS = {}
+i = 0
+for key in '1234567890-=':
+    KEYS[ord(key)] = 62 + i
+    i += 2
+KEYS[pygame.K_BACKSPACE] = 62 + i
+i = 0
+for key in 'qwertyuiop[]\\':
+    KEYS[ord(key)] = 57 + i
+    i += 2
+i = 0
+for key in 'asdfghjkl;\'':
+    KEYS[ord(key)] = 52 + i
+    i += 2
+KEYS[pygame.K_RETURN] = 52 + i
+i = 0
+for key in 'zxcvbnm,./':
+    KEYS[ord(key)] = 47 + i
+    i += 2
+KEYS[pygame.K_RSHIFT] = 47 + i
+del i
+
+
 def save():
     cfg = ConfigParser(allow_no_value=True)
     general = cfg['general'] = {}
@@ -472,7 +496,7 @@ class Core:
         if not self.linn_out:
             print("No LinnStrument output device detected. (Can't control lights)")
         if not self.midi_out:
-            print("No MIDI output device detected. (Did you install LoopMidi?)")
+            print("No MIDI output device detected. (Did you install a midi loopback device?)")
 
         # if not self.out:
         #     oid = pygame.midi.get_default_output_id()
@@ -604,6 +628,27 @@ class Core:
             elif ev.type == pygame.KEYDOWN:
                 if ev.key == pygame.K_ESCAPE:
                     self.quit()
+                else:
+                    try:
+                        n = KEYS[ev.key]
+                        n -= 12
+                        self.mark(n, 1, True)
+                        data = [0x90, n, 127]
+                        if self.midi_out:
+                            self.midi_out.write([data])
+                        pass
+                    except KeyError:
+                        pass
+            elif ev.type == pygame.KEYUP:
+                try:
+                    n = KEYS[ev.key]
+                    n -= 12
+                    self.mark(n, 0, True)
+                    data = [0x80, n, 0]
+                    if self.midi_out:
+                        self.midi_out.write([data])
+                except KeyError:
+                    pass
             elif ev.type == pygame_gui.UI_BUTTON_PRESSED:
                 if ev.ui_element == self.btn_octave_down:
                     self.octave -= 1
