@@ -635,7 +635,7 @@ class Core:
                         self.mark(n, 1, True)
                         data = [0x90, n, 127]
                         if self.midi_out:
-                            self.midi_out.write([data])
+                            self.midi_out.write([[data,0]])
                         pass
                     except KeyError:
                         pass
@@ -646,7 +646,7 @@ class Core:
                     self.mark(n, 0, True)
                     data = [0x80, n, 0]
                     if self.midi_out:
-                        self.midi_out.write([data])
+                        self.midi_out.write([[data, 0]])
                 except KeyError:
                     pass
             elif ev.type == pygame_gui.UI_BUTTON_PRESSED:
