@@ -1,4 +1,4 @@
 pygame
 pygame_gui
 pyglm
-mido
+rtmidi2

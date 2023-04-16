@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # from tkinter import *
 import os,sys,glm,copy,binascii,struct,math,traceback
+import rtmidi2
 with open(os.devnull, 'w') as devnull:
     # suppress pygame messages
     stdout = sys.stdout
@@ -8,7 +9,7 @@ with open(os.devnull, 'w') as devnull:
     import pygame, pygame.midi, pygame.gfxdraw
     sys.stdout = stdout
 import pygame_gui
-import mido
+# import mido
 from collections import OrderedDict
 # from chords import CHORD_SHAPES
 from configparser import ConfigParser
@@ -210,6 +211,9 @@ class Note:
                 self.intensity = max(0.0, self.intensity - dt * FADE_SPEED)
 
 class Core:
+
+    def init_hardware(self):
+        pass
     
     def has_velocity_curve(self):
         return abs(VELOCITY_CURVE - 1.0) > EPSILON
@@ -223,11 +227,11 @@ class Core:
         return val
     
     def send_cc(self, channel, cc, val):
-        msg = mido.Message('control_change', channel=channel, control=cc, value=val)
-        # print(msg)
         if not self.linn_out:
             return
-        self.linn_out.write([[msg.bytes(),0]])
+        # msg = [0xb0 | channel, cc, val]
+        self.linn_out.send_cc(channel, cc, val)
+        # self.linn_out.send_messages(0xb0, [(channel, cc, val)])
 
     def set_light(self, x, y, col): # col is [1,11], 0 resets
         self.red_lights[y][x] = (col==1)
@@ -328,6 +332,142 @@ class Core:
         self.notes = [None] * 16
         for i in range(len(self.notes)):
             self.notes[i] = Note()
+
+    def midi_write(self, dev, msg, ts=0):
+        if dev:
+            dev.send_raw(*msg)
+
+    def cb_midi_in(self, data, ts):
+        # print(data, ts)
+        d0 = data[0]
+        ch = d0 & 0x0f
+        msg = (data[0] & 0xf0) >> 4
+        if ONE_CHANNEL:
+            data[0] = d0 & 0xf0 # send all to channel 0 if enabled
+        row = None
+        if not NO_OVERLAP:
+            row = ch % 8
+            col = ch // 8
+        width = self.board_w//2 if HARDWARE_SPLIT else self.board_w
+        if msg == 9: # note on
+            if NO_OVERLAP:
+                row = data[1] // width
+                col = data[1] % width
+                data[1] = data[1] % width + 30 + 2.5*row
+                data[1] *= 2
+                data[1] = int(data[1])
+                if HARDWARE_SPLIT and ch >= 8:
+                    data[1] += width * 2
+            else:
+                data[1] *= 2
+                try:
+                    data[1] -= row * 5
+                except IndexError:
+                    pass
+            
+            data[1] += (self.octave + self.octave_base) * 12
+            data[1] += BASE_OFFSET
+            midinote = data[1] - 24 + self.transpose*2
+            if self.is_split():
+                split_chan = self.channel_from_split(row, col)
+            self.mark(midinote, 1, only_row=row)
+            data[1] += self.out_octave * 12 + self.transpose*2
+            if self.flipped:
+                data[1] += 7
+            
+            # apply velocity curve
+            vel = data[2]/127
+            if self.has_velocity_settings():
+                vel = self.velocity_curve(data[2]/127)
+                data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
+
+            note = self.notes[ch]
+            if note.location is None:
+                note.location = glm.ivec2(0)
+            self.notes[ch].location.x = col
+            self.notes[ch].location.y = row
+            self.notes[ch].pressure = vel
+            
+            if self.is_split():
+                if split_chan == 0:
+                    # self.midi_out.write([[data, ev[1]]]
+                    self.midi_write(self.midi_out, data, ts)
+                else:
+                    self.midi_write(self.split_out, data, ts)
+            else:
+                self.midi_write(self.midi_out, data, ts)
+            
+            # print('note on: ', data)
+        elif msg == 8: # note off
+            if NO_OVERLAP:
+                row = data[1] // width
+                col = data[1] % width
+                data[1] = data[1] % width + 30 + 2.5*row
+                data[1] *= 2
+                data[1] = int(data[1])
+                if HARDWARE_SPLIT and ch >= 8:
+                    data[1] += width * 2
+            else:
+                data[1] *= 2
+                try:
+                    data[1] -= row * 5
+                except IndexError:
+                    pass
+            
+            data[1] += (self.octave + self.octave_base) * 12
+            data[1] += BASE_OFFSET
+            midinote = data[1] - 24 + self.transpose*2
+            if self.is_split():
+                split_chan = self.channel_from_split(row, col)
+            self.mark(midinote, 0, only_row=row)
+            data[1] += self.out_octave * 12 + self.transpose*2
+            if self.flipped:
+                data[1] += 7
+        
+            if self.is_split():
+                if split_chan == 0:
+                    self.midi_write(self.midi_out, data, ts)
+                else:
+                    self.midi_write(self.split_out, data, ts)
+            else:
+                self.midi_write(self.midi_out, data, ts)
+            # print('note off: ', data)
+        # expression pedal
+        elif msg == 11: # sustain pedal
+            # if SUSTAIN is not None:
+            #     sus = ev[0][2]
+            #     ev[0][2] = int(round(clamp(0, 127, sus*SUSTAIN)))
+            #     self.midi_write(self.midi_out, data, ts)
+            # else:
+            self.midi_write(self.midi_out, data, ts)
+        elif 0xf0 <= msg <= 0xf7: # sysex
+            self.midi_out.write([ev])
+        else:
+            # control change, aftertouch, pitch bend, etc...
+            if self.is_split():
+                note = self.notes[ch]
+                if note.location:
+                    col = self.notes[ch].location.x
+                    row = self.notes[ch].location.y
+                    split_chan = self.channel_from_split(row, col)
+                    if split_chan:
+                        self.midi_write(self.split_out, data, ts)
+                    else:
+                        self.midi_write(self.midi_out, data, ts)
+                else:
+                    self.midi_write(self.midi_out, data, ts)
+            else:
+                self.midi_write(self.midi_out, data, ts)
+        
+    def cb_visualizer(self, data, ts):
+        # print(msg, ts)
+        ch = data[0] & 0x0f
+        msg = data[0] >> 4
+        if msg == 9: # note on
+            self.mark(data[1] + self.vis_octave*12, 1, True)
+        elif msg == 8: # note off
+            self.mark(data[1] + self.vis_octave*12, 0, True)
+
     
     def __init__(self):
 
@@ -359,7 +499,7 @@ class Core:
         self.config_save_timer = 1.0
 
         self.init_board()
-        
+
         # load midi file from command line (playiung it is not yet impl)
         # self.midi_in_fn = None
         # self.midifile = None
@@ -444,7 +584,7 @@ class Core:
         #     manager=self.gui
         # )
         
-        pygame.midi.init()
+        # pygame.midi.init()
         
         self.out = []
         self.midi_in = None
@@ -459,13 +599,13 @@ class Core:
             MIDI_OUT,
             'loopmidi'
         ]
-        for i in range(pygame.midi.get_count()):
-            info = pygame.midi.get_device_info(i)
-            # print(info)
-            if info[2]==1:
-                ins.append((i,str(info[1])))
-            if info[3]==1:
-                outs.append((i,str(info[1])))
+        # for i in range(pygame.midi.get_count()):
+        #     info = pygame.midi.get_device_info(i)
+        #     # print(info)
+        #     if info[2]==1:
+        #         ins.append((i,str(info[1])))
+        #     if info[3]==1:
+        #         outs.append((i,str(info[1])))
 
         # innames = []
         # for inx in ins:
@@ -475,23 +615,41 @@ class Core:
         self.linn_out = None
         self.midi_out = None
         self.split_out = None
-        
+
+        outnames = rtmidi2.get_out_ports()
+        for i in range(len(outnames)):
+            name = outnames[i]
+            name_lower = name.lower()
+            # print(name_lower)
+            if "linnstrument" in name_lower:
+                print("LinnStrument Out: " + name)
+                self.linn_out = rtmidi2.MidiOut()
+                self.linn_out.open_port(i)
+            elif not SPLIT_OUT is None and SPLIT_OUT in name_lower:
+                print("Split Out: " + name)
+                self.split_out = rtmidi2.MidiOut()
+                self.split_out.open_port(i)
+            elif MIDI_OUT in name_lower:
+                print("MIDI Out: " + name)
+                self.midi_out = rtmidi2.MidiOut()
+                self.midi_out.open_port(i)
+
         # innames = []
         # outnames = []
-        brk = False
+        # brk = False
         # for outdev in out_devs:
-        for out in outs:
-            name = str(out[1])
-            name_lower = name.lower()
-            if 'linnstrument' in name_lower:
-                print("Instrument Output: ", name)
-                self.linn_out = pygame.midi.Output(out[0])
-            elif not SPLIT_OUT is None and SPLIT_OUT in name_lower:
-                print("MIDI Output (Split): ", name)
-                self.split_out = pygame.midi.Output(out[0])
-            elif MIDI_OUT in name_lower:
-                print("MIDI Output: ", name)
-                self.midi_out = pygame.midi.Output(out[0])
+        # for out in outs:
+        #     name = str(out[1])
+        #     name_lower = name.lower()
+        #     if 'linnstrument' in name_lower:
+        #         print("Instrument Output: ", name)
+        #         self.linn_out = pygame.midi.Output(out[0])
+        #     elif not SPLIT_OUT is None and SPLIT_OUT in name_lower:
+        #         print("MIDI Output (Split): ", name)
+        #         self.split_out = pygame.midi.Output(out[0])
+        #     elif MIDI_OUT in name_lower:
+        #         print("MIDI Output: ", name)
+        #         self.midi_out = pygame.midi.Output(out[0])
 
         if not self.linn_out:
             print("No LinnStrument output device detected. (Can't control lights)")
@@ -508,24 +666,39 @@ class Core:
 
         # print('outs: ' + ', '.join(outnames))
         # print('ins: ' + ', '.join(innames))
+
+        innames = rtmidi2.get_in_ports()
+        for i in range(len(innames)):
+            name = innames[i]
+            name_lower = name.lower()
+            if "visualizer" in name_lower:
+                print("Visualizer (In): " + name)
+                self.visualizer = rtmidi2.MidiIn()
+                self.visualizer.callback = self.cb_visualizer
+                self.visualizer.open_port(i)
+            elif "linnstrument" in name_lower:
+                print("LinnStrument (In): " + name)
+                self.midi_in = rtmidi2.MidiIn()
+                self.midi_in.callback = self.cb_midi_in
+                self.midi_in.open_port(i)
         
         # for indev in in_devs:
             # i = 0
-        for ini in ins:
-            # if indev.lower() in ini[1].lower():
-            name = str(ini[1])
-            # innames += [name]
-            if "visualizer" in name:
-                print("Visualizer Input: " + name)
-                inp = pygame.midi.Input(ini[0])
-                self.visualizer = inp
-            elif 'linnstrument' in name.lower():
-                print("Instrument Input: " + name)
-                try:
-                    self.midi_in = pygame.midi.Input(ini[0])
-                except:
-                    print("Warning: MIDI DEVICE IN USE")
-            i += 1
+        # for ini in ins:
+        #     # if indev.lower() in ini[1].lower():
+        #     name = str(ini[1])
+        #     # innames += [name]
+        #     if "visualizer" in name:
+        #         print("Visualizer Input: " + name)
+        #         inp = pygame.midi.Input(ini[0])
+        #         self.visualizer = inp
+        #     elif 'linnstrument' in name.lower():
+        #         print("Instrument Input: " + name)
+        #         try:
+        #             self.midi_in = pygame.midi.Input(ini[0])
+        #         except:
+        #             print("Warning: MIDI DEVICE IN USE")
+        #     i += 1
         
         # self.midi_in = None
         # if ins:
@@ -549,6 +722,8 @@ class Core:
             
         # self.retro_font = pygame.font.Font("PressStart2P.ttf", FONT_SZ)
         self.clock = pygame.time.Clock()
+
+        self.init_hardware()
 
         # self.setup_lights()
 
@@ -635,7 +810,7 @@ class Core:
                         self.mark(n, 1, True)
                         data = [0x90, n, 127]
                         if self.midi_out:
-                            self.midi_out.write([[data,0]])
+                            self.midi_write(self.midi_out, data, 0)
                         pass
                     except KeyError:
                         pass
@@ -646,7 +821,7 @@ class Core:
                     self.mark(n, 0, True)
                     data = [0x80, n, 0]
                     if self.midi_out:
-                        self.midi_out.write([[data, 0]])
+                        self.midi_write(self.midi_out, data, 0)
                 except KeyError:
                     pass
             elif ev.type == pygame_gui.UI_BUTTON_PRESSED:
@@ -737,156 +912,156 @@ class Core:
                             if self.get_note(x,y) == self.lowest_note:
                                 self.set_light(x,y,9)
 
-        if self.visualizer:
-            while self.visualizer.poll():
-                events = self.visualizer.read(100)
-                for ev in events:
-                    data = ev[0]
-                    ch = data[0] & 0x0f
-                    msg = data[0] >> 4
-                    if msg == 9: # note on
-                        self.mark(data[1] + self.vis_octave*12, 1, True)
-                    elif msg == 8: # note off
-                        self.mark(data[1] + self.vis_octave*12, 0, True)
+        # if self.visualizer:
+        #     while self.visualizer.poll():
+        #         events = self.visualizer.read(100)
+        #         for ev in events:
+        #             data = ev[0]
+        #             ch = data[0] & 0x0f
+        #             msg = data[0] >> 4
+        #             if msg == 9: # note on
+        #                 self.mark(data[1] + self.vis_octave*12, 1, True)
+        #             elif msg == 8: # note off
+        #                 self.mark(data[1] + self.vis_octave*12, 0, True)
 
         # row_ofs = [
         #     0, -5, -10
         # ]
-        if self.midi_in:
-            while self.midi_in.poll():
-                events = self.midi_in.read(100)
-                for ev in events:
-                    data = ev[0]
-                    d0 = data[0]
-                    ch = d0 & 0x0f
-                    msg = (data[0] & 0xf0) >> 4
-                    if ONE_CHANNEL:
-                        data[0] = d0 & 0xf0 # send all to channel 0 if enabled
-                    row = None
-                    if not NO_OVERLAP:
-                        row = ch % 8
-                        col = ch // 8
-                    width = self.board_w//2 if HARDWARE_SPLIT else self.board_w
-                    if msg == 9: # note on
-                        # if WHOLETONE:
-                        if NO_OVERLAP:
-                            row = data[1] // width
-                            col = data[1] % width
-                            data[1] = data[1] % width + 30 + 2.5*row
-                            data[1] *= 2
-                            data[1] = int(data[1])
-                            if HARDWARE_SPLIT and ch >= 8:
-                                data[1] += width * 2
-                        else:
-                            data[1] *= 2
-                            try:
-                                data[1] -= row * 5
-                            except IndexError:
-                                pass
+        # if self.midi_in:
+        #     while self.midi_in.poll():
+        #         events = self.midi_in.read(100)
+        #         for ev in events:
+        #             data = ev[0]
+        #             d0 = data[0]
+        #             ch = d0 & 0x0f
+        #             msg = (data[0] & 0xf0) >> 4
+        #             if ONE_CHANNEL:
+        #                 data[0] = d0 & 0xf0 # send all to channel 0 if enabled
+        #             row = None
+        #             if not NO_OVERLAP:
+        #                 row = ch % 8
+        #                 col = ch // 8
+        #             width = self.board_w//2 if HARDWARE_SPLIT else self.board_w
+        #             if msg == 9: # note on
+        #                 # if WHOLETONE:
+        #                 if NO_OVERLAP:
+        #                     row = data[1] // width
+        #                     col = data[1] % width
+        #                     data[1] = data[1] % width + 30 + 2.5*row
+        #                     data[1] *= 2
+        #                     data[1] = int(data[1])
+        #                     if HARDWARE_SPLIT and ch >= 8:
+        #                         data[1] += width * 2
+        #                 else:
+        #                     data[1] *= 2
+        #                     try:
+        #                         data[1] -= row * 5
+        #                     except IndexError:
+        #                         pass
                         
-                        data[1] += (self.octave + self.octave_base) * 12
-                        data[1] += BASE_OFFSET
-                        midinote = data[1] - 24 + self.transpose*2
-                        if self.is_split():
-                            split_chan = self.channel_from_split(row, col)
-                        self.mark(midinote, 1, only_row=row)
-                        data[1] += self.out_octave * 12 + self.transpose*2
-                        if self.flipped:
-                            data[1] += 7
+        #                 data[1] += (self.octave + self.octave_base) * 12
+        #                 data[1] += BASE_OFFSET
+        #                 midinote = data[1] - 24 + self.transpose*2
+        #                 if self.is_split():
+        #                     split_chan = self.channel_from_split(row, col)
+        #                 self.mark(midinote, 1, only_row=row)
+        #                 data[1] += self.out_octave * 12 + self.transpose*2
+        #                 if self.flipped:
+        #                     data[1] += 7
                         
-                        # apply velocity curve
-                        vel = data[2]/127
-                        if self.has_velocity_settings():
-                            vel = self.velocity_curve(data[2]/127)
-                            data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
+        #                 # apply velocity curve
+        #                 vel = data[2]/127
+        #                 if self.has_velocity_settings():
+        #                     vel = self.velocity_curve(data[2]/127)
+        #                     data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
 
-                        note = self.notes[ch]
-                        if note.location is None:
-                            note.location = glm.ivec2(0)
-                        self.notes[ch].location.x = col
-                        self.notes[ch].location.y = row
-                        self.notes[ch].pressure = vel
+        #                 note = self.notes[ch]
+        #                 if note.location is None:
+        #                     note.location = glm.ivec2(0)
+        #                 self.notes[ch].location.x = col
+        #                 self.notes[ch].location.y = row
+        #                 self.notes[ch].pressure = vel
                         
-                        if self.is_split():
-                            if split_chan == 0:
-                                self.midi_out.write([[data, ev[1]]])
-                            else:
-                                self.split_out.write([[data, ev[1]]])
-                        else:
-                            self.midi_out.write([[data, ev[1]]])
+        #                 if self.is_split():
+        #                     if split_chan == 0:
+        #                         self.midi_out.write([[data, ev[1]]])
+        #                     else:
+        #                         self.split_out.write([[data, ev[1]]])
+        #                 else:
+        #                     self.midi_out.write([[data, ev[1]]])
                         
-                        # print('note on: ', data)
-                    elif msg == 8: # note off
-                        # if WHOLETONE:
-                        if NO_OVERLAP:
-                            row = data[1] // width
-                            col = data[1] % width
-                            data[1] = data[1] % width + 30 + 2.5*row
-                            data[1] *= 2
-                            data[1] = int(data[1])
-                            if HARDWARE_SPLIT and ch >= 8:
-                                data[1] += width * 2
-                        else:
-                            data[1] *= 2
-                            try:
-                                data[1] -= row * 5
-                            except IndexError:
-                                pass
+        #                 # print('note on: ', data)
+        #             elif msg == 8: # note off
+        #                 # if WHOLETONE:
+        #                 if NO_OVERLAP:
+        #                     row = data[1] // width
+        #                     col = data[1] % width
+        #                     data[1] = data[1] % width + 30 + 2.5*row
+        #                     data[1] *= 2
+        #                     data[1] = int(data[1])
+        #                     if HARDWARE_SPLIT and ch >= 8:
+        #                         data[1] += width * 2
+        #                 else:
+        #                     data[1] *= 2
+        #                     try:
+        #                         data[1] -= row * 5
+        #                     except IndexError:
+        #                         pass
                         
-                        data[1] += (self.octave + self.octave_base) * 12
-                        data[1] += BASE_OFFSET
-                        midinote = data[1] - 24 + self.transpose*2
-                        if self.is_split():
-                            split_chan = self.channel_from_split(row, col)
-                        self.mark(midinote, 0, only_row=row)
-                        data[1] += self.out_octave * 12 + self.transpose*2
-                        if self.flipped:
-                            data[1] += 7
+        #                 data[1] += (self.octave + self.octave_base) * 12
+        #                 data[1] += BASE_OFFSET
+        #                 midinote = data[1] - 24 + self.transpose*2
+        #                 if self.is_split():
+        #                     split_chan = self.channel_from_split(row, col)
+        #                 self.mark(midinote, 0, only_row=row)
+        #                 data[1] += self.out_octave * 12 + self.transpose*2
+        #                 if self.flipped:
+        #                     data[1] += 7
                     
-                        if self.is_split():
-                            if split_chan == 0:
-                                self.midi_out.write([[data, ev[1]]])
-                            else:
-                                self.split_out.write([[data, ev[1]]])
-                        else:
-                            self.midi_out.write([[data, ev[1]]])
-                        # print('note off: ', data)
-                    # expression pedal
-                    # elif msg == 11: # sustain pedal
-                    #     if SUSTAIN is not None:
-                    #         sus = ev[0][2]
-                    #         ev[0][2] = int(round(clamp(0, 127, sus*SUSTAIN)))
-                    #         self.midi_out.write([[data, ev[1]]])
-                    #     else:
-                    #         self.midi_out.write([ev])
-                    elif 0xf0 <= msg <= 0xf7: # sysex
-                        self.midi_out.write([ev])
-                    else:
-                        # control change, aftertouch, pitch bend, etc...
-                        if self.is_split():
-                            note = self.notes[ch]
-                            if note.location:
-                                col = self.notes[ch].location.x
-                                row = self.notes[ch].location.y
-                                split_chan = self.channel_from_split(row, col)
-                                if split_chan:
-                                    self.split_out.write([ev])
-                                else:
-                                    self.midi_out.write([ev])
-                            else:
-                                self.midi_out.write([ev])
-                        else:
-                            self.midi_out.write([ev])
-                    # else: # sysex
-                    #     # if self.split_out:
-                    #     #     self.split_out.write([ev])
-                    #     # print(ch, msg)
-                    #     self.midi_out.write([ev])
+        #                 if self.is_split():
+        #                     if split_chan == 0:
+        #                         self.midi_out.write([[data, ev[1]]])
+        #                     else:
+        #                         self.split_out.write([[data, ev[1]]])
+        #                 else:
+        #                     self.midi_out.write([[data, ev[1]]])
+        #                 # print('note off: ', data)
+        #             # expression pedal
+        #             # elif msg == 11: # sustain pedal
+        #             #     if SUSTAIN is not None:
+        #             #         sus = ev[0][2]
+        #             #         ev[0][2] = int(round(clamp(0, 127, sus*SUSTAIN)))
+        #             #         self.midi_out.write([[data, ev[1]]])
+        #             #     else:
+        #             #         self.midi_out.write([ev])
+        #             elif 0xf0 <= msg <= 0xf7: # sysex
+        #                 self.midi_out.write([ev])
+        #             else:
+        #                 # control change, aftertouch, pitch bend, etc...
+        #                 if self.is_split():
+        #                     note = self.notes[ch]
+        #                     if note.location:
+        #                         col = self.notes[ch].location.x
+        #                         row = self.notes[ch].location.y
+        #                         split_chan = self.channel_from_split(row, col)
+        #                         if split_chan:
+        #                             self.split_out.write([ev])
+        #                         else:
+        #                             self.midi_out.write([ev])
+        #                     else:
+        #                         self.midi_out.write([ev])
+        #                 else:
+        #                     self.midi_out.write([ev])
+        #             # else: # sysex
+        #             #     # if self.split_out:
+        #             #     #     self.split_out.write([ev])
+        #             #     # print(ch, msg)
+        #             #     self.midi_out.write([ev])
 
-        # if self.config_save_timer > 0.0:
-        #     self.config_save_timer -= dt
-        #     if self.config_save_timer <= 0.0:
-        #         save()
+        # # if self.config_save_timer > 0.0:
+        # #     self.config_save_timer -= dt
+        # #     if self.config_save_timer <= 0.0:
+        # #         save()
         
         self.gui.update(dt)
 
