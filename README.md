@@ -48,7 +48,7 @@ pip install -r requirements.txt
 
 ### Layout
 
-Each row consists of a whole tone scale, separated by 4ths, which cause the rows to alternate.  It sounds strange at first but because of the layout's relation to the circle of 5ths, it makes a number of things easier to play and remember than the default chromatic layout.  It's much easier to demonstrate than it is to explain, so let's begin!
+Each row consists of a whole tone scale, separated by 4ths, which cause the rows to alternate.  It sounds strange at first but because of the layout's relation to the circle of 5ths, it makes a number of things easier to play and remember than the default chromatic layout.
 
 ### Basic Scales
 
