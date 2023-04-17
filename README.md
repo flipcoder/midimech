@@ -82,9 +82,6 @@ Melodic minor has a "2-5" pattern:
  12
 ```
 
-You may notice that based on your starting note, the further left you go, the brighter the scale, and the further right,
-the darker the scale.  This is because the alternating whole tone layout resembles a staggered circle of 5ths which corresponds with musical brightness.
-
 ## Basic Chord Shapes
 
 The symbol 'o' is used for a pressed note to show the shape:
@@ -129,8 +126,11 @@ o
 o o
 ```
 
-Another interesting thing about this layout on the Linnstrument is you can walk up and down while holding major and minor 3rd intervals within a scale without lifting your fingers.
-This technique is most useful for a piano sound or something where pitch shifting is disabled.
+## Brightness
+
+Since the layout resembles the circle of 5ths, the further right you go from your tonic, the brighter than sound.  The further left, the darker the sound. This is because the layout resembles a staggered circle of 5ths which corresponds with musical brightness.  Similarly, a major and minor chord are reflections of each other across the axis running through 1-5 (the root and fifth).
+
+If you take the 3-4 pattern described above and shift your tonic inside of it, the further the tonic is to the left, the brighter the mode, from lydian all the way to locrian (left to right).  This happens with other scale shapes as well.
 
 ## More Scales
 
