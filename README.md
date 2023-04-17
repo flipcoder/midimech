@@ -137,7 +137,7 @@ If you take the 3-4 pattern described above and shift your tonic inside of it, t
 Another benefit of this layout is the ability to identify and switch key signatures easily based on position.  As you shift to the left, you add flats.  To the right, you add sharps.  You walk these in a zig-zag motion between both whole tone scales.  Follow the shape of these numbers to see the pattern (from 1 to 7).
 
 ```
-2468
+ 2468
 1357
 ```
 
