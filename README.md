@@ -141,7 +141,7 @@ If note 1 is C (no sharps or flats in key signature), moving to 3 adds 2 sharps 
 
 ### Brightness
 
-Since the layout resembles the circle of 5ths, the further right you go from your tonic, the brighter than sound.  The further left, the darker the sound. This is because the layout resembles a staggered circle of 5ths which corresponds with musical brightness.  Similarly, a major and minor chord are reflections of each other across the axis running through 1-5 (the root and fifth).
+Since the layout resembles the circle of 5ths, the further right you go from your tonic, the brighter than sound.  The further left, the darker the sound. This is because the layout resembles a staggered circle of 5ths which corresponds with musical brightness.
 
 If you take the 3-4 pattern described above and shift your tonic inside of it, the further the tonic is to the left, the brighter the mode, from lydian all the way to locrian (left to right).  This happens with other scale shapes as well.
 
