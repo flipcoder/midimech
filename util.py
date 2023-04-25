@@ -1,5 +1,4 @@
 import os,sys,glm,copy,binascii,struct,math,traceback
-import rtmidi2
 from util import *
 from dataclasses import dataclass
 import glm

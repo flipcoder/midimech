@@ -39,13 +39,13 @@ b = 0.5
 COLOR_CODES = [
     glm.ivec3(0), # default color
     glm.ivec3(255, 0, 0), # red
-    glm.ivec3(255, 255, 0), # yellow
+    glm.ivec3(205, 127, 0), # yellow
     glm.ivec3(0, 127, 0), # green
     glm.ivec3(0, 127, 127), # cyan
-    glm.ivec3(0, 0, 255), # blue
+    glm.ivec3(0, 0, 128), # blue
     glm.ivec3(255, 0, 255), # magenta
-    glm.ivec3(32), # off
-    glm.ivec3(200,200,200), # gray
+    glm.ivec3(0), # off
+    glm.ivec3(80,80,80), # gray
     glm.ivec3(255,127,0), # orange
     glm.ivec3(0,255,0), # lime
     glm.ivec3(255,127,127), # pink
@@ -602,7 +602,7 @@ class Core:
         for i in range(len(outnames)):
             name = outnames[i]
             name_lower = name.lower()
-            # print(name_lower)
+            print(name_lower)
             if "linnstrument" in name_lower:
                 print("LinnStrument (Out): " + name)
                 self.linn_out = rtmidi2.MidiOut()
@@ -1041,6 +1041,7 @@ class Core:
                 #     col = self.get_color(x, y)
                 lit_col = glm.ivec3(255,0,0)
                 unlit_col = copy.copy(self.get_color(x, y))
+                black = (unlit_col == glm.ivec3(0))
                 inner_col = copy.copy(unlit_col)
                 for i in range(len(unlit_col)):
                     unlit_col[i] = min(255, unlit_col[i] * 1.5)
@@ -1050,9 +1051,11 @@ class Core:
                 rect = [x*sz + b, self.menu_sz + y*sz + b, sz - b, sz - b]
                 inner_rect = [rect[0]+4, rect[1]+4, rect[2]-8, rect[3]-8]
                 pygame.draw.rect(self.screen.surface, unlit_col, rect, border_radius=8)
-                
                 pygame.draw.rect(self.screen.surface, inner_col, inner_rect, border_radius=8)
-                pygame.draw.rect(self.screen.surface, BORDER_COLOR, rect, width=2, border_radius=8)
+                if not black:
+                    pygame.draw.rect(self.screen.surface, BORDER_COLOR, rect, width=2, border_radius=8)
+                else:
+                    pygame.draw.rect(self.screen.surface, glm.vec3(24), rect, width=2, border_radius=8)
                 if cell:
                     circ = glm.ivec2(int(x*sz + b/2 + sz/2), int(self.menu_sz + y*sz + b/2 + sz/2))
                     pygame.gfxdraw.aacircle(self.screen.surface, circ.x+1, circ.y-1, rad, glm.ivec3(255,0,0))
