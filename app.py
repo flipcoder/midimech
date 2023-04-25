@@ -813,7 +813,7 @@ class Core:
             sval = sign(val)
             for rpt in range(aval):
                 self.transpose_board(sval)
-                self.tranpose += sval
+                self.transpose += sval
         elif val == 1:  # shift right (add column left)
             for y in range(len(self.board)):
                 self.board[y] = [0] + self.board[y][:-1]
@@ -838,10 +838,10 @@ class Core:
                 except IndexError:
                     pass
                 if use_lights:
-                    if state:
-                        self.set_light(x, y, 1)
-                    else:
-                        self.reset_light(x, y)
+                    # if state:
+                    #     self.set_light(x, y, 1)
+                    # else:
+                    self.reset_light(x, y)
             y += 1
         self.dirty = True
 
@@ -910,7 +910,7 @@ class Core:
         return self.options.no_overlap and self.split_state and self.split_out
 
     def logic(self, dt):
-        keys = pygame.key.get_pressed()
+        # keys = pygame.key.get_pressed()
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT:
                 self.quit()
