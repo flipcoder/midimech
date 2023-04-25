@@ -11,6 +11,8 @@ License: MIT
 
 LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 
+*This is unofficial and not affiliated with Roger Linn Design.*
+
 ![Screenshot](https://i.imgur.com/eYsl3T4.png)
 
 ## Video
