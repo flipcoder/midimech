@@ -138,9 +138,15 @@ class Core:
         #     self.send_cc(0, 22, 7) # no light
 
     def reset_light(self, x, y):
-        if not self.options.lights: return
         note = self.get_note_index(x, y) % 12
-        light_col = self.options.lights[note]
+        if self.is_split():
+            split_chan = self.channel_from_split(self.board_h-y-1, x)
+            if split_chan:
+                light_col = self.options.split_lights[note]
+            else:
+                light_col = self.options.lights[note]
+        else:
+            light_col = self.options.lights[note]
         self.set_light(x, y, light_col)
         self.red_lights[y][x] = False
     
@@ -151,7 +157,6 @@ class Core:
                     self.set_light(x, y, 1)
                 else:
                     self.reset_light(x, y)
-    
 
     def reset_lights(self):
         for y in range(self.board_h):
@@ -188,7 +193,15 @@ class Core:
     def get_color(self, x, y):
         # return NOTE_COLORS[get_note_index(x, y)]
         note = self.get_note_index(x, y)
-        return COLOR_CODES[self.options.lights[note]]
+        if self.is_split():
+            split_chan = self.channel_from_split(self.board_h-y-1, x)
+            if split_chan:
+                light_col = self.options.split_lights[note]
+            else:
+                light_col = self.options.lights[note]
+        else:
+            light_col = self.options.lights[note]
+        return COLOR_CODES[light_col]
 
     def mouse_held(self):
         return self.mouse_midi != -1
@@ -423,26 +436,26 @@ class Core:
                 high = self.options.velocity_curve_HIGH
                 self.velocity_curve_ = low + val2*(high-low)
 
-    def save():
-        self.cfg = ConfigParser(allow_no_value=True)
-        general = self.cfg['general'] = {}
-        if self.options.lights:
-            general['lights'] = ','.join(map(str,self.options.lights))
-        general['one_channel'] = self.options.one_channel
-        general['velocity_curve'] = self.options.velocity_curve
-        general['min_velocity'] = self.options.min_velocity
-        general['max_velocity'] = self.options.max_velocity
-        general['no_overlap'] = self.options.no_overlap
-        general['hardware_split'] = self.options.hardware_split
-        general['show_lowest_note'] = self.options.show_lowest_note
-        general['midi_out'] = self.options.midi_out
-        general['split_out'] = self.options.split_out
-        general['split'] = SPLIT
-        general['fps'] = self.options.fps
-        general['sustain'] = SUSTAIN
-        self.cfg['general'] = general
-        with open('settings_temp.ini', 'w') as configfile:
-            self.cfg.write(configfile)
+    # def save():
+    #     self.cfg = ConfigParser(allow_no_value=True)
+    #     general = self.cfg['general'] = {}
+    #     if self.options.lights:
+    #         general['lights'] = ','.join(map(str,self.options.lights))
+    #     general['one_channel'] = self.options.one_channel
+    #     general['velocity_curve'] = self.options.velocity_curve
+    #     general['min_velocity'] = self.options.min_velocity
+    #     general['max_velocity'] = self.options.max_velocity
+    #     general['no_overlap'] = self.options.no_overlap
+    #     general['hardware_split'] = self.options.hardware_split
+    #     general['show_lowest_note'] = self.options.show_lowest_note
+    #     general['midi_out'] = self.options.midi_out
+    #     general['split_out'] = self.options.split_out
+    #     general['split'] = SPLIT
+    #     general['fps'] = self.options.fps
+    #     general['sustain'] = SUSTAIN
+    #     self.cfg['general'] = general
+    #     with open('settings_temp.ini', 'w') as configfile:
+    #         self.cfg.write(configfile)
     
     def __init__(self):
 
@@ -456,11 +469,17 @@ class Core:
         self.options = Options()
 
         default_lights = '4,7,3,7,3,3,7,3,7,3,7,3'
+        default_split_lights = '4,7,5,7,5,5,7,5,7,5,7,5'
         
         # LIGHT = glm.ivec3(127)
         self.options.lights = get_option(opts,'lights',default_lights)
         if self.options.lights:
             self.options.lights = list(map(lambda x: int(x), self.options.lights.split(',')))
+
+        self.options.split_lights = get_option(opts,'lights',default_split_lights)
+        if self.options.split_lights:
+            self.options.split_lights = list(map(lambda x: int(x), self.options.split_lights.split(',')))
+        
         self.options.one_channel = get_option(opts,'one_channel',False)
         
         # bend the velocity curve, examples: 0.5=sqrt, 1.0=default, 2.0=squared
@@ -746,14 +765,14 @@ class Core:
         self.done = True
 
     def clear_marks(self, use_lights=False):
-        for row in rows:
+        y = 0
+        for row in self.board:
             x = 0
             for x in range(len(row)):
                 idx = self.get_note_index(x, y)
                 try:
-                    self.board[y+self.flipped][x] = state
+                    self.board[y][x] = False
                 except IndexError:
-                    print("clear_marks: Out of range")
                     pass
                 if use_lights:
                     if state:
@@ -815,7 +834,7 @@ class Core:
         self.dirty_lights = True
 
     def channel_from_split(self, row, col):
-        if not self.options.split:
+        if not self.is_split():
             return 0
         w = self.board_w
         col += 1 # move start point from C to A#
@@ -825,7 +844,7 @@ class Core:
 
     def is_split(self):
         # TODO: make this work with hardware overlap (non-mpe)
-        return self.options.no_overlap and self.options.split and self.split_out
+        return self.options.no_overlap and self.split_state and self.split_out
     
     def logic(self, dt):
 
@@ -841,6 +860,7 @@ class Core:
                     try:
                         n = self.keys[ev.key]
                         n -= 12
+                        n += self.octave * 12
                         self.mark(n + self.vis_octave * 12, 1, True)
                         data = [0x90, n, 127]
                         # TODO: add split for mouse?
@@ -852,6 +872,7 @@ class Core:
                 try:
                     n = self.keys[ev.key]
                     n -= 12
+                    n += self.octave * 12
                     self.mark(n + self.vis_octave * 12, 0, True)
                     data = [0x80, n, 0]
                     if self.midi_out:
@@ -874,15 +895,19 @@ class Core:
                 if ev.ui_element == self.btn_octave_down:
                     self.octave -= 1
                     self.dirty = self.dirty_lights = True
+                    self.clear_marks(use_lights=False)
                 elif ev.ui_element == self.btn_octave_up:
                     self.octave += 1
                     self.dirty = self.dirty_lights = True
+                    self.clear_marks(use_lights=False)
                 elif ev.ui_element == self.btn_transpose_down:
                     self.transpose_board(-1)
                     self.dirty = self.dirty_lights = True
+                    self.clear_marks(use_lights=False)
                 elif ev.ui_element == self.btn_transpose_up:
                     self.transpose_board(1)
                     self.dirty = self.dirty_lights = True
+                    self.clear_marks(use_lights=False)
                 # elif ev.ui_element == self.btn_mode:
                 #     # TODO: toggle mode
                 #     self.dirty = True
@@ -901,14 +926,16 @@ class Core:
                     else:
                         self.transpose -= 3
                         self.rotated = True
+                    self.clear_marks(use_lights=False)
                     self.dirty = self.dirty_lights = True
                 elif ev.ui_element == self.btn_flip:
                     self.flipped = not self.flipped
+                    self.clear_marks(use_lights=False)
                     self.dirty = self.dirty_lights = True
                 elif ev.ui_element == self.btn_split:
                     self.split_state = not self.split_state
                     self.btn_split.set_text("SPLIT: " + ("ON" if self.split_state else "OFF"))
-                    self.dirty = True
+                    self.dirty = self.dirty_lights = True
             # elif ev.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
             #     if ev.ui_element == self.slider_velocity:
             #         global self.options.velocity_curve
