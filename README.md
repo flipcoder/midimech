@@ -11,6 +11,8 @@ License: MIT
 
 LinnStrument Discord Chat: https://discord.gg/h2BcrzmTXe
 
+![Screenshot](https://i.imgur.com/eYsl3T4.png)
+
 ## Video
 
 [![Video](https://img.youtube.com/vi/GbkhwpPsbPo/0.jpg)](https://www.youtube.com/watch?v=GbkhwpPsbPo)
