@@ -36,7 +36,7 @@ except KeyError:
 
 default_lights = '3,7,5,7,5,8,7,8,2,8,7,8'
 OFFSET = 0
-TITLE = "Linnstrument-Wholetone"
+TITLE = "Wholetone Layout"
 # FOCUS = False
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 WHOLETONE = True
@@ -59,6 +59,11 @@ BASE_OFFSET = -4
 EPSILON = 0.0001
 # bend the velocity curve, examples: 0.5=sqrt, 1.0=default, 2.0=squared
 VELOCITY_CURVE = get_option(opts,'velocity_curve',1.0)
+
+# these settings are only used with the foot controller
+VELOCITY_CURVE_LOW = get_option(opts,'velocity_curve_low',0.5) # loudest (!)
+VELOCITY_CURVE_HIGH = get_option(opts,'velocity_curve_high',3.0) # quietest (!)
+
 if VELOCITY_CURVE < EPSILON: # if its near zero, set default
     VELOCITY_CURVE = 1.0 # default
 MIN_VELOCITY = get_option(opts,'min_velocity',0)
@@ -71,8 +76,15 @@ MIDI_OUT = get_option(opts,'midi_out','loopmidi')
 SPLIT_OUT = get_option(opts,'split_out','split')
 FPS = get_option(opts,'fps',60)
 SPLIT = get_option(opts,'split',False)
+FOOT_IN = get_option(opts,'foot_in','')
 SUSTAIN = get_option(opts,'sustain',1.0) # sustain scale
 FADE_SPEED = 4.0
+
+# which split the sustain affects
+SUSTAIN_SPLIT = get_option(opts, 'sustain_split', 'both') # left, right, both
+if SUSTAIN_SPLIT not in ('left', 'right', 'both'):
+    print("Invalid sustain split value. Options: left, right, both.")
+    sys.exit(1)
 
 # simulator keys
 KEYS = {}
@@ -216,14 +228,14 @@ class Core:
         pass
     
     def has_velocity_curve(self):
-        return abs(VELOCITY_CURVE - 1.0) > EPSILON
+        return abs(self.velocity_curve_ - 1.0) > EPSILON
 
     def has_velocity_settings(self):
         return MIN_VELOCITY > 0 or MAX_VELOCITY < 127 or self.has_velocity_curve()
 
     def velocity_curve(self, val): # 0-1
         if self.has_velocity_curve():
-            val = val**VELOCITY_CURVE
+            val = val**self.velocity_curve_
         return val
     
     def send_cc(self, channel, cc, val):
@@ -432,21 +444,22 @@ class Core:
             else:
                 self.midi_write(self.midi_out, data, ts)
             # print('note off: ', data)
-        # expression pedal
-        elif msg == 11: # sustain pedal
-            # if SUSTAIN is not None:
-            #     sus = ev[0][2]
-            #     ev[0][2] = int(round(clamp(0, 127, sus*SUSTAIN)))
-            #     self.midi_write(self.midi_out, data, ts)
-            # else:
-            self.midi_write(self.midi_out, data, ts)
         elif 0xf0 <= msg <= 0xf7: # sysex
-            self.midi_out.write([ev])
+            self.midi_write(self.midi_out, data, ts)
         else:
             # control change, aftertouch, pitch bend, etc...
-            if self.is_split():
+            if data[1] == 64: # sustain pedal
+                if self.is_split():
+                    for dev in self.sustainable_devices():
+                        self.midi_write(dev, data, ts)
+                else:
+                    self.midi_write(self.midi_out, data, ts)
+            elif self.is_split():
                 note = self.notes[ch]
-                if note.location:
+                if ch == 0:
+                    self.midi_write(self.midi_out, data, ts)
+                    self.midi_write(self.split_out, data, ts)
+                elif note.location is not None:
                     col = self.notes[ch].location.x
                     row = self.notes[ch].location.y
                     split_chan = self.channel_from_split(row, col)
@@ -456,6 +469,7 @@ class Core:
                         self.midi_write(self.midi_out, data, ts)
                 else:
                     self.midi_write(self.midi_out, data, ts)
+                    self.midi_write(self.split_out, data, ts)
             else:
                 self.midi_write(self.midi_out, data, ts)
         
@@ -468,6 +482,23 @@ class Core:
         elif msg == 8: # note off
             self.mark(data[1] + self.vis_octave*12, 0, True)
 
+    def cb_foot(self, data, ts):
+        ch = data[0] & 0x0f
+        msg = (data[0] & 0xf0) >> 4
+        if msg == 11:
+            # change velocity curve
+            val = data[1]
+            val2 = None
+            if val == 27: # left expr pedal
+                self.midi_write(self.midi_out, data, 0)
+                if self.is_split():
+                    data[1] = 67 # soft pedal
+                    self.midi_write(self.split_out, data, 0)
+            elif val == 7: # right expr pedal
+                val2 = 1.0 - data[2] / 127
+                low = VELOCITY_CURVE_LOW
+                high = VELOCITY_CURVE_HIGH
+                self.velocity_curve_ = low + val2*(high-low)
     
     def __init__(self):
 
@@ -497,6 +528,8 @@ class Core:
         self.rotated = False # transpose -3 whole steps
         self.flipped = False # vertically shift +1
         self.config_save_timer = 1.0
+
+        self.velocity_curve_ = VELOCITY_CURVE
 
         self.init_board()
 
@@ -622,15 +655,15 @@ class Core:
             name_lower = name.lower()
             # print(name_lower)
             if "linnstrument" in name_lower:
-                print("LinnStrument Out: " + name)
+                print("LinnStrument (Out): " + name)
                 self.linn_out = rtmidi2.MidiOut()
                 self.linn_out.open_port(i)
-            elif not SPLIT_OUT is None and SPLIT_OUT in name_lower:
-                print("Split Out: " + name)
+            elif SPLIT_OUT and SPLIT_OUT in name_lower:
+                print("Split (Out): " + name)
                 self.split_out = rtmidi2.MidiOut()
                 self.split_out.open_port(i)
             elif MIDI_OUT in name_lower:
-                print("MIDI Out: " + name)
+                print("Loopback (Out): " + name)
                 self.midi_out = rtmidi2.MidiOut()
                 self.midi_out.open_port(i)
 
@@ -681,6 +714,11 @@ class Core:
                 self.midi_in = rtmidi2.MidiIn()
                 self.midi_in.callback = self.cb_midi_in
                 self.midi_in.open_port(i)
+            elif FOOT_IN and FOOT_IN in name_lower:
+                print("Foot Controller (In): " + name)
+                self.foot_in = rtmidi2.MidiIn()
+                self.foot_in.open_port(i)
+                self.foot_in.callback = self.cb_foot
         
         # for indev in in_devs:
             # i = 0
@@ -869,7 +907,7 @@ class Core:
             #         global VELOCITY_CURVE
             #         VELOCITY_CURVE = ev.value
             #         self.config_save_timer = 1.0
-                
+            
             self.gui.process_events(ev)
 
         # figure out the lowest note to highlight it
@@ -1064,6 +1102,17 @@ class Core:
         # #         save()
         
         self.gui.update(dt)
+
+    def sustainable_devices(self):
+        if not self.is_split() or not SUSTAIN_SPLIT:
+            return [self.midi_out]
+        if SUSTAIN_SPLIT=='left':
+            return [self.midi_out]
+        elif SUSTAIN_SPLIT=='right':
+            return [self.split_out]
+        elif SUSTAIN_SPLIT=='both':
+            return [self.midi_out, self.split_out]
+        return [self.midi_out]
 
     def render(self):
         if not self.dirty:
