@@ -163,7 +163,7 @@ class Core:
 
     def xy_to_midi(self, x, y):
         row = self.board_h - y
-        r = x % self.board_w + 25.5 + 2.5 * row
+        r = x % self.board_w + 25.5 + 2.5 * row # FIXME: make this simpler
         r *= 2
         r = int(r)
         r += (self.octave + self.octave_base) * 12
@@ -186,6 +186,54 @@ class Core:
         # return NOTE_COLORS[get_note_index(x, y)]
         note = self.get_note_index(x, y)
         return COLOR_CODES[self.options.lights[note]]
+
+    def mouse_held(self):
+        return self.mouse_midi != -1
+
+    def mouse_press(self, x, y, state=True, hold=False):
+        if y < 0:
+            return
+        
+        # if we're not intending to hold the note, we release the previous primary note
+        if not hold:
+            if self.mouse_held():
+                self.mouse_release()
+        
+        vel = y % int(self.button_sz)
+        x /= int(self.button_sz)
+        y /= int(self.button_sz)
+        
+        vel = vel / int(self.button_sz)
+        vel = 1 - vel
+        vel *= 127
+        vel = clamp(0, 127, int(vel))
+        
+        x, y = int(x), int(y)
+        
+        self.mark_xy(x, y, state)
+        v = glm.ivec2(x, y)
+        midinote = self.xy_to_midi(v.x, v.y)
+        if not hold:
+            self.mouse_mark = v
+            self.mouse_midi = midinote
+        data = [0x90 if state else 0x80, midinote, vel]
+        if self.midi_out:
+            self.midi_write(self.midi_out, data, 0)
+
+    def mouse_hold(self, x, y):
+        return self.mouse_press(x, y, True, hold=True)
+
+    def mouse_release(self, x=None, y=None):
+        # x and y provided? it's a specific coordinate
+        if x is not None and y is not None:
+            return self.mouse_press(x, y, False)
+        # x and y not provided? it uses the primary mouse coordinate
+        if self.mouse_midi != -1:
+            self.mark_xy(self.mouse_mark.x, self.mouse_mark.y, False)
+            data = [0x80, self.mouse_midi, 127]
+            if self.midi_out:
+                self.midi_write(self.midi_out, data, 0)
+            self.mouse_midi = -1
 
     # Given an x,y position, find the octave
     #  (used to initialize octaves 2D array)
@@ -613,7 +661,7 @@ class Core:
         for i in range(len(outnames)):
             name = outnames[i]
             name_lower = name.lower()
-            print(name_lower)
+            # print(name_lower)
             if "linnstrument" in name_lower:
                 print("LinnStrument (Out): " + name)
                 self.linn_out = rtmidi2.MidiOut()
@@ -801,23 +849,14 @@ class Core:
             elif ev.type == pygame.MOUSEBUTTONDOWN:
                 x, y = ev.pos
                 y -= self.menu_sz
-                if y >= 0:
-                    x /= int(self.button_sz)
-                    y /= int(self.button_sz)
-                    x, y = int(x), int(y)
-                    self.mark_xy(x, y, True)
-                    self.mouse_mark = glm.ivec2(x, y)
-                    self.mouse_midi = self.xy_to_midi(self.mouse_mark.x, self.mouse_mark.y)
-                    data = [0x90, self.mouse_midi, 127]
-                    if self.midi_out:
-                        self.midi_write(self.midi_out, data, 0)
+                if ev.button == 1:
+                    self.mouse_press(x, y)
+                elif ev.button == 2:
+                    self.mouse_release(x, y)
+                elif ev.button == 3:
+                    self.mouse_hold(x, y)
             elif ev.type == pygame.MOUSEBUTTONUP:
-                if self.mouse_midi != -1:
-                    self.mark_xy(self.mouse_mark.x, self.mouse_mark.y, False)
-                    data = [0x80, self.mouse_midi, 127]
-                    if self.midi_out:
-                        self.midi_write(self.midi_out, data, 0)
-                    self.mouse_midi = -1
+                self.mouse_release()
             elif ev.type == pygame_gui.UI_BUTTON_PRESSED:
                 if ev.ui_element == self.btn_octave_down:
                     self.octave -= 1
