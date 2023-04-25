@@ -161,6 +161,14 @@ class Core:
     def get_octave(self, x, y):
         return self.octaves[y - self.board_h + self.flipped][x] + self.octave
 
+    def xy_to_midi(self, x, y):
+        row = self.board_h - y
+        r = x % self.board_w + 25.5 + 2.5 * row
+        r *= 2
+        r = int(r)
+        r += (self.octave + self.octave_base) * 12
+        return r
+
     def get_note_index(self, x, y):
         y += self.flipped
         x += self.transpose
@@ -396,7 +404,7 @@ class Core:
 
         self.options = Options()
 
-        default_lights = '3,7,5,7,5,8,7,8,2,8,7,8'
+        default_lights = '4,7,3,7,3,3,7,3,7,3,7,3'
         
         # LIGHT = glm.ivec3(127)
         self.options.lights = get_option(opts,'lights',default_lights)
@@ -479,6 +487,9 @@ class Core:
         self.config_save_timer = 1.0
 
         self.velocity_curve_ = self.options.velocity_curve
+
+        self.mouse_mark = glm.ivec2(0)
+        self.mouse_midi = -1
 
         self.init_board()
 
@@ -683,6 +694,31 @@ class Core:
         self.reset_lights()
         self.done = True
 
+    def clear_marks(self, use_lights=False):
+        for row in rows:
+            x = 0
+            for x in range(len(row)):
+                idx = self.get_note_index(x, y)
+                self.board[y+self.flipped][x] = state
+                if use_lights:
+                    if state:
+                        self.set_light(x, y, 1)
+                    else:
+                        self.reset_light(x, y)
+            y += 1
+        self.dirty = True
+
+    def mark_xy(self, x, y, state, use_lights=False):
+        idx = self.get_note_index(x, y)
+        octave = self.get_octave(x, y)
+        self.board[y+self.flipped][x] = state
+        if use_lights:
+            if state:
+                self.set_light(x, y, 1)
+            else:
+                self.reset_light(x, y)
+        self.dirty = True
+
     def mark(self, midinote, state, use_lights=False, only_row=None):
         if only_row is not None:
             only_row = self.board_h - only_row - 1 - self.flipped #flip
@@ -746,6 +782,7 @@ class Core:
                         n -= 12
                         self.mark(n + self.vis_octave * 12, 1, True)
                         data = [0x90, n, 127]
+                        # TODO: add split for mouse?
                         if self.midi_out:
                             self.midi_write(self.midi_out, data, 0)
                     except KeyError:
@@ -757,9 +794,30 @@ class Core:
                     self.mark(n + self.vis_octave * 12, 0, True)
                     data = [0x80, n, 0]
                     if self.midi_out:
+                        # TODO: add split for mouse?
                         self.midi_write(self.midi_out, data, 0)
                 except KeyError:
                     pass
+            elif ev.type == pygame.MOUSEBUTTONDOWN:
+                x, y = ev.pos
+                y -= self.menu_sz
+                if y >= 0:
+                    x /= int(self.button_sz)
+                    y /= int(self.button_sz)
+                    x, y = int(x), int(y)
+                    self.mark_xy(x, y, True)
+                    self.mouse_mark = glm.ivec2(x, y)
+                    self.mouse_midi = self.xy_to_midi(self.mouse_mark.x, self.mouse_mark.y)
+                    data = [0x90, self.mouse_midi, 127]
+                    if self.midi_out:
+                        self.midi_write(self.midi_out, data, 0)
+            elif ev.type == pygame.MOUSEBUTTONUP:
+                if self.mouse_midi != -1:
+                    self.mark_xy(self.mouse_mark.x, self.mouse_mark.y, False)
+                    data = [0x80, self.mouse_midi, 127]
+                    if self.midi_out:
+                        self.midi_write(self.midi_out, data, 0)
+                    self.mouse_midi = -1
             elif ev.type == pygame_gui.UI_BUTTON_PRESSED:
                 if ev.ui_element == self.btn_octave_down:
                     self.octave -= 1
@@ -797,7 +855,7 @@ class Core:
                     self.dirty = self.dirty_lights = True
                 elif ev.ui_element == self.btn_split:
                     self.split_state = not self.split_state
-                    self.btn_split.set_text("SPLIT: " + ("ON" if SPLIT else "OFF"))
+                    self.btn_split.set_text("SPLIT: " + ("ON" if self.split_state else "OFF"))
                     self.dirty = True
             # elif ev.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
             #     if ev.ui_element == self.slider_velocity:
