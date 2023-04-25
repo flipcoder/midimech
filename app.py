@@ -86,30 +86,6 @@ if SUSTAIN_SPLIT not in ('left', 'right', 'both'):
     print("Invalid sustain split value. Options: left, right, both.")
     sys.exit(1)
 
-# simulator keys
-KEYS = {}
-i = 0
-for key in '1234567890-=':
-    KEYS[ord(key)] = 62 + i
-    i += 2
-KEYS[pygame.K_BACKSPACE] = 62 + i
-i = 0
-for key in 'qwertyuiop[]\\':
-    KEYS[ord(key)] = 57 + i
-    i += 2
-i = 0
-for key in 'asdfghjkl;\'':
-    KEYS[ord(key)] = 52 + i
-    i += 2
-KEYS[pygame.K_RETURN] = 52 + i
-i = 0
-for key in 'zxcvbnm,./':
-    KEYS[ord(key)] = 47 + i
-    i += 2
-KEYS[pygame.K_RSHIFT] = 47 + i
-del i
-
-
 def save():
     cfg = ConfigParser(allow_no_value=True)
     general = cfg['general'] = {}
@@ -246,6 +222,12 @@ class Core:
         # self.linn_out.send_messages(0xb0, [(channel, cc, val)])
 
     def set_light(self, x, y, col): # col is [1,11], 0 resets
+
+        if y < 0 or y > self.board_h:
+            return
+        if x < 0 or x > self.board_w:
+            return
+        
         self.red_lights[y][x] = (col==1)
         self.send_cc(0, 20, x+1)
         self.send_cc(0, 21, self.board_h - y - 1)
@@ -335,13 +317,13 @@ class Core:
         # ]
         # generate grid of octaves like above
         self.octaves = []
-        for y in range(self.board_h):
+        for y in range(self.board_h + 1): # 1 = flipping
             self.octaves.append([])
             for x in range(self.max_width):
                 self.octaves[y].append(self.init_octave(x, y))
         self.octaves = list(reversed(self.octaves))
 
-        self.notes = [None] * 16
+        self.notes = [None] * 16 # polyphony
         for i in range(len(self.notes)):
             self.notes[i] = Note()
 
@@ -505,6 +487,28 @@ class Core:
         global CORE
         CORE = self
 
+        # simulator keys
+        self.keys = {}
+        i = 0
+        for key in '1234567890-=':
+            self.keys[ord(key)] = 62 + i
+            i += 2
+        self.keys[pygame.K_BACKSPACE] = 62 + i
+        i = 0
+        for key in 'qwertyuiop[]\\':
+            self.keys[ord(key)] = 57 + i
+            i += 2
+        i = 0
+        for key in 'asdfghjkl;\'':
+            self.keys[ord(key)] = 52 + i
+            i += 2
+        self.keys[pygame.K_RETURN] = 52 + i
+        i = 0
+        for key in 'zxcvbnm,./':
+            self.keys[ord(key)] = 47 + i
+            i += 2
+        self.keys[pygame.K_RSHIFT] = 47 + i
+
         # self.panel = CHORD_ANALYZER
         self.menu_sz = 32 # 64
         self.max_width = 25 # MAX WIDTH OF LINNSTRUMENT
@@ -522,7 +526,7 @@ class Core:
         self.lowest_note_midi = None # midi number of lowest note currently pressed
         self.octave = 0
         self.out_octave = 0
-        self.vis_octave = -2
+        self.vis_octave = -2 # this is for both the visualizer and the keyboard simulator marking atm
         self.octave_base = -2
         self.transpose = 0
         self.rotated = False # transpose -3 whole steps
@@ -787,7 +791,7 @@ class Core:
 
     def mark(self, midinote, state, use_lights=False, only_row=None):
         if only_row is not None:
-            only_row = self.board_h - only_row - 1 #flip
+            only_row = self.board_h - only_row - 1 - self.flipped #flip
             rows = [self.board[only_row]]
             y = only_row
         else:
@@ -797,10 +801,11 @@ class Core:
             x = 0
             for x in range(len(row)):
                 idx = self.get_note_index(x, y)
+                # print(x, y, midinote%12, idx)
                 if midinote%12 == idx:
                     octave = self.get_octave(x, y)
                     if octave == midinote//12:
-                        self.board[y][x] = state
+                        self.board[y+self.flipped][x] = state
                         if use_lights:
                             if state:
                                 self.set_light(x, y, 1)
@@ -843,20 +848,19 @@ class Core:
                     self.quit()
                 else:
                     try:
-                        n = KEYS[ev.key]
+                        n = self.keys[ev.key]
                         n -= 12
-                        self.mark(n, 1, True)
+                        self.mark(n + self.vis_octave * 12, 1, True)
                         data = [0x90, n, 127]
                         if self.midi_out:
                             self.midi_write(self.midi_out, data, 0)
-                        pass
                     except KeyError:
                         pass
             elif ev.type == pygame.KEYUP:
                 try:
-                    n = KEYS[ev.key]
+                    n = self.keys[ev.key]
                     n -= 12
-                    self.mark(n, 0, True)
+                    self.mark(n + self.vis_octave * 12, 0, True)
                     data = [0x80, n, 0]
                     if self.midi_out:
                         self.midi_write(self.midi_out, data, 0)
