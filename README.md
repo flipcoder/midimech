@@ -9,7 +9,7 @@ This program is a work-in-progress so some things might be a bit buggy.  Let me 
 
 License: MIT
 
-LinnStrument Discord Chat: https://discord.gg/h2BcrzmTXe
+LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 
 ![Screenshot](https://i.imgur.com/eYsl3T4.png)
 
