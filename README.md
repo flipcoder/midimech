@@ -48,7 +48,7 @@ pip install -r requirements.txt
 
 ### Layout
 
-Each row consists of a whole tone scale, separated by 4ths, which cause the rows to alternate.  It sounds strange at first but because of the layout's relation to the circle of 5ths, it makes a number of things easier to play and remember than the default chromatic layout.  It's much easier to demonstrate than it is to explain, so let's begin!
+Each row consists of a whole tone scale, separated by 4ths, which cause the rows to alternate.  It sounds strange at first but because of the layout's relation to the circle of 5ths, it makes a number of things easier to play and remember than the default chromatic layout.
 
 ### Basic Scales
 
@@ -81,9 +81,6 @@ Melodic minor has a "2-5" pattern:
 34567
  12
 ```
-
-You may notice that based on your starting note, the further left you go, the brighter the scale, and the further right,
-the darker the scale.  This is because the alternating whole tone layout resembles a staggered circle of 5ths which corresponds with musical brightness.
 
 ## Basic Chord Shapes
 
@@ -129,8 +126,24 @@ o
 o o
 ```
 
-Another interesting thing about this layout on the Linnstrument is you can walk up and down while holding major and minor 3rd intervals within a scale without lifting your fingers.
-This technique is most useful for a piano sound or something where pitch shifting is disabled.
+## Circle of 5ths
+
+### Key Signature
+
+A benefit of this layout is the ability to identify and switch key signatures easily based on position.  As you shift to the left, you add flats.  To the right, you add sharps.  You walk these in a zig-zag motion between both whole tone scales.  Follow the shape of these numbers to see the pattern (from 1 to 7).
+
+```
+ 2468
+1357
+```
+
+If note 1 is C (no sharps or flats in key signature), moving to 3 adds 2 sharps to the key signature.  Simiarly if you're moving from 3 to 1, it adds two flats (or subtracts sharps).
+
+### Brightness
+
+Since the layout resembles the circle of 5ths, the further right you go from your tonic, the brighter than sound.  The further left, the darker the sound. This is because the layout resembles a staggered circle of 5ths which corresponds with musical brightness.
+
+If you take the 3-4 pattern described above and shift your tonic inside of it, the further the tonic is to the left, the brighter the mode, from lydian all the way to locrian (left to right).  This happens with other scale shapes as well.
 
 ## More Scales
 
