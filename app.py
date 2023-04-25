@@ -167,6 +167,9 @@ class Core:
         r *= 2
         r = int(r)
         r += (self.octave + self.octave_base) * 12
+        r += self.transpose*2
+        if self.flipped:
+            r += 7
         return r
 
     def get_note_index(self, x, y):
@@ -747,7 +750,11 @@ class Core:
             x = 0
             for x in range(len(row)):
                 idx = self.get_note_index(x, y)
-                self.board[y+self.flipped][x] = state
+                try:
+                    self.board[y+self.flipped][x] = state
+                except IndexError:
+                    print("clear_marks: Out of range")
+                    pass
                 if use_lights:
                     if state:
                         self.set_light(x, y, 1)
@@ -757,9 +764,15 @@ class Core:
         self.dirty = True
 
     def mark_xy(self, x, y, state, use_lights=False):
+        if self.flipped:
+            y -= 1
         idx = self.get_note_index(x, y)
         octave = self.get_octave(x, y)
-        self.board[y+self.flipped][x] = state
+        try:
+            self.board[y+self.flipped][x] = state
+        except IndexError:
+            print("mark_xy: Out of range")
+            pass
         if use_lights:
             if state:
                 self.set_light(x, y, 1)
