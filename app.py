@@ -2,6 +2,10 @@
 # from tkinter import *
 import os,sys,glm,copy,binascii,struct,math,traceback
 import rtmidi2
+from util import *
+from dataclasses import dataclass
+import glm
+
 with open(os.devnull, 'w') as devnull:
     # suppress pygame messages
     stdout = sys.stdout
@@ -11,122 +15,41 @@ with open(os.devnull, 'w') as devnull:
 import pygame_gui
 # import mido
 from collections import OrderedDict
-# from chords import CHORD_SHAPES
 from configparser import ConfigParser
 
-def get_option(section, option, default):
-    if section is None: return default
-    typ = type(default)
-    if typ is bool:
-        return section.get(option, 'true' if default else 'false').lower() in ['true','yes','on']
-    if typ is int:
-        return int(section.get(option, default))
-    if typ is float:
-        return float(section.get(option, default))
-    if typ is str:
-        return section.get(option, default)
-    print('Invalid option value for', option)
-
-cfg = ConfigParser(allow_no_value=True)
-cfg.read('settings.ini')
-try:
-    opts = cfg['general']
-except KeyError:
-    opts = None
-
-default_lights = '3,7,5,7,5,8,7,8,2,8,7,8'
-OFFSET = 0
 TITLE = "Wholetone Layout"
 # FOCUS = False
 NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 WHOLETONE = True
 FONT_SZ = 32
-brightness = 0.4
-C_COLOR = glm.ivec3(0,128 * brightness,0)
-YELLOW = glm.ivec3(205 * brightness,127 * brightness,0)
-LIGHT = glm.ivec3(0,0,128 * brightness)
-FGAB = glm.ivec3(64 * brightness)
-GRAY = glm.ivec3(16 * brightness)
-BORDER_COLOR = glm.ivec3(32 * brightness)
+BRIGHTNESS = 0.4
+C_COLOR = glm.ivec3(0,128 * BRIGHTNESS,0)
+YELLOW = glm.ivec3(205 * BRIGHTNESS,127 * BRIGHTNESS,0)
+LIGHT = glm.ivec3(0,0,128 * BRIGHTNESS)
+FGAB = glm.ivec3(64 * BRIGHTNESS)
+GRAY = glm.ivec3(16 * BRIGHTNESS)
+BORDER_COLOR = glm.ivec3(48)
 DARK = glm.ivec3(0)
-# LIGHT = glm.ivec3(127)
-LIGHTS = get_option(opts,'lights',default_lights)
-if LIGHTS:
-    LIGHTS = list(map(lambda x: int(x), LIGHTS.split(',')))
-ONE_CHANNEL = get_option(opts,'one_channel',False)
 BASE_OFFSET = -4
 # CHORD_ANALYZER = get_option(opts,'chord_analyzer',False)
 EPSILON = 0.0001
-# bend the velocity curve, examples: 0.5=sqrt, 1.0=default, 2.0=squared
-VELOCITY_CURVE = get_option(opts,'velocity_curve',1.0)
-
-# these settings are only used with the foot controller
-VELOCITY_CURVE_LOW = get_option(opts,'velocity_curve_low',0.5) # loudest (!)
-VELOCITY_CURVE_HIGH = get_option(opts,'velocity_curve_high',3.0) # quietest (!)
-
-if VELOCITY_CURVE < EPSILON: # if its near zero, set default
-    VELOCITY_CURVE = 1.0 # default
-MIN_VELOCITY = get_option(opts,'min_velocity',0)
-MAX_VELOCITY = get_option(opts,'max_velocity',127)
-CORE = None
-SHOW_LOWEST_NOTE = get_option(opts,'show_lowest_note',False)
-NO_OVERLAP = get_option(opts,'no_overlap',False)
-HARDWARE_SPLIT = get_option(opts,'hardware_split',False)
-MIDI_OUT = get_option(opts,'midi_out','loopmidi')
-SPLIT_OUT = get_option(opts,'split_out','split')
-FPS = get_option(opts,'fps',60)
-SPLIT = get_option(opts,'split',False)
-FOOT_IN = get_option(opts,'foot_in','')
-SUSTAIN = get_option(opts,'sustain',1.0) # sustain scale
 FADE_SPEED = 4.0
 
-# which split the sustain affects
-SUSTAIN_SPLIT = get_option(opts, 'sustain_split', 'both') # left, right, both
-if SUSTAIN_SPLIT not in ('left', 'right', 'both'):
-    print("Invalid sustain split value. Options: left, right, both.")
-    sys.exit(1)
-
-def save():
-    cfg = ConfigParser(allow_no_value=True)
-    general = cfg['general'] = {}
-    if LIGHTS:
-        general['lights'] = ','.join(map(str,LIGHTS))
-    general['one_channel'] = ONE_CHANNEL
-    general['velocity_curve'] = VELOCITY_CURVE
-    general['min_velocity'] = MIN_VELOCITY
-    general['max_velocity'] = MAX_VELOCITY
-    general['no_overlap'] = NO_OVERLAP
-    general['hardware_split'] = HARDWARE_SPLIT
-    general['show_lowest_note'] = SHOW_LOWEST_NOTE
-    general['midi_out'] = MIDI_OUT
-    general['split_out'] = SPLIT_OUT
-    general['split'] = SPLIT
-    general['fps'] = FPS
-    general['sustain'] = SUSTAIN
-    cfg['general'] = general
-    with open('settings_temp.ini', 'w') as configfile:
-        cfg.write(configfile)
-    
-def sign(val):
-    tv = type(val)
-    if tv is int:
-        if val > 0:
-            return 1
-        elif val == 0:
-            return 0
-        else:
-            return -1
-    elif tv is float:
-        if val >= EPSILON:
-            return 1.0
-        elif abs(val) < EPSILON:
-            return 0.0
-        else:
-            return -1.0
-    assert False
-
-def clamp(low, high, val):
-    return max(low, min(val, high))
+b = 0.5
+COLOR_CODES = [
+    glm.ivec3(0), # default color
+    glm.ivec3(255, 0, 0), # red
+    glm.ivec3(255, 255, 0), # yellow
+    glm.ivec3(0, 127, 0), # green
+    glm.ivec3(0, 127, 127), # cyan
+    glm.ivec3(0, 0, 255), # blue
+    glm.ivec3(255, 0, 255), # magenta
+    glm.ivec3(32), # off
+    glm.ivec3(200,200,200), # gray
+    glm.ivec3(255,127,0), # orange
+    glm.ivec3(0,255,0), # lime
+    glm.ivec3(255,127,127), # pink
+]
 
 # NOTE_COLORS = [
 #     glm.ivec3(255, 0, 0), # C
@@ -142,32 +65,6 @@ def clamp(low, high, val):
 #     glm.ivec3(128/2, 0, 128/2), # A#
 #     glm.ivec3(255, 0, 255) # B
 # ]
-
-class Object:
-   def __init__(self, **kwargs):
-        self.game = kwargs.get('game', None)
-        self.attached = False
-        if self.game:
-            self.game.world.attach(self)
-        
-        self.pos = glm.vec2(*kwargs.get('pos', (0.0, 0.0)))
-        self.vel = glm.vec2(*kwargs.get('vel', (0.0, 0.0)))
-        self.sz = glm.vec2(*kwargs.get('sz', (0.0, 0.0)))
-        self.surface = kwargs.get('surface', None)
-
-class Screen(Object):
-    def __init__(self,core,screen):
-        self.core = core
-        self.pos = glm.vec2(0.0, 0.0)
-        self.sz = glm.vec2(core.screen_w, core.screen_h)
-        self.surface = pygame.Surface(core.screen_sz).convert()
-        self.screen = screen
-    
-    def render(self):
-        self.screen.blit(self.surface, (0,0))
-
-def nothing():
-    pass
 
 # def invert_color(col): # ivec 255
 #     r = glm.vec3(col) / 255.0
@@ -198,6 +95,10 @@ class Note:
                 self.pressure  = 0.0
                 self.intensity = max(0.0, self.intensity - dt * FADE_SPEED)
 
+@dataclass
+class Options:
+    pass
+
 class Core:
 
     def init_hardware(self):
@@ -207,7 +108,7 @@ class Core:
         return abs(self.velocity_curve_ - 1.0) > EPSILON
 
     def has_velocity_settings(self):
-        return MIN_VELOCITY > 0 or MAX_VELOCITY < 127 or self.has_velocity_curve()
+        return self.options.min_velocity > 0 or self.options.max_velocity < 127 or self.has_velocity_curve()
 
     def velocity_curve(self, val): # 0-1
         if self.has_velocity_curve():
@@ -231,15 +132,15 @@ class Core:
         self.red_lights[y][x] = (col==1)
         self.send_cc(0, 20, x+1)
         self.send_cc(0, 21, self.board_h - y - 1)
-        # if LIGHTS:
+        # if self.options.lights:
         self.send_cc(0, 22, col)
         # else:
         #     self.send_cc(0, 22, 7) # no light
 
     def reset_light(self, x, y):
-        if not LIGHTS: return
+        if not self.options.lights: return
         note = self.get_note_index(x, y) % 12
-        light_col = LIGHTS[note]
+        light_col = self.options.lights[note]
         self.set_light(x, y, light_col)
         self.red_lights[y][x] = False
     
@@ -275,27 +176,8 @@ class Core:
 
     def get_color(self, x, y):
         # return NOTE_COLORS[get_note_index(x, y)]
-        note = self.get_note(x, y)
-        if note == "C":
-            return C_COLOR
-        # if note == "G#":
-        #     return GSHARP_COLOR
-        elif note == "G#":
-            return YELLOW
-        elif len(note) == 1: # white key
-            if y%2==self.flipped:
-                return FGAB
-            else:
-                return LIGHT
-        # # if note in 'FB':
-        # #     return GRAY
-        # elif len(note) == 1:
-        #     if y%2==0:
-        #         return LIGHT
-        #     else:
-        #         return FGAB
-        # else:
-        return DARK
+        note = self.get_note_index(x, y)
+        return COLOR_CODES[self.options.lights[note]]
 
     # Given an x,y position, find the octave
     #  (used to initialize octaves 2D array)
@@ -336,21 +218,21 @@ class Core:
         d0 = data[0]
         ch = d0 & 0x0f
         msg = (data[0] & 0xf0) >> 4
-        if ONE_CHANNEL:
+        if self.options.one_channel:
             data[0] = d0 & 0xf0 # send all to channel 0 if enabled
         row = None
-        if not NO_OVERLAP:
+        if not self.options.no_overlap:
             row = ch % 8
             col = ch // 8
-        width = self.board_w//2 if HARDWARE_SPLIT else self.board_w
+        width = self.board_w//2 if self.options.hardware_split else self.board_w
         if msg == 9: # note on
-            if NO_OVERLAP:
+            if self.options.no_overlap:
                 row = data[1] // width
                 col = data[1] % width
                 data[1] = data[1] % width + 30 + 2.5*row
                 data[1] *= 2
                 data[1] = int(data[1])
-                if HARDWARE_SPLIT and ch >= 8:
+                if self.options.hardware_split and ch >= 8:
                     data[1] += width * 2
             else:
                 data[1] *= 2
@@ -373,7 +255,7 @@ class Core:
             vel = data[2]/127
             if self.has_velocity_settings():
                 vel = self.velocity_curve(data[2]/127)
-                data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
+                data[2] = clamp(self.options.min_velocity,self.options.max_velocity,int(vel*127+0.5))
 
             note = self.notes[ch]
             if note.location is None:
@@ -393,13 +275,13 @@ class Core:
             
             # print('note on: ', data)
         elif msg == 8: # note off
-            if NO_OVERLAP:
+            if self.options.no_overlap:
                 row = data[1] // width
                 col = data[1] % width
                 data[1] = data[1] % width + 30 + 2.5*row
                 data[1] *= 2
                 data[1] = int(data[1])
-                if HARDWARE_SPLIT and ch >= 8:
+                if self.options.hardware_split and ch >= 8:
                     data[1] += width * 2
             else:
                 data[1] *= 2
@@ -478,14 +360,77 @@ class Core:
                     self.midi_write(self.split_out, data, 0)
             elif val == 7: # right expr pedal
                 val2 = 1.0 - data[2] / 127
-                low = VELOCITY_CURVE_LOW
-                high = VELOCITY_CURVE_HIGH
+                low = self.options.velocity_curve_LOW
+                high = self.options.velocity_curve_HIGH
                 self.velocity_curve_ = low + val2*(high-low)
+
+    def save():
+        self.cfg = ConfigParser(allow_no_value=True)
+        general = self.cfg['general'] = {}
+        if self.options.lights:
+            general['lights'] = ','.join(map(str,self.options.lights))
+        general['one_channel'] = self.options.one_channel
+        general['velocity_curve'] = self.options.velocity_curve
+        general['min_velocity'] = self.options.min_velocity
+        general['max_velocity'] = self.options.max_velocity
+        general['no_overlap'] = self.options.no_overlap
+        general['hardware_split'] = self.options.hardware_split
+        general['show_lowest_note'] = self.options.show_lowest_note
+        general['midi_out'] = self.options.midi_out
+        general['split_out'] = self.options.split_out
+        general['split'] = SPLIT
+        general['fps'] = self.options.fps
+        general['sustain'] = SUSTAIN
+        self.cfg['general'] = general
+        with open('settings_temp.ini', 'w') as configfile:
+            self.cfg.write(configfile)
     
     def __init__(self):
 
-        global CORE
-        CORE = self
+        self.cfg = ConfigParser(allow_no_value=True)
+        self.cfg.read('settings.ini')
+        try:
+            opts = self.cfg['general']
+        except KeyError:
+            opts = None
+
+        self.options = Options()
+
+        default_lights = '3,7,5,7,5,8,7,8,2,8,7,8'
+        
+        # LIGHT = glm.ivec3(127)
+        self.options.lights = get_option(opts,'lights',default_lights)
+        if self.options.lights:
+            self.options.lights = list(map(lambda x: int(x), self.options.lights.split(',')))
+        self.options.one_channel = get_option(opts,'one_channel',False)
+        
+        # bend the velocity curve, examples: 0.5=sqrt, 1.0=default, 2.0=squared
+        self.options.velocity_curve = get_option(opts,'velocity_curve',1.0)
+
+        # these settings are only used with the foot controller
+        self.options.velocity_curve_low = get_option(opts,'velocity_curve_low',0.5) # loudest (!)
+        self.options.velocity_curve_high = get_option(opts,'velocity_curve_high',3.0) # quietest (!)
+
+        if self.options.velocity_curve < EPSILON: # if its near zero, set default
+            self.options.velocity_curve = 1.0 # default
+        
+        self.options.min_velocity = get_option(opts,'min_velocity',0)
+        self.options.max_velocity = get_option(opts,'max_velocity',127)
+        self.options.show_lowest_note = get_option(opts,'show_lowest_note',False)
+        self.options.no_overlap = get_option(opts,'no_overlap',False)
+        self.options.hardware_split = get_option(opts,'hardware_split',False)
+        self.options.midi_out = get_option(opts,'midi_out','loopmidi')
+        self.options.split_out = get_option(opts,'split_out','split')
+        self.options.fps = get_option(opts,'fps',60)
+        self.split_state = self.options.split = get_option(opts,'split',False)
+        self.options.foot_in = get_option(opts,'foot_in','')
+        self.options.sustain = get_option(opts,'sustain',1.0) # sustain scale
+
+        # which split the sustain affects
+        self.options.sustain_split = get_option(opts, 'sustain_split', 'both') # left, right, both
+        if self.options.sustain_split not in ('left', 'right', 'both'):
+            print("Invalid sustain split value. Options: left, right, both.")
+            sys.exit(1)
 
         # simulator keys
         self.keys = {}
@@ -533,7 +478,7 @@ class Core:
         self.flipped = False # vertically shift +1
         self.config_save_timer = 1.0
 
-        self.velocity_curve_ = VELOCITY_CURVE
+        self.velocity_curve_ = self.options.velocity_curve
 
         self.init_board()
 
@@ -602,10 +547,10 @@ class Core:
             manager=self.gui
         )
         
-        if NO_OVERLAP: # split only works with no overlap for now
+        if self.options.no_overlap: # split only works with no overlap for now
             self.btn_split = pygame_gui.elements.UIButton(
                 relative_rect=pygame.Rect((bs.x*7+2,y),(bs.x*2,bs.y)),
-                text='SPLIT: ' + ('ON' if SPLIT else 'OFF'),
+                text='SPLIT: ' + ('ON' if self.split_state else 'OFF'),
                 manager=self.gui
             )
 
@@ -616,7 +561,7 @@ class Core:
         # )
         # self.slider_velocity = pygame_gui.elements.UIHorizontalSlider (
         #     relative_rect=pygame.Rect((bs.x*2+2,y+bs.y),(bs.x*2,bs.y)),
-        #     start_value=VELOCITY_CURVE,
+        #     start_value=self.options.velocity_curve,
         #     value_range=[0,1],
         #     manager=self.gui
         # )
@@ -627,15 +572,15 @@ class Core:
         self.midi_in = None
         ins = []
         outs = []
-        in_devs = [
-            'linnstrument',
-            'visualizer'
-        ]
-        out_devs = [
-            'linnstrument',
-            MIDI_OUT,
-            'loopmidi'
-        ]
+        # in_devs = [
+        #     'linnstrument',
+        #     'visualizer'
+        # ]
+        # out_devs = [
+        #     'linnstrument',
+        #     self.options.midi_out,
+        #     'loopmidi'
+        # ]
         # for i in range(pygame.midi.get_count()):
         #     info = pygame.midi.get_device_info(i)
         #     # print(info)
@@ -662,47 +607,22 @@ class Core:
                 print("LinnStrument (Out): " + name)
                 self.linn_out = rtmidi2.MidiOut()
                 self.linn_out.open_port(i)
-            elif SPLIT_OUT and SPLIT_OUT in name_lower:
+            elif self.options.split_out and self.options.split_out in name_lower:
                 print("Split (Out): " + name)
                 self.split_out = rtmidi2.MidiOut()
                 self.split_out.open_port(i)
-            elif MIDI_OUT in name_lower:
+            elif self.options.midi_out in name_lower:
                 print("Loopback (Out): " + name)
                 self.midi_out = rtmidi2.MidiOut()
                 self.midi_out.open_port(i)
-
-        # innames = []
-        # outnames = []
-        # brk = False
-        # for outdev in out_devs:
-        # for out in outs:
-        #     name = str(out[1])
-        #     name_lower = name.lower()
-        #     if 'linnstrument' in name_lower:
-        #         print("Instrument Output: ", name)
-        #         self.linn_out = pygame.midi.Output(out[0])
-        #     elif not SPLIT_OUT is None and SPLIT_OUT in name_lower:
-        #         print("MIDI Output (Split): ", name)
-        #         self.split_out = pygame.midi.Output(out[0])
-        #     elif MIDI_OUT in name_lower:
-        #         print("MIDI Output: ", name)
-        #         self.midi_out = pygame.midi.Output(out[0])
 
         if not self.linn_out:
             print("No LinnStrument output device detected. (Can't control lights)")
         if not self.midi_out:
             print("No MIDI output device detected. (Did you install a midi loopback device?)")
 
-        # if not self.out:
-        #     oid = pygame.midi.get_default_output_id()
-        #     o = pygame.midi.Output(oid)
-        #     self.out.append(o)
-
         self.midi_in = None
         self.visualizer = None
-
-        # print('outs: ' + ', '.join(outnames))
-        # print('ins: ' + ', '.join(innames))
 
         innames = rtmidi2.get_in_ports()
         for i in range(len(innames)):
@@ -718,37 +638,11 @@ class Core:
                 self.midi_in = rtmidi2.MidiIn()
                 self.midi_in.callback = self.cb_midi_in
                 self.midi_in.open_port(i)
-            elif FOOT_IN and FOOT_IN in name_lower:
+            elif self.options.foot_in and self.options.foot_in in name_lower:
                 print("Foot Controller (In): " + name)
                 self.foot_in = rtmidi2.MidiIn()
                 self.foot_in.open_port(i)
                 self.foot_in.callback = self.cb_foot
-        
-        # for indev in in_devs:
-            # i = 0
-        # for ini in ins:
-        #     # if indev.lower() in ini[1].lower():
-        #     name = str(ini[1])
-        #     # innames += [name]
-        #     if "visualizer" in name:
-        #         print("Visualizer Input: " + name)
-        #         inp = pygame.midi.Input(ini[0])
-        #         self.visualizer = inp
-        #     elif 'linnstrument' in name.lower():
-        #         print("Instrument Input: " + name)
-        #         try:
-        #             self.midi_in = pygame.midi.Input(ini[0])
-        #         except:
-        #             print("Warning: MIDI DEVICE IN USE")
-        #     i += 1
-        
-        # self.midi_in = None
-        # if ins:
-        #     # try:
-        #     print("Using Midi input: ", ins[1])
-        #     self.midi_in = pygame.midi.Input(ins[1][0])
-        #     # except:
-        #     #     pass
         
         self.done = False
         
@@ -824,7 +718,7 @@ class Core:
         self.dirty_lights = True
 
     def channel_from_split(self, row, col):
-        if not SPLIT:
+        if not self.options.split:
             return 0
         w = self.board_w
         col += 1 # move start point from C to A#
@@ -834,7 +728,7 @@ class Core:
 
     def is_split(self):
         # TODO: make this work with hardware overlap (non-mpe)
-        return NO_OVERLAP and SPLIT and self.split_out
+        return self.options.no_overlap and self.options.split and self.split_out
     
     def logic(self, dt):
 
@@ -902,20 +796,19 @@ class Core:
                     self.flipped = not self.flipped
                     self.dirty = self.dirty_lights = True
                 elif ev.ui_element == self.btn_split:
-                    global SPLIT
-                    SPLIT = not SPLIT
+                    self.split_state = not self.split_state
                     self.btn_split.set_text("SPLIT: " + ("ON" if SPLIT else "OFF"))
                     self.dirty = True
             # elif ev.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
             #     if ev.ui_element == self.slider_velocity:
-            #         global VELOCITY_CURVE
-            #         VELOCITY_CURVE = ev.value
+            #         global self.options.velocity_curve
+            #         self.options.velocity_curve = ev.value
             #         self.config_save_timer = 1.0
             
             self.gui.process_events(ev)
 
         # figure out the lowest note to highlight it
-        if SHOW_LOWEST_NOTE:
+        if self.options.show_lowest_note:
             old_lowest_note = self.lowest_note
             old_lowest_note_midi = self.lowest_note_midi
             self.lowest_note = None
@@ -939,7 +832,7 @@ class Core:
             self.dirty_lights = False
 
         # lowest note changed?
-        if SHOW_LOWEST_NOTE:
+        if self.options.show_lowest_note:
             if self.lowest_note != old_lowest_note:
                 if old_lowest_note:
                     # reset lights for previous lowest note
@@ -977,22 +870,22 @@ class Core:
         #             d0 = data[0]
         #             ch = d0 & 0x0f
         #             msg = (data[0] & 0xf0) >> 4
-        #             if ONE_CHANNEL:
+        #             if self.options.one_channel:
         #                 data[0] = d0 & 0xf0 # send all to channel 0 if enabled
         #             row = None
-        #             if not NO_OVERLAP:
+        #             if not self.options.no_overlap:
         #                 row = ch % 8
         #                 col = ch // 8
-        #             width = self.board_w//2 if HARDWARE_SPLIT else self.board_w
+        #             width = self.board_w//2 if self.options.hardware_split else self.board_w
         #             if msg == 9: # note on
         #                 # if WHOLETONE:
-        #                 if NO_OVERLAP:
+        #                 if self.options.no_overlap:
         #                     row = data[1] // width
         #                     col = data[1] % width
         #                     data[1] = data[1] % width + 30 + 2.5*row
         #                     data[1] *= 2
         #                     data[1] = int(data[1])
-        #                     if HARDWARE_SPLIT and ch >= 8:
+        #                     if self.options.hardware_split and ch >= 8:
         #                         data[1] += width * 2
         #                 else:
         #                     data[1] *= 2
@@ -1015,7 +908,7 @@ class Core:
         #                 vel = data[2]/127
         #                 if self.has_velocity_settings():
         #                     vel = self.velocity_curve(data[2]/127)
-        #                     data[2] = clamp(MIN_VELOCITY,MAX_VELOCITY,int(vel*127+0.5))
+        #                     data[2] = clamp(self.options.min_velocity,self.options.max_velocity,int(vel*127+0.5))
 
         #                 note = self.notes[ch]
         #                 if note.location is None:
@@ -1035,13 +928,13 @@ class Core:
         #                 # print('note on: ', data)
         #             elif msg == 8: # note off
         #                 # if WHOLETONE:
-        #                 if NO_OVERLAP:
+        #                 if self.options.no_overlap:
         #                     row = data[1] // width
         #                     col = data[1] % width
         #                     data[1] = data[1] % width + 30 + 2.5*row
         #                     data[1] *= 2
         #                     data[1] = int(data[1])
-        #                     if HARDWARE_SPLIT and ch >= 8:
+        #                     if self.options.hardware_split and ch >= 8:
         #                         data[1] += width * 2
         #                 else:
         #                     data[1] *= 2
@@ -1108,13 +1001,13 @@ class Core:
         self.gui.update(dt)
 
     def sustainable_devices(self):
-        if not self.is_split() or not SUSTAIN_SPLIT:
+        if not self.is_split() or not self.options.sustain_split:
             return [self.midi_out]
-        if SUSTAIN_SPLIT=='left':
+        if self.options.sustain_split=='left':
             return [self.midi_out]
-        elif SUSTAIN_SPLIT=='right':
+        elif self.options.sustain_split=='right':
             return [self.split_out]
-        elif SUSTAIN_SPLIT=='both':
+        elif self.options.sustain_split=='both':
             return [self.midi_out, self.split_out]
         return [self.midi_out]
 
@@ -1138,7 +1031,7 @@ class Core:
                 split_chan = self.channel_from_split(y, x) # !
                 
                 # note = str(self.get_octave(x, y)) # show octave
-                brightness = 1.0 if cell else 0.5
+                # brightness = 1.0 if cell else 0.5
 
                 col = None
                 
@@ -1147,12 +1040,18 @@ class Core:
                 # else:
                 #     col = self.get_color(x, y)
                 lit_col = glm.ivec3(255,0,0)
-                unlit_col = self.get_color(x, y)
+                unlit_col = copy.copy(self.get_color(x, y))
+                inner_col = copy.copy(unlit_col)
+                for i in range(len(unlit_col)):
+                    unlit_col[i] = min(255, unlit_col[i] * 1.5)
                 
                 ry = y + self.menu_sz # real y
                 # pygame.gfxdraw.box(self.screen.surface, [x*sz + b, self.menu_sz + y*sz + b, sz - b, sz - b], unlit_col)
                 rect = [x*sz + b, self.menu_sz + y*sz + b, sz - b, sz - b]
+                inner_rect = [rect[0]+4, rect[1]+4, rect[2]-8, rect[3]-8]
                 pygame.draw.rect(self.screen.surface, unlit_col, rect, border_radius=8)
+                
+                pygame.draw.rect(self.screen.surface, inner_col, inner_rect, border_radius=8)
                 pygame.draw.rect(self.screen.surface, BORDER_COLOR, rect, width=2, border_radius=8)
                 if cell:
                     circ = glm.ivec2(int(x*sz + b/2 + sz/2), int(self.menu_sz + y*sz + b/2 + sz/2))
@@ -1176,7 +1075,7 @@ class Core:
                 textpos.y += 1
                 self.screen.surface.blit(text, textpos)
 
-                text = self.font.render(note, True, glm.ivec3(255*brightness))
+                text = self.font.render(note, True, glm.ivec3(255))
                 textpos = text.get_rect()
                 textpos.x = x*sz + sz//2 - FONT_SZ//4
                 textpos.y = self.menu_sz + y*sz + sz//2 - FONT_SZ//4
@@ -1184,7 +1083,7 @@ class Core:
                 textpos.y -= 1
                 self.screen.surface.blit(text, textpos)
                 
-                text = self.font.render(note, True, glm.ivec3(200*brightness))
+                text = self.font.render(note, True, glm.ivec3(200))
                 textpos = text.get_rect()
                 textpos.x = x*sz + sz//2 - FONT_SZ//4
                 textpos.y = self.menu_sz + y*sz + sz//2 - FONT_SZ//4
@@ -1256,7 +1155,7 @@ class Core:
             self.done = False
             while not self.done:
                 try:
-                    dt = self.clock.tick(FPS)/1000.0
+                    dt = self.clock.tick(self.options.fps)/1000.0
                 except:
                     self.deinit()
                     break
