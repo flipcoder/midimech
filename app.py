@@ -345,6 +345,7 @@ class Core:
         # print(data)
         ch = d0 & 0x0F
         msg = (data[0] & 0xF0) >> 4
+        aftertouch = (msg == 10)
         if self.options.one_channel:
             data[0] = d0 & 0xF0  # send all to channel 0 if enabled
         row = None
@@ -373,14 +374,16 @@ class Core:
         midinote = data[1] - 24 + self.transpose * 2
         if self.is_split():
             split_chan = self.channel_from_split(row, col)
-        self.mark(midinote, 1, only_row=row)
+        if not aftertouch:
+            self.mark(midinote, 1, only_row=row)
         data[1] += self.out_octave * 12 + self.transpose * 2
         if self.flipped:
             data[1] += 7
         
-        # apply velocity curve
+        # velocity (or pressure if aftertouch)
         vel = data[2] / 127
-        if curve:
+        if curve and not aftertouch:
+            # apply curve
             if self.has_velocity_settings():
                 vel = self.velocity_curve(data[2] / 127)
                 data[2] = clamp(
@@ -550,10 +553,10 @@ class Core:
             x = event[1] % 10 - 1
             state = self.launchpad_state[y][x]
             self.launchpad_state[y][x] = event[2]
+            note = y * 8 + x
             if state is None: # just pressed
-                note = y * 8 + x
                 self.note_on([144, note, event[2]], timestamp, width=8, no_overlap=True, curve=False)
-                # TODO: write pressure
+            self.note_on([160, note, event[2]], timestamp, width=8, no_overlap=True, curve=False)
         elif event[0] == 176:
             if event == [176, 93, 127, 0]:
                 self.transpose_board(-1)
@@ -592,26 +595,28 @@ class Core:
     #     with open('settings_temp.ini', 'w') as configfile:
     #         self.cfg.write(configfile)
 
-    def init_launchpad(self):
-        pattern = [
-            'ggggbb',
-            'cggbbb',
-        ]
+    # def init_launchpad(self):
+    #     pattern = [
+    #         'ggggbb',
+    #         'cggbbb',
+    #     ]
+        
+    #     self.launchpad.LedCtrlXY(x, y+1, lp_col[0], lp_col[1], lp_col[2])
 
-        for y in range(1, 9):
-            for x in range(0, 8):
-                yy = y - 2
-                xx = x
-                yy -= 3
-                xx -= (8-yy-1)//2
-                col = pattern[yy%2][xx%6]
-                if col == 'c': #cyan
-                    col = [0, 63, 63]
-                elif col == 'g': #green
-                    col = [0, 63, 0]
-                elif col == 'b': #black
-                    col = [0, 0, 0]
-                self.launchpad.LedCtrlXY(x, y, col[0], col[1], col[2])
+    #     for y in range(1, 9):
+    #         for x in range(0, 8):
+    #             yy = y - 2
+    #             xx = x
+    #             yy -= 3
+    #             xx -= (8-yy-1)//2
+    #             col = pattern[yy%2][xx%6]
+    #             if col == 'c': #cyan
+    #                 col = [0, 63, 63]
+    #             elif col == 'g': #green
+    #                 col = [0, 63, 0]
+    #             elif col == 'b': #black
+    #                 col = [0, 0, 0]
+    #             self.launchpad.LedCtrlXY(x, y, col[0], col[1], col[2])
 
     def __init__(self):
         self.cfg = ConfigParser(allow_no_value=True)
@@ -932,7 +937,7 @@ class Core:
                     mode = "lpx"
             if mode is not None:
                 self.launchpad = lp
-                self.init_launchpad()
+                # self.init_launchpad()
         
         self.done = False
 
