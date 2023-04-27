@@ -14,6 +14,8 @@ This project intends to bring it to more people.
 
 License: MIT
 
+Copyright (c) 2023 Grady O'Connell
+
 *This project is not affiliated with Roger Linn Design.*
 
 I've renamed the project since it's compatible with more than the LinnStrument now.
