@@ -1,23 +1,32 @@
 # linnstrument-wholetone
 
-Wholetone layout system and visualizer for the Linnstrument, Launchpad X, and computer keyboard.  I consider this to be one of the most accessible and playable musical note layouts, and once you learn how it works, you'll realize why I've made it my primary layout.
+**IN DEVELOPMENT**
 
-Note: So far, this has only been tested on the LinnStrument 128 version.  If you own the 200-note version,
-please let me know how this works for you.
+*This project is not affiliated with Roger Linn Design.*
 
-This program is a work-in-progress so some things might be a bit buggy.  Let me know if you run into any issues!
+Wholetone layout system and visualizer for the Linnstrument and Launchpad X.
+
+This program maps the LinnStrument, LaunchPad X, and your computer keyboard to use an isomorphic wholetone layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  This project intends to bring it to more people.
+
+**Please read the instructions and important notes before usage.  Have fun!**
 
 License: MIT
 
 LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
-
-*This is unofficial and not affiliated with Roger Linn Design.*
 
 ![Screenshot](https://i.imgur.com/eYsl3T4.png)
 
 ## Video
 
 [![Video](https://img.youtube.com/vi/GbkhwpPsbPo/0.jpg)](https://www.youtube.com/watch?v=GbkhwpPsbPo)
+
+## Important Notes
+
+So far, this has only been tested on the LinnStrument 128 version.  If you own the 200-note version, it's harder to set up, but please feel free to test it and me know how this works for you.
+
+This program is *experimental*, so some things will be buggy and tricky to get working.  Let me know if you run into any issues and follow the directions carefully.  If the wrong notes are playing, there's probably something wrong with the way you've set up the linnstrument during the instructions.  If a device persists in a different state after ending the program (such as if a crash occurs), simply reconnect it.  The LinnStrument also has a reset feature you may find useful.
+
+And since this is experimental, please use it at your own risk and prepare to do basic troubleshooting to get it working.
 
 ## Setup
 
