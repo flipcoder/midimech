@@ -85,12 +85,13 @@ COLOR_CODES = [
 
 class Note:
     def __init__(self):
-        self.bend = 0.0
-        self.pressed = False
-        self.intensity = 0.0  # how much to light marker up
+        # self.bend = 0.0
+        # self.pressed = False
+        # self.intensity = 0.0  # how much to light marker up (in app)
         self.pressure = 0.0  # how much the note is being pressed
-        self.dirty = False
+        # self.dirty = False
         self.location: ivec2 = None  # on board
+        self.midinote = None
 
     # def logic(self, dt):
     #     if self.pressed:  # pressed, fade to pressure value
@@ -257,15 +258,8 @@ class Core:
     def mouse_held(self):
         return self.mouse_midi != -1
 
-    def mouse_press(self, x, y, state=True, hold=False):
-        if y < 0:
-            return
-
-        # if we're not intending to hold the note, we release the previous primary note
-        if not hold:
-            if self.mouse_held():
-                self.mouse_release()
-
+    # layout button x, y and velocity
+    def mouse_pos_to_press(self, x, y):
         vel = y % int(self.button_sz)
         x /= int(self.button_sz)
         y /= int(self.button_sz)
@@ -276,13 +270,53 @@ class Core:
         vel = clamp(0, 127, int(vel))
 
         x, y = int(x), int(y)
+        return (x, y, vel)
+
+    def mouse_press(self, x, y, state=True, hold=False, hover=False):
+        if y < 0:
+            return
+
+        if hover:
+            btn = pygame.mouse.get_pressed(3)[0]
+            if not btn:
+                return
+
+        # if we're not intending to hold the note, we release the previous primary note
+        if not hover:
+            if self.mouse_held():
+                self.mouse_release()
+
+        x, y, vel = self.mouse_pos_to_press(x, y)
+
+        if hover and self.mouse_midi_vel is not None:
+            # if hovering, get velocity of last click
+            vel = self.mouse_midi_vel
+        if not hover and self.mouse_midi_vel is None:
+            self.mouse_midi_vel = vel # store velocity for initial click
+
+        # vel = y % int(self.button_sz)
+        # x /= int(self.button_sz)
+        # y /= int(self.button_sz)
+
+        # vel = vel / int(self.button_sz)
+        # vel = 1 - vel
+        # vel *= 127
+        # vel = clamp(0, 127, int(vel))
+
+        # x, y = int(x), int(y)
+        v = ivec2(x, y)
 
         self.mark_xy(x, y, state)
-        v = ivec2(x, y)
         midinote = self.xy_to_midi(v.x, v.y)
+        if hover:
+            if self.mouse_midi == midinote:
+                return
+            else:
+                self.mouse_release()
         if not hold:
             self.mouse_mark = v
             self.mouse_midi = midinote
+            self.mouse_midi_vel = vel
         data = [0x90 if state else 0x80, midinote, vel]
         if self.midi_out:
             self.midi_write(self.midi_out, data, 0)
@@ -301,6 +335,9 @@ class Core:
             if self.midi_out:
                 self.midi_write(self.midi_out, data, 0)
             self.mouse_midi = -1
+
+    def mouse_hover(self, x, y):
+        self.mouse_press(x, y, hover=True)
 
     # Given an x,y position, find the octave
     #  (used to initialize octaves 2D array)
@@ -336,6 +373,12 @@ class Core:
         if dev:
             dev.send_raw(*msg)
 
+    def next_free_note(self):
+        for note in self.notes:
+            if note.location is None:
+                return note
+        return None
+
     def note_on(self, data, timestamp, width=None, curve=True, no_overlap=None):
         if width is None:
             width = self.board_w // 2 if self.options.hardware_split else self.board_w
@@ -350,9 +393,6 @@ class Core:
             data[0] = d0 & 0xF0  # send all to channel 0 if enabled
         row = None
         col = None
-        if not no_overlap:
-            row = ch % 8
-            col = ch // 8
 
         if no_overlap:
             row = data[1] // width
@@ -363,6 +403,8 @@ class Core:
             if self.options.hardware_split and ch >= 8:
                 data[1] += width * 2
         else:
+            row = ch % 8
+            col = ch // 8
             data[1] *= 2
             try:
                 data[1] -= row * 5
@@ -392,12 +434,22 @@ class Core:
                     int(vel * 127 + 0.5),
                 )
 
-        note = self.notes[ch]
-        if note.location is None:
-            note.location = ivec2(0)
-        self.notes[ch].location.x = col
-        self.notes[ch].location.y = row
-        self.notes[ch].pressure = vel
+        if aftertouch:
+            # TODO: add aftertouch values into notes array
+            #   This is not necessary yet
+            pass
+        else:
+            if self.options.no_overlap:
+                note = self.notes[ch]
+            else:
+                note = self.next_free_note()
+            if note:
+                if note.location is None:
+                    note.location = ivec2(0)
+                note.location.x = col
+                note.location.y = row
+                note.pressure = vel
+                note.midinote = data[1]
 
         if self.is_split():
             if split_chan == 0:
@@ -538,32 +590,70 @@ class Core:
                 high = self.options.velocity_curve_high
                 self.velocity_curve_ = low + val2 * (high - low)
 
-    def cb_launchpad_in(self, event, timestamp):
-        if event[0] == 144:
-            # convert to x, y (lower left is 0, 0)
-            y = event[1] // 10 - 1
-            x = event[1] % 10 - 1
-            # convert it to no overlap chromatic
+    # uses button state events (mk3 pro)
+    def cb_launchpad_in(self, event, timestamp=0):
+        # if (self.launchpad_mode == "pro" or self.launchpad_mode == "promk3") and event[0] == 255:
+        # if event[0] >= 255:
+        #     # I'm testing the mk3 method on an lpx, so I'll check this here
+        #     vel = event[2] if self.launchpad_mode == 'lpx' else event[1]
+        #     for note in self.notes:
+        #         if note.location:
+        #             print(note.midinote)
+        #             self.note_on([160, note.midinote, vel], timestamp, width=8, no_overlap=True)
+        
+        if self.launchpad_mode == 'lpx' and event[0] >= 255: # pressure
+            x = event[0] - 255
+            y = 8 - (event[1] - 255)
+            vel = event[2]
+            note = y * 8 + x
+            self.note_on([160, note, event[2]], timestamp, width=8, no_overlap=True)
+        elif event[2] == 0: # note off
+            x = event[0]
+            y = 8 - event[1]
+            if 0 <= x < 8 and 0 <= y < 8:
+                note = y * 8 + x
+                self.note_off([128, note, event[2]], timestamp, width=8, no_overlap=True)
+        else: # note on
+            x = event[0]
+            y = 8 - event[1]
+            if 0 <= x < 8 and 0 <= y < 8:
+                note = y * 8 + x
+                self.note_on([144, note, event[2]], timestamp, width=8, no_overlap=True)
+            else:
+                if x == 2:
+                    self.transpose_board(-1)
+                    self.dirty = self.dirty_lights = True
+                elif x == 3:
+                    self.transpose_board(1)
+                    self.dirty = self.dirty_lights = True
+
+    # uses raw events (Launchpad X)
+    # def cb_launchpad_in(self, event, timestamp=0):
+    #     if event[0] == 144:
+    #         # convert to x, y (lower left is 0, 0)
+    #         y = event[1] // 10 - 1
+    #         x = event[1] % 10 - 1
+    #         # convert it to no overlap chromatic
             
-            self.launchpad_state[y][x] = None
-            note = y * 8 + x
-            self.note_off([128, note, event[2]], timestamp, width=8, no_overlap=True)
-        elif event[0] == 160:
-            y = event[1] // 10 - 1
-            x = event[1] % 10 - 1
-            state = self.launchpad_state[y][x]
-            self.launchpad_state[y][x] = event[2]
-            note = y * 8 + x
-            if state is None: # just pressed
-                self.note_on([144, note, event[2]], timestamp, width=8, no_overlap=True, curve=False)
-            self.note_on([160, note, event[2]], timestamp, width=8, no_overlap=True, curve=False)
-        elif event[0] == 176:
-            if event == [176, 93, 127, 0]:
-                self.transpose_board(-1)
-                self.dirty = self.dirty_lights = True
-            elif event == [176, 94, 127, 0]:
-                self.transpose_board(1)
-                self.dirty = self.dirty_lights = True
+    #         self.launchpad_state[y][x] = None
+    #         note = y * 8 + x
+    #         self.note_off([128, note, event[2]], timestamp, width=8, no_overlap=True)
+    #     elif event[0] == 160:
+    #         y = event[1] // 10 - 1
+    #         x = event[1] % 10 - 1
+    #         state = self.launchpad_state[y][x]
+    #         self.launchpad_state[y][x] = event[2]
+    #         note = y * 8 + x
+    #         if state is None: # just pressed
+    #             self.note_on([144, note, event[2]], timestamp, width=8, no_overlap=True, curve=False)
+    #         self.note_on([160, note, event[2]], timestamp, width=8, no_overlap=True, curve=False)
+    #     elif event[0] == 176:
+    #         if event == [176, 93, 127, 0]:
+    #             self.transpose_board(-1)
+    #             self.dirty = self.dirty_lights = True
+    #         elif event == [176, 94, 127, 0]:
+    #             self.transpose_board(1)
+    #             self.dirty = self.dirty_lights = True
             
         # if events[0] >= 255:
         #     print("PRESSURE: " + str(events[0]-255) + " " + str(events[1]))
@@ -702,6 +792,7 @@ class Core:
         self.options.width = get_option(opts, "width", DEFAULT_OPTIONS.width)
 
         self.options.launchpad = get_option(opts, 'launchpad', True)
+        self.options.experimental = get_option(opts, 'experimental', False)
 
         # simulator keys
         self.keys = {}
@@ -755,6 +846,9 @@ class Core:
 
         self.mouse_mark = ivec2(0)
         self.mouse_midi = -1
+        self.mouse_midi_vel = None
+
+        self.last_note = None # ivec2
 
         self.init_board()
 
@@ -900,6 +994,7 @@ class Core:
         self.midi_in = None
         self.visualizer = None
         self.launchpad = None
+        self.launchpad_mode = None
 
         innames = rtmidi2.get_in_ports()
         for i in range(len(innames)):
@@ -922,22 +1017,23 @@ class Core:
                 self.foot_in.callback = self.cb_foot
 
         if self.options.launchpad:
-            # lp = launchpad.LaunchpadPro()
-            # if lp.Check(0):
-            #     if lp.Open(0):
-            #         mode = "pro"
-            # elif launchpad.LaunchpadProMk3().Check(0):
-            #     lp = launchpad.LaunchpadProMk3()
-            #     if lp.Open(0):
-            #         mode = "promk3"
-            # elif
-            if launchpad.LaunchpadLPX().Check(1):
-                lp = launchpad.LaunchpadLPX()
-                if lp.Open(1):
-                    mode = "lpx"
-            if mode is not None:
+            lp = None
+            if self.options.experimental:
+                lp = launchpad.LaunchpadPro()
+                if lp.Check(0):
+                    if lp.Open(0):
+                        self.launchpad_mode = "pro"
+                if launchpad.LaunchpadProMk3().Check(0):
+                    lp = launchpad.LaunchpadProMk3()
+                    if lp.Open(0):
+                        self.launchpad_mode = "promk3"
+            if not self.launchpad_mode:
+                if launchpad.LaunchpadLPX().Check(1):
+                    lp = launchpad.LaunchpadLPX()
+                    if lp.Open(1):
+                        self.launchpad_mode = "lpx"
+            if self.launchpad_mode is not None:
                 self.launchpad = lp
-                # self.init_launchpad()
         
         self.done = False
 
@@ -1020,7 +1116,10 @@ class Core:
     def mark(self, midinote, state, use_lights=False, only_row=None):
         if only_row is not None:
             only_row = self.board_h - only_row - 1 - self.flipped  # flip
-            rows = [self.board[only_row]]
+            try:
+                rows = [self.board[only_row]]
+            except IndexError:
+                rows = self.board
             y = only_row
         else:
             rows = self.board
@@ -1068,11 +1167,17 @@ class Core:
         # keys = pygame.key.get_pressed()
 
         if self.launchpad:
+            # while True:
+            #     events = self.launchpad.EventRaw()
+            #     if events != []:
+            #         for ev in events:
+            #             self.cb_launchpad_in(ev[0], ev[1])
+            #     else:
+            #         break
             while True:
-                events = self.launchpad.EventRaw()
-                if events != []:
-                    for ev in events:
-                        self.cb_launchpad_in(ev[0], ev[1])
+                event = self.launchpad.ButtonStateXY(returnPressure = True)
+                if event:
+                    self.cb_launchpad_in(event)
                 else:
                     break
         
@@ -1107,6 +1212,10 @@ class Core:
                         self.midi_write(self.midi_out, data, 0)
                 except KeyError:
                     pass
+            elif ev.type == pygame.MOUSEMOTION:
+                x, y = ev.pos
+                y -= self.menu_sz
+                self.mouse_hover(x, y)
             elif ev.type == pygame.MOUSEBUTTONDOWN:
                 x, y = ev.pos
                 y -= self.menu_sz

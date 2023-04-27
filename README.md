@@ -1,6 +1,6 @@
 # linnstrument-wholetone
 
-Wholetone layout system and visualizer for the Linnstrument.  I consider this to be one of the most accessible and playable musical note layouts, and once you learn how it works, you'll realize why I've made it my primary layout.
+Wholetone layout system and visualizer for the Linnstrument, Launchpad X, and computer keyboard.  I consider this to be one of the most accessible and playable musical note layouts, and once you learn how it works, you'll realize why I've made it my primary layout.
 
 Note: So far, this has only been tested on the LinnStrument 128 version.  If you own the 200-note version,
 please let me know how this works for you.
