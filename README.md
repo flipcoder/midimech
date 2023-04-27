@@ -279,10 +279,11 @@ To get pitch bending working properly, you'll need to set your virtual instrumen
 
 ## Future Plans
 
+- Scale integration
+- Touchscreen support
 - Find a way to adjust vibrato sensitivity without affecting slides.  Roger Linn has indicated that this is probably impossible, but I have a few ideas to try.
 - Better velocity curve settings (right now its only basic options in the settings.ini).
 - Better GUI and integration with the settings file.
-- Make custom firmware so the layout can be played without this program.
 
 ## Contact / Questions
 
