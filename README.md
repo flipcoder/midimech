@@ -1,5 +1,7 @@
 # midimech
 
+![midimech](https://i.imgur.com/iNKaTi3.png)
+
 **IN DEVELOPMENT**
 
 Wholetone layout system and visualizer for the Linnstrument and Launchpad X.
