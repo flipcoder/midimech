@@ -6,7 +6,7 @@
 
 Wholetone layout system and visualizer for the Linnstrument and Launchpad X.
 
-This program maps the LinnStrument, LaunchPad X, and your computer keyboard to use an isomorphic wholetone layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as playing the "mech", but
+This program maps the LinnStrument, LaunchPad X, and your computer keyboard to use an isomorphic wholetone layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as playing the "mech" layout, but
 you can call it wholetone, diagonal wicki-hayden, or whatever you like.
 This project intends to bring it to more people.
 
