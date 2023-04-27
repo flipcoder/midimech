@@ -18,8 +18,6 @@ Copyright (c) 2023 Grady O'Connell
 
 *This project is not affiliated with Roger Linn Design.*
 
-I've renamed the project since it's compatible with more than the LinnStrument now.
-
 LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 
 ![Screenshot](https://i.imgur.com/eYsl3T4.png)
