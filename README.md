@@ -1,16 +1,20 @@
-# linnstrument-wholetone
+# midimech
 
 **IN DEVELOPMENT**
 
-*This project is not affiliated with Roger Linn Design.*
-
 Wholetone layout system and visualizer for the Linnstrument and Launchpad X.
 
-This program maps the LinnStrument, LaunchPad X, and your computer keyboard to use an isomorphic wholetone layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  This project intends to bring it to more people.
+This program maps the LinnStrument, LaunchPad X, and your computer keyboard to use an isomorphic wholetone layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as playing the "mech", but
+you can call it wholetone, diagonal wicki-hayden, or whatever you like.
+This project intends to bring it to more people.
 
 **Please read the instructions and important notes before usage.  Have fun!**
 
 License: MIT
+
+*This project is not affiliated with Roger Linn Design.*
+
+I've renamed the project since it's compatible with more than the LinnStrument now.
 
 LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 
@@ -22,7 +26,7 @@ LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 
 ## Important Notes
 
-So far, this has only been tested on the LinnStrument 128 version.  If you own the 200-note version, it's harder to set up, but please feel free to test it and me know how this works for you.
+So far, this has only been tested on the LinnStrument 128 version.  If you own the 200-note version, it's harder to set up, but please feel free to test it and let me know how this works for you.
 
 This program is *experimental*, so some things will be buggy and tricky to get working.  Let me know if you run into any issues and follow the directions carefully.  If the wrong notes are playing, there's probably something wrong with the way you've set up the linnstrument during the instructions.  If a device persists in a different state after ending the program (such as if a crash occurs), simply reconnect it.  The LinnStrument also has a reset feature you may find useful.
 
@@ -36,12 +40,12 @@ And since this is experimental, please use it at your own risk and prepare to do
 
 - Download the project by typing the following commands in terminal:
 ```
-git clone https://github.com/flipcoder/linnstrument-wholetone
+git clone https://github.com/flipcoder/midimech
 ```
 
 - Switch to the new project folder:
 ```
-cd linnstrument-wholetone
+cd midimech
 ```
 
 - Install the dependencies:
@@ -49,9 +53,9 @@ cd linnstrument-wholetone
 pip install -r requirements.txt
 ```
 
-- Run app.py.  You should see a window pop up with the layout.
+- Run midimech.py.  You should see a window pop up with the layout.
 
-- If this works, your linnstrument will show the colors of the wholetone layout and be playable in your DAW.
+- If this works, your linnstrument will show the colors of the layout and be playable in your DAW.
 
 - If you're using the larger (200-note) version of the LinnStrument, click "SIZE" to use the full layout (experimental).
 
