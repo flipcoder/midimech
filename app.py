@@ -701,7 +701,7 @@ class Core:
 
         self.options.width = get_option(opts, "width", DEFAULT_OPTIONS.width)
 
-        self.options.launchpad = get_option(opts, 'launchpad', False)
+        self.options.launchpad = get_option(opts, 'launchpad', True)
 
         # simulator keys
         self.keys = {}
@@ -1444,6 +1444,7 @@ class Core:
     def deinit(self):
         if self.launchpad:
             self.launchpad.Reset()
+            self.launchpad.LedSetMode(0)
         for out in self.out:
             out.close()
             out.abort()
