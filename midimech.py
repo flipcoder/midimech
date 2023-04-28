@@ -122,7 +122,7 @@ class Options:
     show_lowest_note: bool = False
     no_overlap: bool = False
     hardware_split: bool = False
-    midi_out: str = "loopmidi"
+    midi_out: str = "midimech"
     split_out: str = "split"
     fps: int = 60
     split: bool = False
@@ -817,7 +817,8 @@ class Core:
         self.keys[pygame.K_RSHIFT] = 47 + i
 
         # self.panel = CHORD_ANALYZER
-        self.menu_sz = 32  # 64
+        self.panel_sz = 32  # 64
+        self.menu_sz = 32 #96  # full
         self.max_width = 25  # MAX WIDTH OF LINNSTRUMENT
         self.board_h = 8
         self.scale = vec2(64.0)
@@ -873,6 +874,7 @@ class Core:
         # self.root.protocol("WM_DELETE_WINDOW", self.quit)
         pygame.init()
         pygame.display.set_caption(TITLE)
+        pygame.display.set_icon(pygame.image.load('icon.png'))
         # if FOCUS:
         #     pygame.mouse.set_visible(0)
         #     pygame.event.set_grab(True)
@@ -880,7 +882,7 @@ class Core:
             self, pygame.display.set_mode(self.screen_sz, pygame.DOUBLEBUF)
         )
 
-        bs = ivec2(self.button_sz, self.menu_sz)  # // 2
+        bs = ivec2(self.button_sz, self.panel_sz)  # // 2 double panel
         self.gui = pygame_gui.UIManager(self.screen_sz)
         y = 0
         self.btn_octave_down = pygame_gui.elements.UIButton(
@@ -922,6 +924,42 @@ class Core:
                 manager=self.gui,
             )
 
+        # ---
+
+        # y = bs.y
+        # end_pos = 0
+        # inc = bs.x * 1.5
+        # self.btn_mode_prev = pygame_gui.elements.UIButton(
+        #     relative_rect=pygame.Rect((2, y), (inc, bs.y)),
+        #     text="< MODE",
+        #     manager=self.gui
+        # )
+        # self.btn_mode_next = pygame_gui.elements.UIButton(
+        #     relative_rect=pygame.Rect((inc, y), (inc, bs.y)),
+        #     text="MODE >",
+        #     manager=self.gui
+        # )
+        # self.btn_scale_prev = pygame_gui.elements.UIButton(
+        #     relative_rect=pygame.Rect((inc*2, y), (inc, bs.y)),
+        #     text="< SCALE",
+        #     manager=self.gui
+        # )
+        # self.btn_scale_prev = pygame_gui.elements.UIButton(
+        #     relative_rect=pygame.Rect((inc*3, y), (inc, bs.y)),
+        #     text="SCALE >",
+        #     manager=self.gui
+        # )
+        
+        # y = bs.y * 2
+        # self.note_buttons = [None] * 12
+        # for n in range(12):
+        #     end_pos = n*2*bs.x//3 + 2*bs.x//3
+        #     self.note_buttons[n] = pygame_gui.elements.UIButton(
+        #         relative_rect=pygame.Rect((2+n*2*bs.x//3, y), (2*bs.x//3, bs.y)),
+        #         text=NOTES[n],
+        #         manager=self.gui
+        #     )
+        
         # self.slider_label = pygame_gui.elements.UILabel(
         #     relative_rect=pygame.Rect((0,y+bs.y),(bs.x*2,bs.y)),
         #     text='Velocity Curve',
@@ -947,7 +985,7 @@ class Core:
         # out_devs = [
         #     'linnstrument',
         #     self.options.midi_out,
-        #     'loopmidi'
+        #     'midimech'
         # ]
         # for i in range(pygame.midi.get_count()):
         #     info = pygame.midi.get_device_info(i)
