@@ -191,12 +191,28 @@ class Core:
         self.set_light(x, y, light_col)
         self.red_lights[y][x] = False
 
+    def reset_launchpad_light(self, x, y):
+        note = self.get_note_index(x, 8-y-1) % 12
+        # if self.is_split():
+        #     split_chan = self.channel_from_split(self.board_h - y - 1, x)
+        #     if split_chan:
+        #         light_col = self.options.split_lights[note]
+        #     else:
+        light_col = self.options.lights[note]
+        # else:
+        #     light_col = self.options.lights[note]
+        self.set_launchpad_light(x, y, light_col)
+
     def set_red_light(self, x, y, state=True):
         self.red_lights[y][x] = state
         if self.launchpad:
             lp_col = ivec3(127, 0, 0)
             if state:
-                self.launchpad.LedCtrlXY(x, y+1, lp_col[0], lp_col[1], lp_col[2])
+                self.launchpad.LedCtrlXY(x, y, lp_col[0], lp_col[1], lp_col[2])
+
+    def set_launchpad_light(self, x, y, color):
+        col = COLOR_CODES[color]
+        self.launchpad.LedCtrlXY(x, 8-y, col[0], col[1], col[2])
 
     def setup_lights(self):
         for y in range(self.board_h):
@@ -380,8 +396,6 @@ class Core:
         return None
 
     def note_on(self, data, timestamp, width=None, curve=True, no_overlap=None):
-        if width is None:
-            width = self.board_w // 2 if self.options.hardware_split else self.board_w
         if no_overlap is None:
             no_overlap = self.options.no_overlap
         d0 = data[0]
@@ -394,14 +408,47 @@ class Core:
         row = None
         col = None
 
+        within_hardware_split = False
+        if width is None:
+            if self.options.hardware_split:
+                if self.board_w == 25: # 200
+                    left_width = 11
+                    right_width = 14
+                    if ch >= 8:
+                        width = right_width
+                        within_hardware_split = True
+                    else:
+                        width = left_width
+                else:
+                    left_width = 8
+                    right_width = 8
+                    if ch >= 8:
+                        width = right_width
+                        within_hardware_split = True
+                    else:
+                        width = left_width
+            else:
+                width = self.board_w
+            # else: # 128
+                # width = 8 if self.options.hardware_split else 16
+        
+        if self.options.debug:
+            print("MIDI:", data)
+            print("Message:", msg)
+            print("Channel:", ch)
+            print("---")
+
         if no_overlap:
             row = data[1] // width
             col = data[1] % width
-            data[1] = data[1] % width + 30 + 2.5 * row
+            if within_hardware_split:
+                data[1] += left_width
+            data[1] = col + 30 + 2.5 * row
             data[1] *= 2
             data[1] = int(data[1])
-            if self.options.hardware_split and ch >= 8:
-                data[1] += width * 2
+            if within_hardware_split:
+                data[1] += left_width * 2
+            # print(data[1])
         else:
             row = ch % 8
             col = ch // 8
@@ -463,8 +510,7 @@ class Core:
     def note_off(self, data, timestamp, width=None, no_overlap=None):
         if no_overlap is None:
             no_overlap = self.options.no_overlap
-        if width is None:
-            width = self.board_w // 2 if self.options.hardware_split else self.board_w
+        
         d0 = data[0]
         # print(data)
         ch = d0 & 0x0F
@@ -473,17 +519,61 @@ class Core:
             data[0] = d0 & 0xF0  # send all to channel 0 if enabled
         row = None
         col = None
+
+        # if width is None:
+        #     if self.board_w == 25: # 200
+        #         width = 11 if self.options.hardware_split else 25
+        #     else: # 128
+        #         width = 8 if self.options.hardware_split else 16
+        # if width is None:
+        #     left_width = 5
+        #     right_width = 11
+        #     width = left_width if ch < 8 else right_width
+        
+        within_hardware_split = False
+        if width is None:
+            if self.options.hardware_split:
+                if self.board_w == 25: # 200
+                    left_width = 11
+                    right_width = 14
+                    if ch >= 8:
+                        width = right_width
+                        within_hardware_split = True
+                    else:
+                        width = left_width
+                else:
+                    left_width = 8
+                    right_width = 8
+                    if ch >= 8:
+                        width = right_width
+                        within_hardware_split = True
+                    else:
+                        width = left_width
+            else:
+                width = self.board_w
+        
         if not no_overlap:
             row = ch % 8
             col = ch // 8
         if no_overlap:
+            # row and col within the current split
+            # row = data[1] // width
+            # col = data[1] % width
+            # print(data[1])
+            # # data[1] = data[1] % width + 30 + 2.5 * row
+            # data[1] *= 2
+            # data[1] = int(data[1])
+            # if self.options.hardware_split and ch >= 8:
+            #     data[1] += self.board_w
             row = data[1] // width
             col = data[1] % width
-            data[1] = data[1] % width + 30 + 2.5 * row
+            if within_hardware_split:
+                data[1] += left_width
+            data[1] = col + 30 + 2.5 * row
             data[1] *= 2
             data[1] = int(data[1])
-            if self.options.hardware_split and ch >= 8:
-                data[1] += width * 2
+            if within_hardware_split:
+                data[1] += left_width * 2
         else:
             data[1] *= 2
             try:
@@ -612,12 +702,14 @@ class Core:
             y = 8 - event[1]
             if 0 <= x < 8 and 0 <= y < 8:
                 note = y * 8 + x
+                self.reset_launchpad_light(x, y)
                 self.note_off([128, note, event[2]], timestamp, width=8, no_overlap=True)
         else: # note on
             x = event[0]
             y = 8 - event[1]
             if 0 <= x < 8 and 0 <= y < 8:
                 note = y * 8 + x
+                self.set_launchpad_light(x, y, 1) # red
                 self.note_on([144, note, event[2]], timestamp, width=8, no_overlap=True)
             else:
                 if x == 2:
@@ -793,6 +885,7 @@ class Core:
 
         self.options.launchpad = get_option(opts, 'launchpad', True)
         self.options.experimental = get_option(opts, 'experimental', False)
+        self.options.debug = get_option(opts, 'debug', False)
 
         # simulator keys
         self.keys = {}
