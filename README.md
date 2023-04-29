@@ -4,11 +4,17 @@
 
 **IN DEVELOPMENT**
 
-Wholetone layout system and visualizer for the Linnstrument and Launchpad X.
+This program maps the LinnStrument, LaunchPad X, and your computer keyboard to use an isomorphic wholetone layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as "playing the mech", but
+you could also call the layout Diagonal Wicki-Hayden, Wholetone, or whatever you like.  I prefer mech. 😎
+This project intends to bring the layout to more people and I consider it a good proposal for next-gen instruments.
 
-This program maps the LinnStrument, LaunchPad X, and your computer keyboard to use an isomorphic wholetone layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as playing the "mech" layout, but
-you can call it wholetone, diagonal wicki-hayden, or whatever you like.
-This project intends to bring it to more people.
+Midimech supports:
+- Bigger range than the default LinnStrument layout
+- Synthesia/DAW visualization for learning songs
+- Diagonal split, which fits great even on the 128
+- Transposing and Octave shifting
+- LaunchPad X support (more devices coming in the future)
+- And it's great for playing piano runs ;)
 
 **Please read the instructions and important notes before usage.  Have fun!**
 
