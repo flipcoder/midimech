@@ -36,7 +36,7 @@ Launchpad Support powered by: [Launchpad-Py](https://github.com/FMMT666/launchpa
 
 ## Important Notes
 
-So far, this has only been tested on the LinnStrument 128 version.  If you own the 200-note version, it's harder to set up, but please feel free to test it and let me know how this works for you.
+So far, this has been mostly tested on the LinnStrument 128 version.  If you own the 200-note version, it's harder to set up, but please feel free to test it and let me know how this works for you.
 
 This program is *experimental*, so some things will be buggy and tricky to get working.  Let me know if you run into any issues and follow the directions carefully.  If the wrong notes are playing, there's probably something wrong with the way you've set up the linnstrument during the instructions.  If a device persists in a different state after ending the program (such as if a crash occurs), simply reconnect it.  The LinnStrument also has a reset feature you may find useful.
 
