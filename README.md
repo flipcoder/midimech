@@ -34,6 +34,10 @@ Launchpad Support powered by: [Launchpad-Py](https://github.com/FMMT666/launchpa
 
 [![Video](https://img.youtube.com/vi/GbkhwpPsbPo/0.jpg)](https://www.youtube.com/watch?v=GbkhwpPsbPo)
 
+## Chord Shapes
+
+![Chord Shapes](https://i.imgur.com/DaqVFqP.png)
+
 ## Important Notes
 
 So far, this has been mostly tested on the LinnStrument 128 version.  If you own the 200-note version, it's harder to set up, but please feel free to test it and let me know how this works for you.
