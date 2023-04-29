@@ -46,11 +46,15 @@ This program is *experimental*, so some things will be buggy and tricky to get w
 
 And since this is experimental, please use it at your own risk and prepare to do basic troubleshooting to get it working.
 
-## Setup
+## Getting Started
 
-- First create a midi loopback device.  You can do this easily with LoopMidi on Windows or using "Audio MIDI Setup / MIDI Studio" on Mac.  Then set your DAW to use this device instead of the linnstrument.  Make sure the virtual device you set up has "midimech" in its device name, since this is how its detected by the program.
+### Latest Builds
 
-- Set your LinnStrument to use ChPerRow mode.  (Or alternatively, see the section *MPE* for getting the full MPE mode working).
+- [Download (Win)](https://github.com/flipcoder/midimech/releases)
+
+Alternatively, you can use the process below to run it from the repository.
+
+### Running from Git (for Mac/Linux)
 
 - Download the project by typing the following commands in terminal:
 ```
@@ -66,6 +70,12 @@ cd midimech
 ```
 pip install -r requirements.txt
 ```
+
+### Setup
+
+- First create a midi loopback device.  You can do this easily with LoopMidi on Windows or using "Audio MIDI Setup / MIDI Studio" on Mac.  Then set your DAW to use this device instead of the linnstrument.  Make sure the virtual device you set up has "midimech" in its device name, since this is how its detected by the program.
+
+- Set your LinnStrument to use ChPerRow mode.  (Or alternatively, see the section *MPE* for getting the full MPE mode working).
 
 - Run midimech.py.  You should see a window pop up with the layout.
 
