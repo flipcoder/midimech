@@ -4,7 +4,7 @@
 
 **IN DEVELOPMENT**
 
-Midimech is an alternative musical note layout system for next-gen grid controllers like the LinnStrument and LaunchPad X (and your computer keyboard).  It uses a layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as "playing the mech", but
+Midimech is an alternative musical note layout system for next-gen grid controllers like the LinnStrument and LaunchPad X (and your computer keyboard).  It uses an isomorphic layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as "playing the mech", but
 you could also call the layout Diagonal Wicki-Hayden, Wholetone, or whatever you like.  I prefer mech. 😎
 
 **Unlike the layout of other instruments, notes that sound good together are closer together, and notes that sound worse are furthest apart.**
@@ -137,69 +137,6 @@ Melodic minor has a "2-5" pattern:
  12
 ```
 
-## Basic Chord Shapes
-
-The symbol 'o' is used for a pressed note to show the shape:
-
-```
-Major:
- o
-o o
-
-Minor:
-o o
- o
-
-Dim:
-o
- o
-  o
-  
-Aug:
-o o o
-
-Sus2:
- o
-oo
-
-Sus4:
-oo
-o
- 
-Maj7:
- o o
-o o
-
-m7:
- o
-o o
- o
- 
-7:
-o
- o
-o o
-```
-
-## Circle of 5ths
-
-### Key Signature
-
-A benefit of this layout is the ability to identify and switch key signatures easily based on position.  As you shift to the left, you add flats.  To the right, you add sharps.  You walk these in a zig-zag motion between both whole tone scales.  Follow the shape of these numbers to see the pattern (from 1 to 7).
-
-```
- 2468
-1357
-```
-
-If note 1 is C (no sharps or flats in key signature), moving to 3 adds 2 sharps to the key signature.  Simiarly if you're moving from 3 to 1, it adds two flats (or subtracts sharps).
-
-### Brightness
-
-Since the layout resembles the circle of 5ths, the further right you go from your tonic, the brighter than sound.  The further left, the darker the sound. This is because the layout resembles a staggered circle of 5ths which corresponds with musical brightness.
-
-If you take the 3-4 pattern described above and shift your tonic inside of it, the further the tonic is to the left, the brighter the mode, from lydian all the way to locrian (left to right).  This happens with other scale shapes as well.
-
 ## More Scales
 
 Once you become comfortable with this layout, you can introduce the harder scales into your playing:
@@ -285,6 +222,26 @@ Or:
  4 67
  123 5
 ```
+
+## Circle of 5ths (Advanced)
+
+### Key Signature
+
+A benefit of this layout is the ability to identify and switch key signatures easily based on position.  As you shift to the left, you add flats.  To the right, you add sharps.  You walk these in a zig-zag motion between both whole tone scales.  Follow the shape of these numbers to see the pattern (from 1 to 7).
+
+```
+ 2468
+1357
+```
+
+If note 1 is C (no sharps or flats in key signature), moving to 3 adds 2 sharps to the key signature.  Simiarly if you're moving from 3 to 1, it adds two flats (or subtracts sharps).
+
+### Brightness
+
+Since the layout resembles the circle of 5ths, the further right you go from your tonic, the brighter than sound.  The further left, the darker the sound. This is because the layout resembles a staggered circle of 5ths which corresponds with musical brightness.
+
+If you take the 3-4 pattern described above and shift your tonic inside of it, the further the tonic is to the left, the brighter the mode, from lydian all the way to locrian (left to right).  This happens with other scale shapes as well.
+
 
 ## Visualizer
 
