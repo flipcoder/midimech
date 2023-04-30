@@ -4,14 +4,18 @@
 
 **IN DEVELOPMENT**
 
-This program maps the LinnStrument, LaunchPad X, and your computer keyboard to use an isomorphic wholetone layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as "playing the mech", but
+Midimech is an alternative musical note layout system for next-gen grid controllers like the LinnStrument and LaunchPad X (and your computer keyboard).  It uses a layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as "playing the mech", but
 you could also call the layout Diagonal Wicki-Hayden, Wholetone, or whatever you like.  I prefer mech. 😎
-This project intends to bring the layout to more people and I consider it a good proposal for next-gen instruments.
+
+**Unlike the layout of other instruments, notes that sound good together are closer together, and notes that sound worse are furthest apart.**
+
+This project intends to bring the layout to more people and since it appears to have many advantages, I consider it a good proposal for next-gen musical instruments.
 
 Midimech supports:
+- Usage as a MIDI controller in your DAW of choice
 - Bigger range than the default LinnStrument layout
 - Synthesia/DAW visualization for learning songs
-- Diagonal split, which fits great even on the 128
+- Diagonal split, which fits great even on the LinnStrument 128
 - Transposing and Octave shifting
 - LaunchPad X support (more devices coming in the future)
 - And it's great for playing piano runs ;)
@@ -33,6 +37,16 @@ Launchpad Support powered by: [Launchpad-Py](https://github.com/FMMT666/launchpa
 ## Video
 
 [![Video](https://img.youtube.com/vi/GbkhwpPsbPo/0.jpg)](https://www.youtube.com/watch?v=GbkhwpPsbPo)
+
+## Advantages
+
+- Notes that sound good together are closer together.  Notes that sound worse are furthest apart.  Mistakes will be less likely and less obvious!
+- Like the LinnStrument's layout, it is also isomorphic (the same chord and scale shapes can be played anywhere)
+- Chords and scales are far easier to play than other layouts.
+- Extended range compared to standard +5 tuning, making room for using a split.
+- Unlike piano, instrument splits can overlap.
+- Less finger stretching than other layouts when playing chords, which may help ergonomically.
+- Piano runs are quite smooth, as you're simply walking stacked shapes.
 
 ## Chord Shapes
 
@@ -89,7 +103,7 @@ pip install -r requirements.txt
 
 ### Layout
 
-Each row consists of a whole tone scale, separated by 4ths, which cause the rows to alternate.  It sounds strange at first but because of the layout's relation to the circle of 5ths, it makes a number of things easier to play and remember than the default chromatic layout.
+Each row consists of a whole tone scale and each row is separating by a fourth.  This has a number of advantages you'll see below.
 
 ### Basic Scales
 
