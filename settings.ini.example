@@ -1,12 +1,8 @@
 [general]
-one_channel=false
-chord_analyzer=false
 velocity_curve=1.0
 min_velocity=0
 max_velocity=127
-show_lowest_note=false
-no_overlap=false
-hardware_split=false
+size=128
 midi_out=midimech
 split_out=split
 fps=60

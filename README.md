@@ -4,14 +4,18 @@
 
 **IN DEVELOPMENT**
 
-This program maps the LinnStrument, LaunchPad X, and your computer keyboard to use an isomorphic wholetone layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as "playing the mech", but
+Midimech is an alternative musical note layout system for next-gen grid controllers like the LinnStrument and LaunchPad X (and your computer keyboard).  It uses an isomorphic layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as "playing the mech", but
 you could also call the layout Diagonal Wicki-Hayden, Wholetone, or whatever you like.  I prefer mech. 😎
-This project intends to bring the layout to more people and I consider it a good proposal for next-gen instruments.
+
+**Unlike the layout of other instruments, notes that sound good together are closer together, and notes that sound worse are furthest apart.**
+
+This project intends to bring the layout to more people and since it appears to have many advantages, I consider it a good proposal for next-gen musical instruments.
 
 Midimech supports:
+- Usage as a MIDI controller in your DAW of choice
 - Bigger range than the default LinnStrument layout
 - Synthesia/DAW visualization for learning songs
-- Diagonal split, which fits great even on the 128
+- Diagonal split, which fits great even on the LinnStrument 128
 - Transposing and Octave shifting
 - LaunchPad X support (more devices coming in the future)
 - And it's great for playing piano runs ;)
@@ -34,19 +38,39 @@ Launchpad Support powered by: [Launchpad-Py](https://github.com/FMMT666/launchpa
 
 [![Video](https://img.youtube.com/vi/GbkhwpPsbPo/0.jpg)](https://www.youtube.com/watch?v=GbkhwpPsbPo)
 
+## Advantages
+
+- Notes that sound good together are closer together.  Notes that sound worse are furthest apart.  Mistakes will be less likely and less obvious!
+- Like the LinnStrument's layout, it is also isomorphic (the same chord and scale shapes can be played anywhere)
+- Chords and scales are far easier to play than other layouts.
+- Extended range compared to standard +5 tuning, making room for using a split.
+- Unlike piano, instrument splits can overlap.
+- Less finger stretching than other layouts when playing chords, which may help ergonomically.
+- Piano runs are quite smooth, as you're simply walking stacked shapes.
+
+## Chord Shapes
+
+![Chord Shapes](https://i.imgur.com/DaqVFqP.png)
+
 ## Important Notes
 
-So far, this has been mostly tested on the LinnStrument 128 version.  If you own the 200-note version, it's harder to set up, but please feel free to test it and let me know how this works for you.
+So far, this has mostly been tested on the LinnStrument 128 version.  If you own the 200-note version, please feel free to test it and let me know how this works for you.
 
-This program is *experimental*, so some things will be buggy and tricky to get working.  Let me know if you run into any issues and follow the directions carefully.  If the wrong notes are playing, there's probably something wrong with the way you've set up the linnstrument during the instructions.  If a device persists in a different state after ending the program (such as if a crash occurs), simply reconnect it.  The LinnStrument also has a reset feature you may find useful.
+This program is *in development*, so some things may be buggy.  If a device persists in a different state after ending the program (such as if a crash occurs), simply reconnect it.  The LinnStrument also has a reset feature you may find useful.
 
-And since this is experimental, please use it at your own risk and prepare to do basic troubleshooting to get it working.
+And since this is experimental, as with anything that sends commands to hardware, please use it at your own risk and prepare to do basic troubleshooting if something goes wrong.
 
-## Setup
+That being said, I hope you enjoy it and have fun!
 
-- First create a midi loopback device.  You can do this easily with LoopMidi on Windows or using "Audio MIDI Setup / MIDI Studio" on Mac.  Then set your DAW to use this device instead of the linnstrument.  Make sure the virtual device you set up has "midimech" in its device name, since this is how its detected by the program.
+## Getting Started
 
-- Set your LinnStrument to use ChPerRow mode.  (Or alternatively, see the section *MPE* for getting the full MPE mode working).
+### Latest Builds
+
+- [Download (Win)](https://github.com/flipcoder/midimech/releases)
+
+Alternatively, you can use the process below to run it from the repository.
+
+### Running from Git (for Mac/Linux)
 
 - Download the project by typing the following commands in terminal:
 ```
@@ -63,19 +87,28 @@ cd midimech
 pip install -r requirements.txt
 ```
 
-- Run midimech.py.  You should see a window pop up with the layout.
+- Run the program
+```
+python midimech.py
+```
 
-- If this works, your linnstrument will show the colors of the layout and be playable in your DAW.
+### Setup
 
-- If you're using the larger (200-note) version of the LinnStrument, click "SIZE" to use the full layout (experimental).
+- First create a midi loopback device.  You can do this easily with LoopMidi on Windows or using "Audio MIDI Setup / MIDI Studio" on Mac.  Then set your DAW to use this device instead of the linnstrument.  Make sure the virtual device you set up has "midimech" in its device name, since this is how its detected by the program.
 
-- Set your virtual instruments' pitch bend range to double the LinnStrument's value.
+- If you're using the LinnStrument 200, set `size=200` in your settings.ini.  If you don't have one, copy it from settings.ini.example.
+
+- Run midimech.  You should see a window pop up with the layout.
+
+- Your Linnstrument or LaunchPad X should show the colors of the layout and be playable in your DAW.
+
+- To enable the split, create another midi loopback device called "split" and click the SPLIT button.  One side should turn blue.
 
 ## How to Play
 
 ### Layout
 
-Each row consists of a whole tone scale, separated by 4ths, which cause the rows to alternate.  It sounds strange at first but because of the layout's relation to the circle of 5ths, it makes a number of things easier to play and remember than the default chromatic layout.
+Each row consists of a whole tone scale and each row is separating by a fourth.  This has a number of advantages you'll see below.
 
 ### Basic Scales
 
@@ -108,69 +141,6 @@ Melodic minor has a "2-5" pattern:
 34567
  12
 ```
-
-## Basic Chord Shapes
-
-The symbol 'o' is used for a pressed note to show the shape:
-
-```
-Major:
- o
-o o
-
-Minor:
-o o
- o
-
-Dim:
-o
- o
-  o
-  
-Aug:
-o o o
-
-Sus2:
- o
-oo
-
-Sus4:
-oo
-o
- 
-Maj7:
- o o
-o o
-
-m7:
- o
-o o
- o
- 
-7:
-o
- o
-o o
-```
-
-## Circle of 5ths
-
-### Key Signature
-
-A benefit of this layout is the ability to identify and switch key signatures easily based on position.  As you shift to the left, you add flats.  To the right, you add sharps.  You walk these in a zig-zag motion between both whole tone scales.  Follow the shape of these numbers to see the pattern (from 1 to 7).
-
-```
- 2468
-1357
-```
-
-If note 1 is C (no sharps or flats in key signature), moving to 3 adds 2 sharps to the key signature.  Simiarly if you're moving from 3 to 1, it adds two flats (or subtracts sharps).
-
-### Brightness
-
-Since the layout resembles the circle of 5ths, the further right you go from your tonic, the brighter than sound.  The further left, the darker the sound. This is because the layout resembles a staggered circle of 5ths which corresponds with musical brightness.
-
-If you take the 3-4 pattern described above and shift your tonic inside of it, the further the tonic is to the left, the brighter the mode, from lydian all the way to locrian (left to right).  This happens with other scale shapes as well.
 
 ## More Scales
 
@@ -258,6 +228,26 @@ Or:
  123 5
 ```
 
+## Circle of 5ths (Advanced)
+
+### Key Signature
+
+A benefit of this layout is the ability to identify and switch key signatures easily based on position.  As you shift to the left, you add flats.  To the right, you add sharps.  You walk these in a zig-zag motion between both whole tone scales.  Follow the shape of these numbers to see the pattern (from 1 to 7).
+
+```
+ 2468
+1357
+```
+
+If note 1 is C (no sharps or flats in key signature), moving to 3 adds 2 sharps to the key signature.  Simiarly if you're moving from 3 to 1, it adds two flats (or subtracts sharps).
+
+### Brightness
+
+Since the layout resembles the circle of 5ths, the further right you go from your tonic, the brighter than sound.  The further left, the darker the sound. This is because the layout resembles a staggered circle of 5ths which corresponds with musical brightness.
+
+If you take the 3-4 pattern described above and shift your tonic inside of it, the further the tonic is to the left, the brighter the mode, from lydian all the way to locrian (left to right).  This happens with other scale shapes as well.
+
+
 ## Visualizer
 
 ### DAW visualization
@@ -271,35 +261,6 @@ on the track you want to visualize and set the plugin to use the visualizer midi
 To use the visualizer with Synthesia, create a new MIDI loopback device called "visualizer".
 In Synthesia settings, set it as an output device for note lights.
 
-## Full MPE
-
-### 128 Key
-
-To use ChPerNote/MPE mode, set your LinnStrument 128 to "NO OVERLAP" with a transposition of -3 octaves and +6 pitch.
-Then, set `no_overlap=true` in your settings.ini file (if you don't have one, copy it from settings.ini.example).
-
-### 200 Key
-
-Note: This workaround has not been tested on the 200 but it should work.
-
-To use ChPerNote/MPE mode, first enable SPLIT.  Then, set your LinnStrument to "NO OVERLAP" with a transposition on both splits of -3 octaves and +6 pitch.  Make sure ChPerNote mode is also set on both splits.
-Then, set `no_overlap=true` and `hardware_split=true` in your settings.ini file (if you don't have one, copy it from settings.ini.example).
-
-## Split
-
-Because of the diagonal nature of the layout, the split is diagonal as well (through G# in the center).
-To use a split, create another midi loopback port called "split" and set `split=true` in your settings.ini.
-At the moment this requires using full MPE mode to work (see section `Full MPE`).
-The split creates a second virtual instrument you can access in your DAW called "split".
-
-Note: If you use the 128, do not set the split on your linnstrument.  The program will make its own split.
-However, if you use the 200, you will need to enable to split in order to have all the notes come through.
-(This is to work around a limitation with no overlap mode.)
-
-## Pitch Bend
-
-To get pitch bending working properly, you'll need to set your virtual instruments' pitch bend range to exactly double the amount of the LinnStrument's range.
-
 ## Future Plans
 
 - Scale integration
@@ -311,3 +272,5 @@ To get pitch bending working properly, you'll need to set your virtual instrumen
 ## Contact / Questions
 
 I'm on the LinnStrument Discord at https://discord.gg/h2BcrzmTXe.  Come hang out!
+
+
