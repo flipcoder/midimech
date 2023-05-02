@@ -54,11 +54,13 @@ Launchpad Support powered by: [Launchpad-Py](https://github.com/FMMT666/launchpa
 
 ## Important Notes
 
-So far, this has been mostly tested on the LinnStrument 128 version.  If you own the 200-note version, it's harder to set up, but please feel free to test it and let me know how this works for you.
+So far, this has mostly been tested on the LinnStrument 128 version.  If you own the 200-note version, please feel free to test it and let me know how this works for you.
 
-This program is *experimental*, so some things will be buggy and tricky to get working.  Let me know if you run into any issues and follow the directions carefully.  If the wrong notes are playing, there's probably something wrong with the way you've set up the linnstrument during the instructions.  If a device persists in a different state after ending the program (such as if a crash occurs), simply reconnect it.  The LinnStrument also has a reset feature you may find useful.
+This program is *in development*, so some things may be buggy.  If a device persists in a different state after ending the program (such as if a crash occurs), simply reconnect it.  The LinnStrument also has a reset feature you may find useful.
 
-And since this is experimental, please use it at your own risk and prepare to do basic troubleshooting to get it working.
+And since this is experimental, as with anything that sends commands to hardware, please use it at your own risk and prepare to do basic troubleshooting if something goes wrong.
+
+That being said, I hope you enjoy it and have fun!
 
 ## Getting Started
 
@@ -85,19 +87,22 @@ cd midimech
 pip install -r requirements.txt
 ```
 
+- Run the program
+```
+python midimech.py
+```
+
 ### Setup
 
 - First create a midi loopback device.  You can do this easily with LoopMidi on Windows or using "Audio MIDI Setup / MIDI Studio" on Mac.  Then set your DAW to use this device instead of the linnstrument.  Make sure the virtual device you set up has "midimech" in its device name, since this is how its detected by the program.
 
-- Set your LinnStrument to use ChPerRow mode.  (Or alternatively, see the section *MPE* for getting the full MPE mode working).
+- If you're using the LinnStrument 200, set `size=200` in your settings.ini.  If you don't have one, copy it from settings.ini.example.
 
-- Run midimech.py.  You should see a window pop up with the layout.
+- Run midimech.  You should see a window pop up with the layout.
 
-- If this works, your Linnstrument will show the colors of the layout and be playable in your DAW.
+- Your Linnstrument or LaunchPad X should show the colors of the layout and be playable in your DAW.
 
-- If you're using the larger (200-note) version of the LinnStrument, click "SIZE" to use the full layout (experimental).
-
-- Set your LinnStrument's pitch bend range to 24 (half of what the range on the virtual instrument is).
+- To enable the split, create another midi loopback device called "split" and click the SPLIT button.  One side should turn blue.
 
 ## How to Play
 
@@ -256,34 +261,6 @@ on the track you want to visualize and set the plugin to use the visualizer midi
 To use the visualizer with Synthesia, create a new MIDI loopback device called "visualizer".
 In Synthesia settings, set it as an output device for note lights.
 
-## Full MPE
-
-### 128 Key
-
-To use ChPerNote/MPE mode, set your LinnStrument 128 to "NO OVERLAP" with a transposition of -3 octaves and +6 pitch.
-Then, set `no_overlap=true` in your settings.ini file (if you don't have one, copy it from settings.ini.example).
-
-If notes are in the wrong spot, check your device's transpose.  If notes are jumping around sometimes, check your linnstrument is properly in MPE mode with the right channels set up.
-
-### 200 Key
-
-To use ChPerNote/MPE mode, first enable SPLIT.  Then, set your LinnStrument to "NO OVERLAP" with a transposition on both splits of -3 octaves and +6 pitch.  Make sure ChPerNote mode is also set on both splits.
-Then, set `no_overlap=true` and `hardware_split=true` in your settings.ini file (if you don't have one, copy it from settings.ini.example).
-
-If notes are in the wrong spot, check your device's transpose.  If notes are jumping around sometimes, check your linnstrument is properly in MPE mode with the right channels set up.
-Make sure you apply the settings to both splits and that the splits are in default position.
-
-## Split
-
-Because of the diagonal nature of the layout, the split is diagonal as well (through G# in the center).
-To use a split, create another midi loopback port called "split" and set `split=true` in your settings.ini.
-At the moment this requires using full MPE mode to work (see section `Full MPE`).
-The split creates a second virtual instrument you can access in your DAW called "split".
-
-Note: If you use the 128, do not set the split on your linnstrument.  The program will make its own split.
-However, if you use the 200, you will need to enable to split in order to have all the notes come through in MPE mode.
-(This is to work around a limitation with no overlap mode.)
-
 ## Future Plans
 
 - Scale integration
@@ -295,3 +272,6 @@ However, if you use the 200, you will need to enable to split in order to have a
 ## Contact / Questions
 
 I'm on the LinnStrument Discord at https://discord.gg/h2BcrzmTXe.  Come hang out!
+
+
+

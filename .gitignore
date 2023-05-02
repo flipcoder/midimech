@@ -1,3 +1,6 @@
 __pycache__/
 settings.ini
 test.py
+midimech.spec
+build/
+dist/

@@ -2,11 +2,12 @@
 # from tkinter import *
 from collections import OrderedDict
 from configparser import ConfigParser
-import os, sys, glm, copy, binascii, struct, math, traceback
+import os, sys, glm, copy, binascii, struct, math, traceback, signal
 import rtmidi2
 from util import *
 from dataclasses import dataclass
 from glm import ivec2, vec2, ivec3, vec3
+import time
 
 with open(os.devnull, "w") as devnull:
     # suppress pygame messages
@@ -18,12 +19,19 @@ with open(os.devnull, "w") as devnull:
 import pygame_gui
 
 try:
+    import pymsgbox
+except ImportError:
+    print("The project dependencies have changed! Run the requirements setup command again!")
+    sys.exit(1)
+
+try:
     import launchpad_py as launchpad
 except ImportError:
     try:
         import launchpad
     except ImportError:
-        sys.exit("The dependencies have changed! Run the requirements setup command again!")
+        print("The project dependencies have changed! Run the requirements setup command again!")
+        sys.exit(1)
 
 # import mido
 
@@ -48,11 +56,11 @@ FADE_SPEED = 4.0
 COLOR_CODES = [
     ivec3(0),  # default color
     ivec3(255, 0, 0),  # red
-    ivec3(205, 127, 0),  # yellow
+    ivec3(205, 205, 0),  # yellow
     ivec3(0, 127, 0),  # green
     ivec3(0, 127, 127),  # cyan
     ivec3(0, 0, 128),  # blue
-    ivec3(255, 0, 255),  # magenta
+    ivec3(159, 43, 104), # purple
     ivec3(0),  # off
     ivec3(80, 80, 80),  # gray
     ivec3(255, 127, 0),  # orange
@@ -82,6 +90,24 @@ COLOR_CODES = [
 #         r[i] *= 255
 #     return ivec3(r)
 
+def decompose_pitch_bend(pitch_bend_bytes):
+    pitch_bend_value = (pitch_bend_bytes[1] << 7) + pitch_bend_bytes[0]
+    pitch_bend_norm = (pitch_bend_value - 8192) / 8192.0
+    return pitch_bend_norm
+
+
+def compose_pitch_bend(pitch_bend_norm):
+    pitch_bend_value = int((pitch_bend_norm + 1.0) * 8192)
+    pitch_bend_bytes = [pitch_bend_value & 0x7F, (pitch_bend_value >> 7) & 0x7F]
+    return pitch_bend_bytes
+
+def decode_value(value):
+    lsb = value & 0x7F
+    msb = (value >> 7) & 0x7F
+    return msb, lsb
+
+# def pitch_bend_to_semitones(pitch_bend_value):
+#     return bend_semitones
 
 class Note:
     def __init__(self):
@@ -90,8 +116,9 @@ class Note:
         # self.intensity = 0.0  # how much to light marker up (in app)
         self.pressure = 0.0  # how much the note is being pressed
         # self.dirty = False
-        self.location: ivec2 = None  # on board
+        self.location = None  # on board
         self.midinote = None
+        self.split = 0
 
     # def logic(self, dt):
     #     if self.pressed:  # pressed, fade to pressure value
@@ -109,18 +136,26 @@ class Note:
 
 
 @dataclass
+class DeviceSettings:
+    row_offset: int
+    octave: int
+    transpose: int
+    bend: int
+
+@dataclass
 class Options:
     version: int = 0
     lights: str = "4,7,3,7,3,3,7,3,7,3,7,3"
     split_lights: str = "4,7,5,7,5,5,7,5,7,5,7,5"
     one_channel: bool = False
+    lite: bool = False # lite mode (no gfx)
     velocity_curve: float = 1.0
     velocity_curve_low: float = 0.5
     velocity_curve_high: float = 3.0
     min_velocity: float = 0
     max_velocity: float = 127
     show_lowest_note: bool = False
-    no_overlap: bool = False
+    mpe: bool = True
     hardware_split: bool = False
     midi_out: str = "midimech"
     split_out: str = "split"
@@ -129,6 +164,7 @@ class Options:
     foot_in: str = ""
     sustain: float = 1.0
     sustain_split: str = "both"
+    size: int = 128
     width: int = 16
     height: int = 8
 
@@ -181,7 +217,7 @@ class Core:
     def reset_light(self, x, y, reset_red=True):
         note = self.get_note_index(x, y) % 12
         if self.is_split():
-            split_chan = self.channel_from_split(self.board_h - y - 1, x)
+            split_chan = self.channel_from_split(x, self.board_h - y - 1)
             if split_chan:
                 light_col = self.options.split_lights[note]
             else:
@@ -194,7 +230,7 @@ class Core:
     def reset_launchpad_light(self, x, y):
         note = self.get_note_index(x, 8-y-1) % 12
         # if self.is_split():
-        #     split_chan = self.channel_from_split(self.board_h - y - 1, x)
+        #     split_chan = self.channel_from_split(x, self.board_h - y - 1)
         #     if split_chan:
         #         light_col = self.options.split_lights[note]
         #     else:
@@ -262,7 +298,7 @@ class Core:
         # return NOTE_COLORS[get_note_index(x, y)]
         note = self.get_note_index(x, y)
         if self.is_split():
-            split_chan = self.channel_from_split(self.board_h - y - 1, x)
+            split_chan = self.channel_from_split(x, self.board_h - y - 1)
             if split_chan:
                 light_col = self.options.split_lights[note]
             else:
@@ -382,7 +418,7 @@ class Core:
         self.octaves = list(reversed(self.octaves))
 
         self.notes = [None] * 16  # polyphony
-        for i in range(len(self.notes)):
+        for i, note in enumerate(self.notes):
             self.notes[i] = Note()
 
     def midi_write(self, dev, msg, ts=0):
@@ -395,9 +431,9 @@ class Core:
                 return note
         return None
 
-    def note_on(self, data, timestamp, width=None, curve=True, no_overlap=None):
-        if no_overlap is None:
-            no_overlap = self.options.no_overlap
+    def note_on(self, data, timestamp, width=None, curve=True, mpe=None):
+        if mpe is None:
+            mpe = self.options.mpe
         d0 = data[0]
         # print(data)
         ch = d0 & 0x0F
@@ -438,7 +474,7 @@ class Core:
             print("Channel:", ch)
             print("---")
 
-        if no_overlap:
+        if mpe:
             row = data[1] // width
             col = data[1] % width
             if within_hardware_split:
@@ -461,8 +497,9 @@ class Core:
         data[1] += (self.octave + self.octave_base) * 12
         data[1] += BASE_OFFSET
         midinote = data[1] - 24 + self.transpose * 2
+        split_chan = 0
         if self.is_split():
-            split_chan = self.channel_from_split(row, col)
+            split_chan = self.channel_from_split(col, row)
         if not aftertouch:
             self.mark(midinote, 1, only_row=row)
         data[1] += self.out_octave * 12 + self.transpose * 2
@@ -486,7 +523,7 @@ class Core:
             #   This is not necessary yet
             pass
         else:
-            if self.options.no_overlap:
+            if self.options.mpe:
                 note = self.notes[ch]
             else:
                 note = self.next_free_note()
@@ -497,6 +534,7 @@ class Core:
                 note.location.y = row
                 note.pressure = vel
                 note.midinote = data[1]
+                note.split = split_chan
 
         if self.is_split():
             if split_chan == 0:
@@ -507,9 +545,9 @@ class Core:
         else:
             self.midi_write(self.midi_out, data, timestamp)
 
-    def note_off(self, data, timestamp, width=None, no_overlap=None):
-        if no_overlap is None:
-            no_overlap = self.options.no_overlap
+    def note_off(self, data, timestamp, width=None, mpe=None):
+        if mpe is None:
+            mpe = self.options.mpe
         
         d0 = data[0]
         # print(data)
@@ -552,10 +590,10 @@ class Core:
             else:
                 width = self.board_w
         
-        if not no_overlap:
+        if not mpe:
             row = ch % 8
             col = ch // 8
-        if no_overlap:
+        if mpe:
             # row and col within the current split
             # row = data[1] // width
             # col = data[1] % width
@@ -580,12 +618,12 @@ class Core:
                 data[1] -= row * 5
             except IndexError:
                 pass
-
+        
         data[1] += (self.octave + self.octave_base) * 12
         data[1] += BASE_OFFSET
         midinote = data[1] - 24 + self.transpose * 2
         if self.is_split():
-            split_chan = self.channel_from_split(row, col)
+            split_chan = self.channel_from_split(col, row)
         self.mark(midinote, 0, only_row=row)
         data[1] += self.out_octave * 12 + self.transpose * 2
         if self.flipped:
@@ -600,6 +638,60 @@ class Core:
             self.midi_write(self.midi_out, data, timestamp)
         # print('note off: ', data)
 
+    def device_to_xy(self, data):
+        mpe = self.options.mpe
+        
+        d0 = data[0]
+        ch = d0 & 0x0F
+        msg = (data[0] & 0xF0) >> 4
+        if self.options.one_channel:
+            data[0] = d0 & 0xF0  # send all to channel 0 if enabled
+        row = None
+        col = None
+
+        within_hardware_split = False
+        if self.options.hardware_split:
+            if self.board_w == 25: # 200
+                left_width = 11
+                right_width = 14
+                if ch >= 8:
+                    width = right_width
+                    within_hardware_split = True
+                else:
+                    width = left_width
+            else:
+                left_width = 8
+                right_width = 8
+                if ch >= 8:
+                    width = right_width
+                    within_hardware_split = True
+                else:
+                    width = left_width
+        else:
+            width = self.board_w
+        
+        if not mpe:
+            row = ch % 8
+            col = ch // 8
+        if mpe:
+            row = data[1] // width
+            col = data[1] % width
+            if within_hardware_split:
+                data[1] += left_width
+            data[1] = col + 30 + 2.5 * row
+            data[1] *= 2
+            data[1] = int(data[1])
+            if within_hardware_split:
+                data[1] += left_width * 2
+        else:
+            data[1] *= 2
+            try:
+                data[1] -= row * 5
+            except IndexError:
+                pass
+        
+        return col, row
+    
     def cb_midi_in(self, data, timestamp):
         # d4 = None
         # if len(data)==4:
@@ -613,7 +705,7 @@ class Core:
             data[0] = d0 & 0xF0  # send all to channel 0 if enabled
         row = None
         col = None
-        if not self.options.no_overlap:
+        if not self.options.mpe:
             row = ch % 8
             col = ch // 8
         if msg == 9:  # note on
@@ -627,14 +719,51 @@ class Core:
         elif 0xF0 <= msg <= 0xF7:  # sysex
             self.midi_write(self.midi_out, data, timestamp)
         else:
-            # control change, aftertouch, pitch bend, etc...
-            if data[1] == 64:  # sustain pedal
+            # pitch bend
+            skip = False
+            if msg == 14:
+                if self.is_split():
+                    # experimental: ignore pitch bend for a certain split
+                    split_chan = self.notes[ch].split
+                    if self.options.stable_left and split_chan == 0:
+                        data[1] = 0
+                        data[2] = 64
+                        self.midi_write(self.midi_out, data, timestamp)
+                        skip = True
+                    if self.options.stable_right and split_chan == 1:
+                        data[1] = 0
+                        data[2] = 64
+                        self.midi_write(self.split_out, data, timestamp)
+                        skip = True
+                
+            # use_stabilizer = self.options.stabilizer
+            # bend = decompose_pitch_bend([data[1], data[2]])
+            # print('bend', bend)
+            # note_ofs = bend * 24
+            # print(' note_ofs', note_ofs)
+            # closest_ofs = round(note_ofs)
+            # print(' closest_ofs', closest_ofs)
+            # diff = note_ofs - closest_ofs # diff between note and tuning
+            # diff **= 0.9 # bend the curve
+            # print(' diff', diff)
+            # note_ofs = closest_ofs + diff
+            # bend = note_ofs / 24
+            # print(' end bend', bend)
+            # data[1], data[2] = compose_pitch_bend(bend)
+            # print(data[1], data[2])
+            # semitones = pitch_bend_to_semitones(bend)
+            # print('pitch', bend, semitones)
+            # stabilized = True
+            
+            if skip:
+                pass
+            elif msg == 11 and data[1] == 64:  # sustain pedal
                 if self.is_split():
                     for dev in self.sustainable_devices():
                         self.midi_write(dev, data, timestamp)
                 else:
                     self.midi_write(self.midi_out, data, timestamp)
-            elif self.is_split():
+            elif self.is_split(): # everything else (if split)...
                 note = self.notes[ch]
                 if ch == 0:
                     self.midi_write(self.midi_out, data, timestamp)
@@ -642,7 +771,7 @@ class Core:
                 elif note.location is not None:
                     col = self.notes[ch].location.x
                     row = self.notes[ch].location.y
-                    split_chan = self.channel_from_split(row, col)
+                    split_chan = self.channel_from_split(col, row)
                     if split_chan:
                         self.midi_write(self.split_out, data, timestamp)
                     else:
@@ -650,7 +779,7 @@ class Core:
                 else:
                     self.midi_write(self.midi_out, data, timestamp)
                     self.midi_write(self.split_out, data, timestamp)
-            else:
+            else:  # everything else (if not split)...
                 self.midi_write(self.midi_out, data, timestamp)
 
     def cb_visualizer(self, data, timestamp):
@@ -689,28 +818,28 @@ class Core:
         #     for note in self.notes:
         #         if note.location:
         #             print(note.midinote)
-        #             self.note_on([160, note.midinote, vel], timestamp, width=8, no_overlap=True)
+        #             self.note_on([160, note.midinote, vel], timestamp, width=8, mpe=True)
         
         if self.launchpad_mode == 'lpx' and event[0] >= 255: # pressure
             x = event[0] - 255
             y = 8 - (event[1] - 255)
             vel = event[2]
             note = y * 8 + x
-            self.note_on([160, note, event[2]], timestamp, width=8, no_overlap=True)
+            self.note_on([160, note, event[2]], timestamp, width=8, mpe=True)
         elif event[2] == 0: # note off
             x = event[0]
             y = 8 - event[1]
             if 0 <= x < 8 and 0 <= y < 8:
                 note = y * 8 + x
                 self.reset_launchpad_light(x, y)
-                self.note_off([128, note, event[2]], timestamp, width=8, no_overlap=True)
+                self.note_off([128, note, event[2]], timestamp, width=8, mpe=True)
         else: # note on
             x = event[0]
             y = 8 - event[1]
             if 0 <= x < 8 and 0 <= y < 8:
                 note = y * 8 + x
                 self.set_launchpad_light(x, y, 1) # red
-                self.note_on([144, note, event[2]], timestamp, width=8, no_overlap=True)
+                self.note_on([144, note, event[2]], timestamp, width=8, mpe=True)
             else:
                 if x == 2:
                     self.transpose_board(-1)
@@ -729,7 +858,7 @@ class Core:
             
     #         self.launchpad_state[y][x] = None
     #         note = y * 8 + x
-    #         self.note_off([128, note, event[2]], timestamp, width=8, no_overlap=True)
+    #         self.note_off([128, note, event[2]], timestamp, width=8, mpe=True)
     #     elif event[0] == 160:
     #         y = event[1] // 10 - 1
     #         x = event[1] % 10 - 1
@@ -737,8 +866,8 @@ class Core:
     #         self.launchpad_state[y][x] = event[2]
     #         note = y * 8 + x
     #         if state is None: # just pressed
-    #             self.note_on([144, note, event[2]], timestamp, width=8, no_overlap=True, curve=False)
-    #         self.note_on([160, note, event[2]], timestamp, width=8, no_overlap=True, curve=False)
+    #             self.note_on([144, note, event[2]], timestamp, width=8, mpe=True, curve=False)
+    #         self.note_on([160, note, event[2]], timestamp, width=8, mpe=True, curve=False)
     #     elif event[0] == 176:
     #         if event == [176, 93, 127, 0]:
     #             self.transpose_board(-1)
@@ -765,7 +894,7 @@ class Core:
     #     general['velocity_curve'] = self.options.velocity_curve
     #     general['min_velocity'] = self.options.min_velocity
     #     general['max_velocity'] = self.options.max_velocity
-    #     general['no_overlap'] = self.options.no_overlap
+    #     general['mpe'] = self.options.mpe
     #     general['hardware_split'] = self.options.hardware_split
     #     general['show_lowest_note'] = self.options.show_lowest_note
     #     general['midi_out'] = self.options.midi_out
@@ -800,7 +929,13 @@ class Core:
     #                 col = [0, 0, 0]
     #             self.launchpad.LedCtrlXY(x, y, col[0], col[1], col[2])
 
+    def sig(self, signal, frame):
+        self.quit()
+
     def __init__(self):
+        signal.signal(signal.SIGINT, self.sig)
+        signal.signal(signal.SIGTERM, self.sig)
+         
         self.cfg = ConfigParser(allow_no_value=True)
         self.cfg.read("settings.ini")
         try:
@@ -814,20 +949,34 @@ class Core:
         self.options.lights = get_option(opts, "lights", DEFAULT_OPTIONS.lights)
         if self.options.lights:
             self.options.lights = list(
-                map(lambda x: int(x), DEFAULT_OPTIONS.lights.split(","))
+                map(lambda x: int(x), self.options.lights.split(","))
             )
 
         self.options.split_lights = get_option(
-            opts, "lights", DEFAULT_OPTIONS.split_lights
+            opts, "split_lights", DEFAULT_OPTIONS.split_lights
         )
         if self.options.split_lights:
             self.options.split_lights = list(
                 map(lambda x: int(x), self.options.split_lights.split(","))
             )
 
+        if len(self.options.lights) != 12:
+            pymsgbox.alert("Invalid light color configuration. Make sure you have 12 light colors under the lights option or remove it.")
+            sys.exit(1)
+        if len(self.options.split_lights) != 12:
+            pymsgbox.alert("Invalid light color configuration for split. Make sure you have 12 light colors under the split_lights option or remove it.")
+            sys.exit(1)
+
         self.options.one_channel = get_option(
             opts, "one_channel", DEFAULT_OPTIONS.one_channel
         )
+
+        if "--lite" in sys.argv:
+            self.options.lite = True
+        else:
+            self.options.lite = get_option(
+                opts, "lite", DEFAULT_OPTIONS.lite
+            )
 
         # bend the velocity curve, examples: 0.5=sqrt, 1.0=default, 2.0=squared
         self.options.velocity_curve = get_option(
@@ -854,12 +1003,11 @@ class Core:
         self.options.show_lowest_note = get_option(
             opts, "show_lowest_note", DEFAULT_OPTIONS.show_lowest_note
         )
-        self.options.no_overlap = get_option(
-            opts, "no_overlap", DEFAULT_OPTIONS.no_overlap
-        )
-        self.options.hardware_split = get_option(
-            opts, "hardware_split", DEFAULT_OPTIONS.hardware_split
-        )
+        # self.options.mpe = get_option(
+        #     opts, "mpe", DEFAULT_OPTIONS.mpe
+        # ) or get_option(
+        #     opts, "no_overlap", DEFAULT_OPTIONS.mpe
+        # )
         self.options.midi_out = get_option(opts, "midi_out", DEFAULT_OPTIONS.midi_out)
         self.options.split_out = get_option(
             opts, "split_out", DEFAULT_OPTIONS.split_out
@@ -881,11 +1029,19 @@ class Core:
             print("Invalid sustain split value. Options: left, right, both.")
             sys.exit(1)
 
-        self.options.width = get_option(opts, "width", DEFAULT_OPTIONS.width)
+        self.options.size = get_option(opts, "size", DEFAULT_OPTIONS.size)
+        if self.options.size == 128:
+            self.options.width = 16
+        elif self.options.size == 200:
+            self.options.width = 25
+            self.options.hardware_split = True
 
         self.options.launchpad = get_option(opts, 'launchpad', True)
         self.options.experimental = get_option(opts, 'experimental', False)
         self.options.debug = get_option(opts, 'debug', False)
+        self.options.stabilizer = get_option(opts, 'stabilizer', False)
+        self.options.stable_left = get_option(opts, 'stable_left', False)
+        self.options.stable_right = get_option(opts, 'stable_right', False)
 
         # simulator keys
         self.keys = {}
@@ -910,7 +1066,7 @@ class Core:
         self.keys[pygame.K_RSHIFT] = 47 + i
 
         # self.panel = CHORD_ANALYZER
-        self.panel_sz = 32  # 64
+        self.panel_sz = 32
         self.menu_sz = 32 #96  # full
         self.max_width = 25  # MAX WIDTH OF LINNSTRUMENT
         self.board_h = 8
@@ -967,13 +1123,19 @@ class Core:
         # self.root.protocol("WM_DELETE_WINDOW", self.quit)
         pygame.init()
         pygame.display.set_caption(TITLE)
-        pygame.display.set_icon(pygame.image.load('icon.png'))
+        self.icon = pygame.image.load('icon.png')
+        pygame.display.set_icon(self.icon)
         # if FOCUS:
         #     pygame.mouse.set_visible(0)
         #     pygame.event.set_grab(True)
-        self.screen = Screen(
-            self, pygame.display.set_mode(self.screen_sz, pygame.DOUBLEBUF)
-        )
+        if self.options.lite:
+            self.screen = Screen(
+                self, pygame.display.set_mode((256, 256), pygame.DOUBLEBUF)
+            )
+        else:
+            self.screen = Screen(
+                self, pygame.display.set_mode(self.screen_sz, pygame.DOUBLEBUF)
+            )
 
         bs = ivec2(self.button_sz, self.panel_sz)  # // 2 double panel
         self.gui = pygame_gui.UIManager(self.screen_sz)
@@ -994,55 +1156,61 @@ class Core:
             text="TR>",
             manager=self.gui,
         )
-        self.btn_size = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect((bs.x * 4 + 2, y), bs),
-            text="SIZE",
-            manager=self.gui,
-        )
+        # self.btn_size = pygame_gui.elements.UIButton(
+        #     relative_rect=pygame.Rect((bs.x * 4 + 2, y), bs),
+        #     text="SIZE",
+        #     manager=self.gui,
+        # )
         self.btn_rotate = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect((bs.x * 5 + 2, y), bs),
+            relative_rect=pygame.Rect((bs.x * 4 + 2, y), bs),
             text="ROT",
             manager=self.gui,
         )
         self.btn_flip = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect((bs.x * 6 + 2, y), bs),
+            relative_rect=pygame.Rect((bs.x * 5 + 2, y), bs),
             text="FLIP",
             manager=self.gui,
         )
 
-        if self.options.no_overlap:  # split only works with no overlap for now
+        if self.options.mpe:  # split only works with no overlap for now
             self.btn_split = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((bs.x * 7 + 2, y), (bs.x * 2, bs.y)),
+                relative_rect=pygame.Rect((bs.x * 6 + 2, y), (bs.x * 2, bs.y)),
                 text="SPLIT: " + ("ON" if self.split_state else "OFF"),
                 manager=self.gui,
             )
 
-        # ---
+        # self.prev_mode = pygame_gui.elements.UIButton(
+        #     relative_rect=pygame.Rect((bs.x * 8 + 2, y), (bs.x, bs.y)),
+        #     text='<MODE',
+        #     manager=self.gui
+        # )
+        # self.next_mode = pygame_gui.elements.UIButton(
+        #     relative_rect=pygame.Rect((bs.x * 9 + 2, y), (bs.x, bs.y)),
+        #     text='MODE>',
+        #     manager=self.gui
+        # )
 
-        # y = bs.y
-        # end_pos = 0
-        # inc = bs.x * 1.5
-        # self.btn_mode_prev = pygame_gui.elements.UIButton(
-        #     relative_rect=pygame.Rect((2, y), (inc, bs.y)),
-        #     text="< MODE",
+        # self.prev_scale = pygame_gui.elements.UIButton(
+        #     relative_rect=pygame.Rect((bs.x * 10 + 2, y), (bs.x, bs.y)),
+        #     text='<SCL',
         #     manager=self.gui
         # )
-        # self.btn_mode_next = pygame_gui.elements.UIButton(
-        #     relative_rect=pygame.Rect((inc, y), (inc, bs.y)),
-        #     text="MODE >",
+        # self.next_scale = pygame_gui.elements.UIButton(
+        #     relative_rect=pygame.Rect((bs.x * 11 + 2, y), (bs.x, bs.y)),
+        #     text='SCL>',
         #     manager=self.gui
         # )
-        # self.btn_scale_prev = pygame_gui.elements.UIButton(
-        #     relative_rect=pygame.Rect((inc*2, y), (inc, bs.y)),
-        #     text="< SCALE",
+        # self.next_scale = pygame_gui.elements.UIButton(
+        #     relative_rect=pygame.Rect((bs.x * 11 + 2, y), (bs.x, bs.y)),
+        #     text='SCL>',
         #     manager=self.gui
         # )
-        # self.btn_scale_prev = pygame_gui.elements.UIButton(
-        #     relative_rect=pygame.Rect((inc*3, y), (inc, bs.y)),
-        #     text="SCALE >",
+        # self.scale_label = pygame_gui.elements.UILabel(
+        #     relative_rect=pygame.Rect((bs.x * 12 + 2, y), (bs.x, bs.y)),
+        #     text='Major',
         #     manager=self.gui
         # )
-        
+
         # y = bs.y * 2
         # self.note_buttons = [None] * 12
         # for n in range(12):
@@ -1053,11 +1221,6 @@ class Core:
         #         manager=self.gui
         #     )
         
-        # self.slider_label = pygame_gui.elements.UILabel(
-        #     relative_rect=pygame.Rect((0,y+bs.y),(bs.x*2,bs.y)),
-        #     text='Velocity Curve',
-        #     manager=self.gui
-        # )
         # self.slider_velocity = pygame_gui.elements.UIHorizontalSlider (
         #     relative_rect=pygame.Rect((bs.x*2+2,y+bs.y),(bs.x*2,bs.y)),
         #     start_value=self.options.velocity_curve,
@@ -1115,13 +1278,6 @@ class Core:
                 self.midi_out = rtmidi2.MidiOut()
                 self.midi_out.open_port(i)
 
-        if not self.linn_out:
-            print("No LinnStrument output device detected. (Can't control lights)")
-        if not self.midi_out:
-            print(
-                "No MIDI output device detected. (Did you install a midi loopback device?)"
-            )
-
         self.midi_in = None
         self.visualizer = None
         self.launchpad = None
@@ -1165,8 +1321,14 @@ class Core:
                         self.launchpad_mode = "lpx"
             if self.launchpad_mode is not None:
                 self.launchpad = lp
-        
+
         self.done = False
+        
+        if not self.midi_out:
+            pymsgbox.alert(
+                "No MIDI output device detected.  Install a midi loopback device and name it 'midimech'!", "Midimech"
+            )
+            sys.exit(1)
 
         self.dirty = True
         self.dirty_lights = True
@@ -1189,6 +1351,87 @@ class Core:
 
         # self.setup_lights()
 
+        self.setup_rpn()
+        # self.test()
+
+    def setup_rpn(self, on=True):
+        if on:
+            if self.options.mpe:
+                self.mpe_rpn()
+                self.transpose_rpn()
+            else:
+                self.rows_rpn()
+            self.bend_rpn()
+            self.split_rpn(self.options.hardware_split)
+        else:
+            self.transpose_rpn(False)
+            self.mpe_rpn(False)
+            self.bend_rpn(False)
+            self.split_rpn(False)
+            self.split_rpn(False)
+
+    def split_rpn(self, on=True):
+        if self.options.hardware_split:
+            self.rpn(200, 1 if on else 0)
+
+            self.send_cc(0, 20, 0)
+            self.send_cc(0, 21, 1)
+            self.send_cc(0, 22, 7 if on else 0)
+        else:
+            self.rpn(200, 7)
+
+    def rpn(self, num, value):
+        num_msb, num_lsb = decode_value(num)
+        value_msb, value_lsb = decode_value(value)
+        self.midi_write(self.linn_out, [176, 99, num_msb])
+        self.midi_write(self.linn_out, [176, 98, num_lsb])
+        self.midi_write(self.linn_out, [176, 6, value_msb])
+        self.midi_write(self.linn_out, [176, 38, value_lsb])
+        self.midi_write(self.linn_out, [176, 101, 127])
+        self.midi_write(self.linn_out, [176, 100, 127])
+        time.sleep(0.1)
+
+    def mpe_rpn(self, on=True):
+        if on:
+            self.rpn(0, 1)
+            self.rpn(100, 1)
+            self.rpn(227, 0)
+        else:
+            self.rpn(227, 5)
+
+    def rows_rpn(self):
+        self.rpn(0, 2)
+        self.rpn(100, 2)
+
+    def bend_rpn(self, on=True):
+        if on:
+            self.rpn(19, 24)
+            self.rpn(119, 24)
+        else:
+            self.rpn(19, 48)
+            self.rpn(119, 48)
+    
+    def transpose_rpn(self, on=True):
+        if on:
+            self.rpn(36, 2)
+            self.rpn(37, 13)
+            self.rpn(136, 2)
+            self.rpn(137, 13)
+
+            # turn transpose light off
+            self.send_cc(0, 20, 0)
+            self.send_cc(0, 21, 4)
+            self.send_cc(0, 22, 7)
+
+        else:
+            self.rpn(36, 5)
+            self.rpn(37, 7)
+            self.rpn(136, 5)
+            self.rpn(137, 7)
+
+    # def test(self):
+    #     self.transpose_rpn()
+
     def transpose_board(self, val):
         aval = abs(val)
         if aval > 1:  # more than one shift
@@ -1207,6 +1450,7 @@ class Core:
 
     def quit(self):
         self.reset_lights()
+        self.setup_rpn(False)
         self.done = True
 
     def clear_marks(self, use_lights=False):
@@ -1281,7 +1525,7 @@ class Core:
         self.screen = Screen(self, pygame.display.set_mode(self.screen_sz))
         self.dirty_lights = True
 
-    def channel_from_split(self, row, col):
+    def channel_from_split(self, col, row):
         if not self.is_split():
             return 0
         w = self.board_w
@@ -1292,7 +1536,7 @@ class Core:
 
     def is_split(self):
         # TODO: make this work with hardware overlap (non-mpe)
-        return self.options.no_overlap and self.split_state and self.split_out
+        return self.options.mpe and self.split_state and self.split_out
 
     def logic(self, dt):
         # keys = pygame.key.get_pressed()
@@ -1343,75 +1587,80 @@ class Core:
                         self.midi_write(self.midi_out, data, 0)
                 except KeyError:
                     pass
-            elif ev.type == pygame.MOUSEMOTION:
-                x, y = ev.pos
-                y -= self.menu_sz
-                self.mouse_hover(x, y)
-            elif ev.type == pygame.MOUSEBUTTONDOWN:
-                x, y = ev.pos
-                y -= self.menu_sz
-                if ev.button == 1:
-                    self.mouse_press(x, y)
-                elif ev.button == 2:
-                    self.mouse_release(x, y)
-                elif ev.button == 3:
-                    self.mouse_hold(x, y)
-            elif ev.type == pygame.MOUSEBUTTONUP:
-                self.mouse_release()
-            elif ev.type == pygame_gui.UI_BUTTON_PRESSED:
-                if ev.ui_element == self.btn_octave_down:
-                    self.octave -= 1
-                    self.dirty = self.dirty_lights = True
-                    self.clear_marks(use_lights=False)
-                elif ev.ui_element == self.btn_octave_up:
-                    self.octave += 1
-                    self.dirty = self.dirty_lights = True
-                    self.clear_marks(use_lights=False)
-                elif ev.ui_element == self.btn_transpose_down:
-                    self.transpose_board(-1)
-                    self.dirty = self.dirty_lights = True
-                    self.clear_marks(use_lights=False)
-                elif ev.ui_element == self.btn_transpose_up:
-                    self.transpose_board(1)
-                    self.dirty = self.dirty_lights = True
-                    self.clear_marks(use_lights=False)
-                # elif ev.ui_element == self.btn_mode:
-                #     # TODO: toggle mode
-                #     self.dirty = True
-                elif ev.ui_element == self.btn_size:
-                    if self.board_w == 16:
-                        self.board_w = 25
-                        self.resize()
-                    else:
-                        self.board_w = 16
-                        self.resize()
-                    self.dirty = True
-                elif ev.ui_element == self.btn_rotate:
-                    if self.rotated:
-                        self.transpose += 3
-                        self.rotated = False
-                    else:
-                        self.transpose -= 3
-                        self.rotated = True
-                    self.clear_marks(use_lights=False)
-                    self.dirty = self.dirty_lights = True
-                elif ev.ui_element == self.btn_flip:
-                    self.flipped = not self.flipped
-                    self.clear_marks(use_lights=False)
-                    self.dirty = self.dirty_lights = True
-                elif ev.ui_element == self.btn_split:
-                    self.split_state = not self.split_state
-                    self.btn_split.set_text(
-                        "SPLIT: " + ("ON" if self.split_state else "OFF")
-                    )
-                    self.dirty = self.dirty_lights = True
-            # elif ev.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
-            #     if ev.ui_element == self.slider_velocity:
-            #         global self.options.velocity_curve
-            #         self.options.velocity_curve = ev.value
-            #         self.config_save_timer = 1.0
 
-            self.gui.process_events(ev)
+            if not self.options.lite:
+                if ev.type == pygame.MOUSEMOTION:
+                    x, y = ev.pos
+                    y -= self.menu_sz
+                    self.mouse_hover(x, y)
+                elif ev.type == pygame.MOUSEBUTTONDOWN:
+                    x, y = ev.pos
+                    y -= self.menu_sz
+                    if ev.button == 1:
+                        self.mouse_press(x, y)
+                    elif ev.button == 2:
+                        self.mouse_release(x, y)
+                    elif ev.button == 3:
+                        self.mouse_hold(x, y)
+                elif ev.type == pygame.MOUSEBUTTONUP:
+                    self.mouse_release()
+                elif ev.type == pygame_gui.UI_BUTTON_PRESSED:
+                    if ev.ui_element == self.btn_octave_down:
+                        self.octave -= 1
+                        self.dirty = self.dirty_lights = True
+                        self.clear_marks(use_lights=False)
+                    elif ev.ui_element == self.btn_octave_up:
+                        self.octave += 1
+                        self.dirty = self.dirty_lights = True
+                        self.clear_marks(use_lights=False)
+                    elif ev.ui_element == self.btn_transpose_down:
+                        self.transpose_board(-1)
+                        self.dirty = self.dirty_lights = True
+                        self.clear_marks(use_lights=False)
+                    elif ev.ui_element == self.btn_transpose_up:
+                        self.transpose_board(1)
+                        self.dirty = self.dirty_lights = True
+                        self.clear_marks(use_lights=False)
+                    # elif ev.ui_element == self.btn_mode:
+                    #     # TODO: toggle mode
+                    #     self.dirty = True
+                    # elif ev.ui_element == self.btn_size:
+                    #     if self.board_w == 16:
+                    #         self.board_w = 25
+                    #         self.resize()
+                    #     else:
+                    #         self.board_w = 16
+                    #         self.resize()
+                    #     self.dirty = True
+                    elif ev.ui_element == self.btn_rotate:
+                        if self.rotated:
+                            self.transpose += 3
+                            self.rotated = False
+                        else:
+                            self.transpose -= 3
+                            self.rotated = True
+                        self.clear_marks(use_lights=False)
+                        self.dirty = self.dirty_lights = True
+                    elif ev.ui_element == self.btn_flip:
+                        self.flipped = not self.flipped
+                        self.clear_marks(use_lights=False)
+                        self.dirty = self.dirty_lights = True
+                    elif ev.ui_element == self.btn_split:
+                        if self.split_out:
+                            self.split_state = not self.split_state
+                            self.btn_split.set_text(
+                                "SPLIT: " + ("ON" if self.split_state else "OFF")
+                            )
+                            self.dirty = self.dirty_lights = True
+                        else:
+                            pymsgbox.alert("You need to add another MIDI loopback device called 'split'")
+                # elif ev.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
+                #     if ev.ui_element == self.slider_velocity:
+                #         global self.options.velocity_curve
+                #         self.options.velocity_curve = ev.value
+                #         self.config_save_timer = 1.0
+
+                self.gui.process_events(ev)
 
         # figure out the lowest note to highlight it
         if self.options.show_lowest_note:
@@ -1433,8 +1682,8 @@ class Core:
                             self.lowest_note_midi = note_num
                         note_count += 1
 
-        if self.dirty:
-            self.init_board()
+        # if self.dirty:
+        #     self.init_board()
 
         if self.dirty_lights:
             self.setup_lights()
@@ -1461,7 +1710,8 @@ class Core:
         # #     if self.config_save_timer <= 0.0:
         # #         save()
 
-        self.gui.update(dt)
+        if not self.options.lite:
+            self.gui.update(dt)
 
     def sustainable_devices(self):
         if not self.is_split() or not self.options.sustain_split:
@@ -1476,7 +1726,12 @@ class Core:
 
     def render(self):
         if not self.dirty:
-            return
+            return False
+
+        if self.options.lite:
+            self.screen.surface.blit(self.icon, (0,0,256,256))
+            return True
+        
         self.dirty = False
 
         self.screen.surface.fill((0, 0, 0))
@@ -1491,7 +1746,7 @@ class Core:
                 # write text
                 note = self.get_note(x, y)
 
-                split_chan = self.channel_from_split(y, x)  # !
+                split_chan = self.channel_from_split(x, y)
 
                 # note = str(self.get_octave(x, y)) # show octave
                 # brightness = 1.0 if cell else 0.5
@@ -1603,6 +1858,11 @@ class Core:
                 x += 1
             y += 1
 
+        # for note in self.notes:
+        #     if note.location is None:
+        #         continue
+        #     print(note.location)
+
         # if CHORD_ANALYZER:
         #     self.render_chords()
 
@@ -1652,6 +1912,7 @@ class Core:
     #     textpos.x = 0
     #     textpos.y = self.menu_sz // 2
     #     self.screen.surface.blit(text, textpos)
+        return True
 
     def draw(self):
         self.gui.draw_ui(self.screen.surface)
