@@ -7,8 +7,6 @@
 Midimech is an alternative musical note layout system for next-gen grid controllers like the LinnStrument and LaunchPad X (and your computer keyboard).  It uses an isomorphic layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as "playing the mech", but
 you could also call the layout Diagonal Wicki-Hayden, Wholetone, or whatever you like.  I prefer mech. 😎
 
-**Unlike the layout of other instruments, notes that sound good together are closer together, and notes that sound worse are furthest apart.**
-
 This project intends to bring the layout to more people and since it appears to have many advantages, I consider it a good proposal for next-gen musical instruments.
 
 Midimech supports:
@@ -18,7 +16,7 @@ Midimech supports:
 - Diagonal split, which fits great even on the LinnStrument 128
 - Transposing and Octave shifting
 - LaunchPad X support (more devices coming in the future)
-- And it's great for playing piano runs ;)
+- Great for playing fast arpeggios and piano runs ;)
 
 **Please read the instructions and important notes before usage.  Have fun!**
 
@@ -42,11 +40,11 @@ Launchpad Support powered by: [Launchpad-Py](https://github.com/FMMT666/launchpa
 
 - Notes that sound good together are closer together.  Notes that sound worse are furthest apart.  Mistakes will be less likely and less obvious!
 - Like the LinnStrument's layout, it is also isomorphic (the same chord and scale shapes can be played anywhere)
-- Chords and scales are far easier to play than other layouts.
+- The most common chords and scales are far easier to play and remember than other layouts.
 - Extended range compared to standard +5 tuning, making room for using a split.
 - Unlike piano, instrument splits can overlap.
 - Less finger stretching than other layouts when playing chords, which may help ergonomically.
-- Piano runs are quite smooth, as you're simply walking stacked shapes.
+- Arpeggios are quite smooth, as you're simply walking stacked shapes.
 
 ## Chord Shapes
 
@@ -56,9 +54,11 @@ Launchpad Support powered by: [Launchpad-Py](https://github.com/FMMT666/launchpa
 
 So far, this has mostly been tested on the LinnStrument 128 version.  If you own the 200-note version, please feel free to test it and let me know how this works for you.
 
-This program is *in development*, so some things may be buggy.  If a device persists in a different state after ending the program (such as if a crash occurs), simply reconnect it.  The LinnStrument also has a reset feature you may find useful.
+Midimech sends midi commands to your midi controller and does NOT replace the firmware of your device.  It changes certain settings for the program to function and resets them to common values after ending the program.
 
-And since this is experimental, as with anything that sends commands to hardware, please use it at your own risk and prepare to do basic troubleshooting if something goes wrong.
+This program is *in development*, so some things may be buggy.  If a device persists in a different state after ending the program (such as if a crash occurs), try running the program again and closing it.  Otherwise try reconnecting or resetting it.
+
+Because it changes the setup of the LinnStrument, it is only recommended for people that are comfortable with setting up and configuring the Linnstrument.
 
 That being said, I hope you enjoy it and have fun!
 
@@ -108,7 +108,9 @@ python midimech.py
 
 ### Layout
 
-Each row consists of a whole tone scale and each row is separating by a fourth.  This has a number of advantages you'll see below.
+**Unlike the layout of other instruments, notes that sound good together are closer together, and notes that sound worse are furthest apart.**
+
+Each row consists of a whole tone scale and each row is separated by a fourth.  This has a number of advantages you'll see below.
 
 ### Basic Scales
 
