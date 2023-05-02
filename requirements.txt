@@ -3,3 +3,4 @@ pygame_gui
 pyglm
 rtmidi2
 launchpad-py
+pymsgbox
