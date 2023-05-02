@@ -4,7 +4,7 @@
 
 **IN DEVELOPMENT**
 
-Midimech is an alternative musical note layout system for the the LinnStrument and LaunchPad X (and your computer keyboard).  It uses an isomorphic layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as "playing the mech", but
+Midimech is an alternative musical note layout system for the LinnStrument and LaunchPad X (and your computer keyboard).  It uses an isomorphic layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as "playing the mech", but
 you could also call the layout Diagonal Wicki-Hayden, Wholetone, or whatever you like.  I prefer mech. 😎
 
 This project intends to bring the layout to more people and since it appears to have many advantages, I consider it a good proposal for next-gen musical instruments.
