@@ -58,7 +58,7 @@ Midimech sends midi commands to your midi controller and does NOT replace the fi
 
 This program is *in development*, so some things may be buggy.  If a device persists in a different state after ending the program (such as if a crash occurs), try running the program again and closing it.  Otherwise try reconnecting or resetting it.
 
-Because it changes the setup of the LinnStrument, it is only recommended for people that are comfortable with setting up and configuring the Linnstrument.
+Because it changes the setup of the LinnStrument during usage, it is only recommended for people that are comfortable with setting up and configuring the Linnstrument.
 
 That being said, I hope you enjoy it and have fun!
 
