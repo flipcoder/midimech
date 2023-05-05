@@ -4,18 +4,16 @@
 
 **IN DEVELOPMENT**
 
-Midimech is an alternative musical note layout system for the LinnStrument and LaunchPad X (and your computer keyboard).  It uses an isomorphic layout that I discovered years ago.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly easy to play.  I used to map this layout to my mechanical keyboard and just play it like that.  Because of this, my friends and I referred to it as "playing the mech", but
-you could also call the layout Diagonal Wicki-Hayden, Wholetone, or whatever you like.  I prefer mech. 😎
+Midimech is an alternative musical note layout system for the LinnStrument and LaunchPad X.  It uses a wholetone-based isomorphic layout.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly convincing.  Lacking an isomorphic controller, I used to map this layout to my mechanical keyboard to play.  Because of this, my friends and I referred to it as "playing the mech".  The layout could also be referred to as Wholetone +5 or Diagonal Wicki-Hayden but I still prefer calling it mech.
 
-This project intends to bring the layout to more devices and since it appears to have many advantages, I consider it a good proposal for next-gen musical instruments.
+This project intends to bring the layout to wherever it is capable of being played, starting with the LinnStrument and Launchpad X.
 
 Midimech supports:
-- Usage as a MIDI controller in your DAW of choice
+- Usage as a virtual MIDI controller in your DAW
 - Bigger range than the default LinnStrument layout
 - Synthesia/DAW visualization for learning songs
-- Diagonal split, which fits great even on the LinnStrument 128
+- Diagonal split
 - Transposing and Octave shifting
-- LaunchPad X support (more devices coming in the future)
 - Great for playing fast arpeggios and piano runs ;)
 
 **Please read the instructions and important notes before usage.  Have fun!**
@@ -64,7 +62,7 @@ That being said, I hope you enjoy it and have fun!
 
 ## Getting Started
 
-### Latest Builds
+### Latest Builds (Windows)
 
 - [Download (Win)](https://github.com/flipcoder/midimech/releases)
 
@@ -108,9 +106,7 @@ python midimech.py
 
 ### Layout
 
-**Unlike the layout of other instruments, notes that sound good together are closer together, and notes that sound worse are furthest apart.**
-
-Each row consists of a whole tone scale and each row is separated by a fourth.  This has a number of advantages you'll see below.
+Each row consists of a whole tone scale and each row is separated by fourths.  This has a number of advantages you'll see below.
 
 ### Basic Scales
 
