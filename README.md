@@ -18,11 +18,9 @@ Midimech supports:
 
 **Please read the instructions and important notes before usage.  Have fun!**
 
-License: MIT
+License: MIT (see *Attributions*)
 
 Copyright (c) 2023 Grady O'Connell
-
-Please see the Attributions section below for a list of what powers this project!
 
 *This project is not affiliated with Roger Linn Design.*
 
@@ -278,7 +276,7 @@ This program is built using the following projects and libraries:
 - [RtMidi2](https://github.com/gesellkammer/rtmidi2)
 - [PyMsgbox](https://github.com/asweigart/pymsgbox)
 - [PyGLM](https://github.com/Zuzu-Typ/PyGLM)
-- [Launchpad-Py](https://github.com/FMMT666/launchpad.py) by FMMT666 (CC Attribution)
+- [Launchpad-Py](https://github.com/FMMT666/launchpad.py) by FMMT666 ([CC Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/))
 
 Thank you!
 
