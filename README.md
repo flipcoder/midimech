@@ -85,7 +85,9 @@ cd midimech
 pip3 install -r requirements.txt
 ```
 
-- Run the program
+- Follow the **Setup** instructions described in the section below.
+
+- When running the program, you can use:
 ```
 python3 midimech.py
 ```
@@ -94,13 +96,13 @@ python3 midimech.py
 
 - First create a midi loopback device.  You can do this easily with LoopMidi on Windows or using "Audio MIDI Setup / MIDI Studio" on Mac.  Then set your DAW to use this device instead of the linnstrument.  Make sure the virtual device you set up has "midimech" in its device name, since this is how its detected by the program.
 
-- If you're using the LinnStrument 200, set `size=200` in your settings.ini.  If you don't have one, copy it from settings.ini.example.
+- If you're using the LinnStrument 200, set `size=200` in your settings.ini.  If you don't have a settings file, copy it from settings.ini.example.
 
 - Run midimech.  You should see a window pop up with the layout.
 
 - Your Linnstrument or LaunchPad X should show the colors of the layout and be playable in your DAW.
 
-- To enable the split, create another midi loopback device called "split" and click the SPLIT button.  One side should turn blue.
+- To enable the split, create another midi loopback device called "split" and restart midimech.  Click the SPLIT button.  One side should turn blue.
 
 ## How to Play
 
