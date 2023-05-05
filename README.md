@@ -87,7 +87,7 @@ pip install -r requirements.txt
 
 - Run the program
 ```
-python midimech.py
+python3 midimech.py
 ```
 
 ### Setup
