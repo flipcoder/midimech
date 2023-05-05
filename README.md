@@ -22,13 +22,13 @@ License: MIT
 
 Copyright (c) 2023 Grady O'Connell
 
+Please see the Attributions section below for a list of what powers this project!
+
 *This project is not affiliated with Roger Linn Design.*
 
 LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 
 ![Screenshot](https://i.imgur.com/eYsl3T4.png)
-
-Launchpad Support powered by: [Launchpad-Py](https://github.com/FMMT666/launchpad.py)
 
 ## Video
 
@@ -268,6 +268,19 @@ In Synthesia settings, set it as an output device for note lights.
 - Find a way to adjust vibrato sensitivity without affecting slides.  Roger Linn has indicated that this is probably impossible, but I have a few ideas to try.
 - Better velocity curve settings (right now its only basic options in the settings.ini).
 - Better GUI and integration with the settings file.
+
+## Attributions
+
+This program is built using the following projects and libraries:
+
+- [Pygame](https://github.com/pygame/pygame)
+- [Pygame_GUI](https://github.com/MyreMylar/pygame_gui)
+- [RtMidi2](https://github.com/gesellkammer/rtmidi2)
+- [PyMsgbox](https://github.com/asweigart/pymsgbox)
+- [PyGLM](https://github.com/Zuzu-Typ/PyGLM)
+- [Launchpad-Py](https://github.com/FMMT666/launchpad.py) by FMMT666 (CC Attribution)
+
+Thank you!
 
 ## Contact / Questions
 
