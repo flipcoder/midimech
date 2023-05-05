@@ -82,7 +82,7 @@ cd midimech
 
 - Install the dependencies:
 ```
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 - Run the program
