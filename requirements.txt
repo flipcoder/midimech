@@ -4,3 +4,4 @@ pyglm
 rtmidi2
 launchpad-py
 pymsgbox
+musicpy

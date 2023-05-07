@@ -18,6 +18,11 @@ with open(os.devnull, "w") as devnull:
     sys.stdout = stdout
 import pygame_gui
 
+def error(msg):
+    print(msg)
+    pymsgbox.alert(msg)
+    sys.exit(1)
+
 try:
     import pymsgbox
 except ImportError:
@@ -30,10 +35,20 @@ except ImportError:
     try:
         import launchpad
     except ImportError:
-        print("The project dependencies have changed! Run the requirements setup command again!")
-        sys.exit(1)
+        error("The project dependencies have changed! Run the requirements setup command again!")
+
+try:
+    import yaml
+except ImportError:
+    error("The project dependencies have changed! Run the requirements setup command again!")
 
 # import mido
+
+try:
+    import musicpy as mp
+except ImportError:
+    pymsgbox.alert("The project dependencies have changed! Run the requirements setup command again!")
+    sys.exit(1)
 
 TITLE = "midimech"
 # FOCUS = False
@@ -119,6 +134,7 @@ class Note:
         self.location = None  # on board
         self.midinote = None
         self.split = 0
+        self.note = None
 
     # def logic(self, dt):
     #     if self.pressed:  # pressed, fade to pressure value
@@ -172,6 +188,45 @@ DEFAULT_OPTIONS = Options()
 
 
 class Core:
+
+    def rotate_mode(self, notes, mode):
+        notes = copy.copy(notes)
+        while mode:
+            if notes[0] == 'x':
+                notes = notes[1:] + notes[0]
+            while notes[0] == '.':
+                notes = notes[1:] + notes[0]
+            mode -= 1
+        return notes
+
+    def prev_mode(self, ofs=1):
+        self.next_mode(-ofs)
+
+    def next_mode(self, ofs=1):
+        self.set_mode((self.mode_index + ofs) % self.scale_notes.count('x'))
+
+    def prev_scale(self, ofs=1):
+        self.next_scale(-ofs)
+
+    def next_scale(self, ofs=1):
+        self.scale_index = (self.scale_index + ofs) % len(self.scale_db)
+        self.scale_name = self.scale_db[self.scale_index]['name']
+        self.set_mode(0)
+    
+    def set_mode(self, mode):
+        self.scale_notes = self.rotate_mode(self.scale_db[self.scale_index]['notes'], mode)
+        self.mode_index = mode
+        try:
+            self.mode_name = self.scale_db[self.scale_index]['modes'][mode]
+        except:
+            self.mode_name = 'Mode ' + str(self.mode_index + 1)
+        self.scale_root = mode
+
+    def set_scale(self, scale, mode):
+        self.scale_index = scale
+        self.scale_name = self.scale_db[scale]['name']
+        self.set_mode(mode)
+    
     def init_hardware(self):
         pass
 
@@ -220,10 +275,26 @@ class Core:
             split_chan = self.channel_from_split(x, self.board_h - y - 1)
             if split_chan:
                 light_col = self.options.split_lights[note]
+                if self.scale:
+                    try:
+                        light_col = light_col if self.scale_notes[note]!='.' else 7
+                    except IndexError:
+                        light_col = 7
             else:
                 light_col = self.options.lights[note]
+                if self.scale:
+                    try:
+                        light_col = light_col if self.scale_notes[note]!='.' else 7
+                    except IndexError:
+                        light_col = 7
         else:
             light_col = self.options.lights[note]
+            if self.scale:
+                try:
+                    light_col = light_col if self.scale_notes[note]!='.' else 7
+                except IndexError:
+                    light_col = 7
+
         self.set_light(x, y, light_col)
         self.red_lights[y][x] = False
 
@@ -301,10 +372,27 @@ class Core:
             split_chan = self.channel_from_split(x, self.board_h - y - 1)
             if split_chan:
                 light_col = self.options.split_lights[note]
+                if self.scale:
+                    try:
+                        light_col = light_col if self.scale_notes[note]!='.' else 7
+                    except IndexError:
+                        light_col = 7
             else:
                 light_col = self.options.lights[note]
+                if self.scale:
+                    try:
+                        light_col = light_col if self.scale_notes[note]!='.' else 7
+                    except IndexError:
+                        light_col = 7
+
         else:
             light_col = self.options.lights[note]
+            if self.scale:
+                try:
+                    light_col = light_col if self.scale_notes[note]!='.' else 7
+                except IndexError:
+                    light_col = 7
+
         return COLOR_CODES[light_col]
 
     def mouse_held(self):
@@ -421,6 +509,8 @@ class Core:
         for i, note in enumerate(self.notes):
             self.notes[i] = Note()
 
+        self.chord_notes = [False] * 12
+
     def midi_write(self, dev, msg, ts=0):
         if dev:
             dev.send_raw(*msg)
@@ -536,6 +626,9 @@ class Core:
                 note.midinote = data[1]
                 note.split = split_chan
 
+        self.chord_notes[data[1]%12] = True
+        self.dirty_chord = True
+
         if self.is_split():
             if split_chan == 0:
                 # self.midi_out.write([[data, ev[1]]]
@@ -628,6 +721,9 @@ class Core:
         data[1] += self.out_octave * 12 + self.transpose * 2
         if self.flipped:
             data[1] += 7
+
+        self.chord_notes[data[1]%12] = False
+        self.dirty_chord = True
 
         if self.is_split():
             if split_chan == 0:
@@ -841,12 +937,21 @@ class Core:
                 self.set_launchpad_light(x, y, 1) # red
                 self.note_on([144, note, event[2]], timestamp, width=8, mpe=True)
             else:
-                if x == 2:
-                    self.transpose_board(-1)
-                    self.dirty = self.dirty_lights = True
-                elif x == 3:
-                    self.transpose_board(1)
-                    self.dirty = self.dirty_lights = True
+                if self.launchpad_mode == 'lpx':
+                    if x == 0:
+                        self.octave += 1
+                        self.dirty = self.dirty_lights = True
+                        self.clear_marks(use_lights=False)
+                    elif x == 1:
+                        self.octave -= 1
+                        self.dirty = self.dirty_lights = True
+                        self.clear_marks(use_lights=False)
+                    elif x == 2:
+                        self.transpose_board(-1)
+                        self.dirty = self.dirty_lights = True
+                    elif x == 3:
+                        self.transpose_board(1)
+                        self.dirty = self.dirty_lights = True
 
     # uses raw events (Launchpad X)
     # def cb_launchpad_in(self, event, timestamp=0):
@@ -943,6 +1048,14 @@ class Core:
         except KeyError:
             opts = None
 
+        with open("scales.yaml", 'r') as stream:
+            try:
+                self.scale_db = yaml.safe_load(stream)
+            except yaml.YAMLError as exc:
+                error('Cannot load scales.yaml')
+
+        # print(self.scale_db)
+
         self.options = Options()
 
         # LIGHT = ivec3(127)
@@ -951,6 +1064,7 @@ class Core:
             self.options.lights = list(
                 map(lambda x: int(x), self.options.lights.split(","))
             )
+        self.options.lights = list(map(lambda x: 3 if x==7 else x, self.options.lights))
 
         self.options.split_lights = get_option(
             opts, "split_lights", DEFAULT_OPTIONS.split_lights
@@ -959,6 +1073,7 @@ class Core:
             self.options.split_lights = list(
                 map(lambda x: int(x), self.options.split_lights.split(","))
             )
+        self.options.split_lights = list(map(lambda x: 5 if x==7 else x, self.options.split_lights))
 
         if len(self.options.lights) != 12:
             pymsgbox.alert("Invalid light color configuration. Make sure you have 12 light colors under the lights option or remove it.")
@@ -1067,6 +1182,8 @@ class Core:
 
         # self.panel = CHORD_ANALYZER
         self.panel_sz = 32
+        self.status_sz = 32
+        # self.status_sz = 32 if self.options.experimental else 0
         self.menu_sz = 32 #96  # full
         self.max_width = 25  # MAX WIDTH OF LINNSTRUMENT
         self.board_h = 8
@@ -1075,7 +1192,7 @@ class Core:
         self.board_w = self.options.width
         self.board_sz = ivec2(self.board_w, self.board_h)
         self.screen_w = self.board_w * self.scale.x
-        self.screen_h = self.board_h * self.scale.y + self.menu_sz
+        self.screen_h = self.board_h * self.scale.y + self.menu_sz + self.status_sz
         self.button_sz = self.screen_w / self.board_w
         self.screen_sz = ivec2(self.screen_w, self.screen_h)
 
@@ -1099,6 +1216,14 @@ class Core:
         self.mouse_midi_vel = None
 
         self.last_note = None # ivec2
+        self.chord = ''
+
+        self.scale_index = 0
+        self.mode_index = 0
+        self.scale_name = self.scale_db[self.scale_index]['name']
+        self.mode_name = self.scale_db[self.scale_index]['modes'][self.mode_index]
+        self.scale_notes = self.scale_db[self.scale_index]['notes']
+        self.scale_root = 0
 
         self.init_board()
 
@@ -1148,12 +1273,12 @@ class Core:
         )
         self.btn_transpose_down = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x * 2 + 2, y), bs),
-            text="<TR",
+            text="<MOV",
             manager=self.gui,
         )
         self.btn_transpose_up = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x * 3 + 2, y), bs),
-            text="TR>",
+            text="MOV>",
             manager=self.gui,
         )
         # self.btn_size = pygame_gui.elements.UIButton(
@@ -1179,27 +1304,28 @@ class Core:
                 manager=self.gui,
             )
 
-        # self.prev_mode = pygame_gui.elements.UIButton(
-        #     relative_rect=pygame.Rect((bs.x * 8 + 2, y), (bs.x, bs.y)),
-        #     text='<MODE',
-        #     manager=self.gui
-        # )
-        # self.next_mode = pygame_gui.elements.UIButton(
-        #     relative_rect=pygame.Rect((bs.x * 9 + 2, y), (bs.x, bs.y)),
-        #     text='MODE>',
-        #     manager=self.gui
-        # )
+        # if self.options.experimental:
+        self.btn_prev_scale = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x * 8 + 2, y), (bs.x, bs.y)),
+            text='<SCL',
+            manager=self.gui
+        )
+        self.btn_next_scale = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x * 9 + 2, y), (bs.x, bs.y)),
+            text='SCL>',
+            manager=self.gui
+        )
 
-        # self.prev_scale = pygame_gui.elements.UIButton(
-        #     relative_rect=pygame.Rect((bs.x * 10 + 2, y), (bs.x, bs.y)),
-        #     text='<SCL',
-        #     manager=self.gui
-        # )
-        # self.next_scale = pygame_gui.elements.UIButton(
-        #     relative_rect=pygame.Rect((bs.x * 11 + 2, y), (bs.x, bs.y)),
-        #     text='SCL>',
-        #     manager=self.gui
-        # )
+        self.btn_prev_mode = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x * 10 + 2, y), (bs.x, bs.y)),
+            text='<MOD',
+            manager=self.gui
+        )
+        self.btn_next_mode = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x * 11 + 2, y), (bs.x, bs.y)),
+            text='MOD>',
+            manager=self.gui
+        )
         # self.next_scale = pygame_gui.elements.UIButton(
         #     relative_rect=pygame.Rect((bs.x * 11 + 2, y), (bs.x, bs.y)),
         #     text='SCL>',
@@ -1210,6 +1336,13 @@ class Core:
         #     text='Major',
         #     manager=self.gui
         # )
+
+        # self.chord_label = pygame_gui.elements.UILabel(
+        #     relative_rect=pygame.Rect((0, self.screen_h - self.status_sz), (self.screen_w, self.status_sz)),
+        #     text='test',
+        #     manager=self.gui
+        # )
+        # self.chord_label.centerx = self.screen_w/2
 
         # y = bs.y * 2
         # self.note_buttons = [None] * 12
@@ -1310,15 +1443,19 @@ class Core:
                 if lp.Check(0):
                     if lp.Open(0):
                         self.launchpad_mode = "pro"
-                if launchpad.LaunchpadProMk3().Check(0):
-                    lp = launchpad.LaunchpadProMk3()
-                    if lp.Open(0):
-                        self.launchpad_mode = "promk3"
+            if launchpad.LaunchpadProMk3().Check(0):
+                lp = launchpad.LaunchpadProMk3()
+                if lp.Open(0):
+                    self.launchpad_mode = "promk3"
             if not self.launchpad_mode:
                 if launchpad.LaunchpadLPX().Check(1):
                     lp = launchpad.LaunchpadLPX()
                     if lp.Open(1):
                         self.launchpad_mode = "lpx"
+                    lp.LedCtrlXY(0, 0, 0, 0, 63)
+                    lp.LedCtrlXY(1, 0, 0, 0, 63)
+                    lp.LedCtrlXY(2, 0, 63, 0, 63)
+                    lp.LedCtrlXY(3, 0, 63, 0, 63)
             if self.launchpad_mode is not None:
                 self.launchpad = lp
 
@@ -1332,6 +1469,7 @@ class Core:
 
         self.dirty = True
         self.dirty_lights = True
+        self.dirty_chord = False
 
         w = self.max_width
         h = self.board_h
@@ -1519,14 +1657,14 @@ class Core:
     def resize(self):
         self.board_sz = ivec2(self.board_w, self.board_h)
         self.screen_w = self.board_w * self.scale.x
-        self.screen_h = self.board_h * self.scale.y + self.menu_sz
+        self.screen_h = self.board_h * self.scale.y + self.menu_sz + self.status_sz
         self.button_sz = self.screen_w / self.board_w
         self.screen_sz = ivec2(self.screen_w, self.screen_h)
         self.screen = Screen(self, pygame.display.set_mode(self.screen_sz))
         self.dirty_lights = True
 
-    def channel_from_split(self, col, row):
-        if not self.is_split():
+    def channel_from_split(self, col, row, force=False):
+        if not force and not self.is_split():
             return 0
         w = self.board_w
         col += 1  # move start point from C to A#
@@ -1654,6 +1792,18 @@ class Core:
                             self.dirty = self.dirty_lights = True
                         else:
                             pymsgbox.alert("You need to add another MIDI loopback device called 'split'")
+                    elif ev.ui_element == self.btn_next_scale:
+                        self.next_scale()
+                        self.dirty = self.dirty_lights = True
+                    elif ev.ui_element == self.btn_prev_scale:
+                        self.prev_scale()
+                        self.dirty = self.dirty_lights = True
+                    elif ev.ui_element == self.btn_next_mode:
+                        self.next_mode()
+                        self.dirty = self.dirty_lights = True
+                    elif ev.ui_element == self.btn_prev_mode:
+                        self.prev_mode()
+                        self.dirty = self.dirty_lights = True
                 # elif ev.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
                 #     if ev.ui_element == self.slider_velocity:
                 #         global self.options.velocity_curve
@@ -1663,24 +1813,24 @@ class Core:
                 self.gui.process_events(ev)
 
         # figure out the lowest note to highlight it
-        if self.options.show_lowest_note:
-            old_lowest_note = self.lowest_note
-            old_lowest_note_midi = self.lowest_note_midi
-            self.lowest_note = None
-            self.lowest_note_midi = None
-            note_count = 0
-            for y, row in enumerate(self.board):
-                for x, cell in enumerate(row):
-                    if cell:
-                        note_idx = self.get_note_index(x, y)
-                        note_num = note_idx + 12 * self.octaves[y][x]
-                        if (
-                            not self.lowest_note_midi
-                            or note_num < self.lowest_note_midi
-                        ):
-                            self.lowest_note = NOTES[note_idx]
-                            self.lowest_note_midi = note_num
-                        note_count += 1
+        # if self.options.show_lowest_note:
+        #     old_lowest_note = self.lowest_note
+        #     old_lowest_note_midi = self.lowest_note_midi
+        #     self.lowest_note = None
+        #     self.lowest_note_midi = None
+        #     note_count = 0
+        #     for y, row in enumerate(self.board):
+        #         for x, cell in enumerate(row):
+        #             if cell:
+        #                 note_idx = self.get_note_index(x, y)
+        #                 note_num = note_idx + 12 * self.octaves[y][x]
+        #                 if (
+        #                     not self.lowest_note_midi
+        #                     or note_num < self.lowest_note_midi
+        #                 ):
+        #                     self.lowest_note = NOTES[note_idx]
+        #                     self.lowest_note_midi = note_num
+        #                 note_count += 1
 
         # if self.dirty:
         #     self.init_board()
@@ -1690,26 +1840,45 @@ class Core:
             self.dirty_lights = False
 
         # lowest note changed?
-        if self.options.show_lowest_note:
-            if self.lowest_note != old_lowest_note:
-                if old_lowest_note:
-                    # reset lights for previous lowest note
-                    for y, row in enumerate(self.board):
-                        for x, cell in enumerate(row):
-                            if self.get_note(x, y) == old_lowest_note:
-                                self.reset_light(x, y)
-                if self.lowest_note:
-                    # set lights for new lowest note
-                    for y, row in enumerate(self.board):
-                        for x, cell in enumerate(row):
-                            if self.get_note(x, y) == self.lowest_note:
-                                self.set_light(x, y, 9)
+        # if self.options.show_lowest_note:
+        #     if self.lowest_note != old_lowest_note:
+        #         if old_lowest_note:
+        #             # reset lights for previous lowest note
+        #             for y, row in enumerate(self.board):
+        #                 for x, cell in enumerate(row):
+        #                     if self.get_note(x, y) == old_lowest_note:
+        #                         self.reset_light(x, y)
+        #         if self.lowest_note:
+        #             # set lights for new lowest note
+        #             for y, row in enumerate(self.board):
+        #                 for x, cell in enumerate(row):
+        #                     if self.get_note(x, y) == self.lowest_note:
+        #                         self.set_light(x, y, 9)
 
         # # if self.config_save_timer > 0.0:
         # #     self.config_save_timer -= dt
         # #     if self.config_save_timer <= 0.0:
         # #         save()
 
+        # TODO: if notes changed
+        if self.dirty_chord:
+            notes = set()
+            for i, note in enumerate(self.chord_notes):
+                if note:
+                    notes.add(NOTES[i])
+            if notes:
+                self.chord = mp.alg.detect(mp.chord(','.join(notes)))
+                try:
+                    self.chord = self.chord[0:self.chord.index(' sort')]
+                except ValueError:
+                    pass
+                if self.chord.startswith('note '):
+                    self.chord = self.chord[len('note '):-1]
+            else:
+                self.chord = ''
+            self.dirty_chord = False
+            self.dirty = True
+        
         if not self.options.lite:
             self.gui.update(dt)
 
@@ -1857,6 +2026,27 @@ class Core:
 
                 x += 1
             y += 1
+
+
+        # if self.options.experimental:
+        text = self.font.render(self.scale_name, True, ivec3(127))
+        textpos = text.get_rect()
+        textpos.x = self.screen_w*1/4 - textpos[2]/2
+        textpos.y = self.screen_h - self.status_sz*3/4
+        self.screen.surface.blit(text, textpos)
+
+        text = self.font.render(self.mode_name.capitalize(), True, ivec3(127))
+        textpos = text.get_rect()
+        textpos.x = self.screen_w*2/4 - textpos[2]/2
+        textpos.y = self.screen_h - self.status_sz*3/4
+        self.screen.surface.blit(text, textpos)
+
+        chord = self.chord or '-'
+        text = self.font.render(chord, True, ivec3(127))
+        textpos = text.get_rect()
+        textpos.x = self.screen_w*3/4 - textpos[2]/2
+        textpos.y = self.screen_h - self.status_sz*3/4
+        self.screen.surface.blit(text, textpos)
 
         # for note in self.notes:
         #     if note.location is None:

@@ -1,0 +1,25 @@
+- name: Diatonic
+  notes: 'x.x.xx.x.x.x'
+  modes:
+     - major
+     - dorian
+     - phyrigian
+     - lydian
+     - mixolydian
+     - minor
+     - locrian
+- name: Pentatonic
+  notes: 'x.x..x.x.x..'
+- name: Blues
+  notes: 'x..x.xxx..x.'
+- name: Melodic Minor
+  notes: 'x.xx.x.x.x.x'
+- name: Neapoliton Minor
+  notes: 'xx.x.x.xx..x'
+- name: Harmonic Minor
+  notes: 'x.xx.x.xx..x'
+- name: Harmonic Major
+  notes: 'x.x.xx.xx..x'
+- name: Neapoliton Major
+  notes: 'xx.x.x.x.x.x'
+
