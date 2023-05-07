@@ -1054,6 +1054,25 @@ class Core:
             except yaml.YAMLError as exc:
                 error('Cannot load scales.yaml')
 
+        dups = {}
+        for scale in self.scale_db:
+            notes = scale['notes']
+            count = notes.count('x')
+            dupes = (scale.get('duplicates') is True) or False
+            if not dupes:
+                for i in range(count):
+                    mode_notes = self.rotate_mode(notes, i)
+                    try:
+                        name = scale['name'] + ' ' + scale['modes'][i]
+                    except:
+                        name = scale['name'] + ' Mode ' + str(i+1)
+                    if mode_notes in dups:
+                        print('Duplicate scale: ', dups[mode_notes], ' and ', name)
+                        break
+                    else:
+                        # print(mode_notes, name)
+                        dups[mode_notes] = name
+
         # print(self.scale_db)
 
         self.options = Options()
@@ -2035,7 +2054,7 @@ class Core:
         textpos.y = self.screen_h - self.status_sz*3/4
         self.screen.surface.blit(text, textpos)
 
-        text = self.font.render(self.mode_name.capitalize(), True, ivec3(127))
+        text = self.font.render(self.mode_name, True, ivec3(127))
         textpos = text.get_rect()
         textpos.x = self.screen_w*2/4 - textpos[2]/2
         textpos.y = self.screen_h - self.status_sz*3/4

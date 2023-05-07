@@ -1,25 +1,124 @@
 - name: Diatonic
   notes: 'x.x.xx.x.x.x'
   modes:
-     - major
-     - dorian
-     - phyrigian
-     - lydian
-     - mixolydian
-     - minor
-     - locrian
+     - Major
+     - Dorian
+     - Phyrigian
+     - Lydian
+     - Mixolydian
+     - Minor
+     - Locrian
 - name: Pentatonic
   notes: 'x.x..x.x.x..'
+  modes:
+    - Yo
+    - Minor Pentatonic
+    - Major Pentatonic
+    - Egyption
+    - Man Gong
 - name: Blues
   notes: 'x..x.xxx..x.'
 - name: Melodic Minor
   notes: 'x.xx.x.x.x.x'
-- name: Neapoliton Minor
-  notes: 'xx.x.x.xx..x'
+  modes:
+    - Melodic Minor
+    - Assyrian
+    - Lydian Augmented
+    - Acoustic
+    - Melodic Major
+    - Half Dim
+    - Altered
+- name: Neapolitan Major
+  notes: 'xx.x.x.x.x.x'
+  modes:
+    - Neapolitan Major
+    - Leading Whole Tone
+    - Lydian Aug Dom
+    - Minor Lydian
+    - Major Locrian
+    - Semilocrian b4
+    - Superlocrian bb3
 - name: Harmonic Minor
   notes: 'x.xx.x.xx..x'
+  modes:
+    - Harmonic Minor
+    - Locrian n6
+    - Ionian Aug
+    - 'Dorian #4'
+    - Phrygiain Minor
+    - 'Lydian #9'
+    - Altered bb7
 - name: Harmonic Major
   notes: 'x.x.xx.xx..x'
-- name: Neapoliton Major
-  notes: 'xx.x.x.x.x.x'
-
+  modes:
+    - Harmonic Major
+    - Dorian b5
+    - Phyrigian b4
+    - Lydian b3
+    - Mixolydian b2
+    - 'Lydian Aug #2'
+    - Locrian bb7
+- name: Neapolitan Minor
+  notes: 'xx.x.x.xx..x'
+  modes:
+    - Neopolitan Minor
+    - 'Lydian #6'
+    - Mixolydian Aug
+    - Romani Minor
+    - Locrian Dom
+    - 'Ionian #2'
+    - Ultralocrian bb3
+- name: Double Harmonic
+  notes: 'xx..xx.xx..x'
+  modes:
+    - Double Harmonic
+    - 'Lydian #2 #6'
+    - Ultraphyrigian
+    - Hungarian Minor
+    - Oriental
+    - 'Ionian #2 #5'
+    - Locrian b3 bb7
+- name: Algerian
+  notes: 'x.xx.xxxx..x'
+- name: Eight Tone Spanish
+  notes: 'xx.xxxx.x.x.'
+- name: Iberian
+  notes: 'xx..xx.x..x.'
+- name: Hungarian Major
+  notes: 'x..xx.xx.xx.'
+- name: Balinese
+  notes: 'xx.x...xx...'
+- name: Chinese
+  notes: 'x...x.xx...x'
+  modes:
+    - Chinese
+    - Hirajoshi
+    - Iwato
+- name: Japanese
+  notes: 'xx...x.x..x.'
+  modes:
+    - Insen
+- name: Augmented
+  notes: 'x..xx..xx..x'
+  duplicates: true
+- name: Prometheus
+  notes: 'x.x.x.x..xx.'
+- name: Diminished
+  notes: 'x.xx.xx.xx.x'
+  duplicates: true
+  modes:
+    - Diminished
+    - Dominant Diminished
+    - Diminished (2)
+    - Dominant Diminished (2)
+    - Diminished (3)
+    - Dominant Diminished (3)
+    - Diminished (4)
+    - Dominant Diminished (4)
+- name: Whole Tone
+  notes: 'x.x.x.x.x.x.'
+  duplicates: true
+- name: Major Bebop
+  notes: 'x.x.xx.xxx.x'
+- name: Minor Bebop
+  notes: 'x.xxxx.x.xx.'
