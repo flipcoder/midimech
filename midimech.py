@@ -20,14 +20,13 @@ import pygame_gui
 
 def error(msg):
     print(msg)
-    pymsgbox.alert(msg)
     sys.exit(1)
 
-try:
-    import pymsgbox
-except ImportError:
-    print("The project dependencies have changed! Run the requirements setup command again!")
-    sys.exit(1)
+# try:
+#     import pymsgbox
+# except ImportError:
+#     print("The project dependencies have changed! Run the requirements setup command again!")
+#     sys.exit(1)
 
 try:
     import launchpad_py as launchpad
@@ -47,8 +46,7 @@ except ImportError:
 try:
     import musicpy as mp
 except ImportError:
-    pymsgbox.alert("The project dependencies have changed! Run the requirements setup command again!")
-    sys.exit(1)
+    error("The project dependencies have changed! Run the requirements setup command again!")
 
 TITLE = "midimech"
 # FOCUS = False
@@ -1100,11 +1098,9 @@ class Core:
         self.options.split_lights = list(map(lambda x: 5 if x==7 else x, self.options.split_lights))
 
         if len(self.options.lights) != 12:
-            pymsgbox.alert("Invalid light color configuration. Make sure you have 12 light colors under the lights option or remove it.")
-            sys.exit(1)
+            error("Invalid light color configuration. Make sure you have 12 light colors under the lights option or remove it.")
         if len(self.options.split_lights) != 12:
-            pymsgbox.alert("Invalid light color configuration for split. Make sure you have 12 light colors under the split_lights option or remove it.")
-            sys.exit(1)
+            error("Invalid light color configuration for split. Make sure you have 12 light colors under the split_lights option or remove it.")
 
         self.options.one_channel = get_option(
             opts, "one_channel", DEFAULT_OPTIONS.one_channel
@@ -1497,10 +1493,9 @@ class Core:
         self.done = False
         
         if not self.midi_out:
-            pymsgbox.alert(
-                "No MIDI output device detected.  Install a midi loopback device and name it 'midimech'!", "Midimech"
+            error(
+                "No MIDI output device detected.  Install a midi loopback device and name it 'midimech'!"
             )
-            sys.exit(1)
 
         self.dirty = True
         self.dirty_lights = True
@@ -1838,7 +1833,7 @@ class Core:
                             )
                             self.dirty = self.dirty_lights = True
                         else:
-                            pymsgbox.alert("You need to add another MIDI loopback device called 'split'")
+                            print("You need to add another MIDI loopback device called 'split'")
                     elif ev.ui_element == self.btn_prev_root:
                         self.set_tonic((self.tonic - 1) % 12)
                         self.dirty = self.dirty_lights = True
@@ -2200,6 +2195,8 @@ def main():
     try:
         core = Core()
         core()
+    except SystemExit:
+        pass
     except:
         print(traceback.format_exc())
     del core
