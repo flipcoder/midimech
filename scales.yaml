@@ -9,13 +9,13 @@
      - Minor
      - Locrian
 - name: Pentatonic
-  notes: 'x.x..x.x.x..'
+  notes: 'x.x.x..x.x..'
   modes:
-    - Yo
-    - Minor Pentatonic
     - Major Pentatonic
     - Egyption
     - Man Gong
+    - Yo
+    - Minor Pentatonic
 - name: Blues
   notes: 'x..x.xxx..x.'
 - name: Melodic Minor

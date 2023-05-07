@@ -270,7 +270,7 @@ class Core:
                 self.launchpad.LedCtrlXY(x, y+1, lp_col[0], lp_col[1], lp_col[2])
 
     def reset_light(self, x, y, reset_red=True):
-        note = self.get_note_index(x, y) % 12
+        note = (self.get_note_index(x, y) - self.tonic) % 12
         if self.is_split():
             split_chan = self.channel_from_split(x, self.board_h - y - 1)
             if split_chan:
@@ -368,6 +368,7 @@ class Core:
     def get_color(self, x, y):
         # return NOTE_COLORS[get_note_index(x, y)]
         note = self.get_note_index(x, y)
+        note = (note - self.tonic) % 12
         if self.is_split():
             split_chan = self.channel_from_split(x, self.board_h - y - 1)
             if split_chan:
@@ -509,7 +510,7 @@ class Core:
         for i, note in enumerate(self.notes):
             self.notes[i] = Note()
 
-        self.chord_notes = [False] * 12
+        self.chord_notes = [False] * 127
 
     def midi_write(self, dev, msg, ts=0):
         if dev:
@@ -626,7 +627,7 @@ class Core:
                 note.midinote = data[1]
                 note.split = split_chan
 
-        self.chord_notes[data[1]%12] = True
+        self.chord_notes[data[1]] = True
         self.dirty_chord = True
 
         if self.is_split():
@@ -722,7 +723,7 @@ class Core:
         if self.flipped:
             data[1] += 7
 
-        self.chord_notes[data[1]%12] = False
+        self.chord_notes[data[1]] = False
         self.dirty_chord = True
 
         if self.is_split():
@@ -1055,11 +1056,13 @@ class Core:
                 error('Cannot load scales.yaml')
 
         dups = {}
+        scale_count = 0
         for scale in self.scale_db:
             notes = scale['notes']
             count = notes.count('x')
             dupes = (scale.get('duplicates') is True) or False
             if not dupes:
+                scale_count += count
                 for i in range(count):
                     mode_notes = self.rotate_mode(notes, i)
                     try:
@@ -1072,8 +1075,10 @@ class Core:
                     else:
                         # print(mode_notes, name)
                         dups[mode_notes] = name
+            else:
+                scale_count += 1
 
-        # print(self.scale_db)
+        # print('Scale Count:', scale_count)
 
         self.options = Options()
 
@@ -1243,6 +1248,7 @@ class Core:
         self.mode_name = self.scale_db[self.scale_index]['modes'][self.mode_index]
         self.scale_notes = self.scale_db[self.scale_index]['notes']
         self.scale_root = 0
+        self.tonic = 0
 
         self.init_board()
 
@@ -1290,13 +1296,23 @@ class Core:
         self.btn_octave_up = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x + 2, y), bs), text="OCT>", manager=self.gui
         )
+        self.btn_prev_root = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x * 2 + 2, y), (bs.x, bs.y)),
+            text='<TR',
+            manager=self.gui
+        )
+        self.btn_next_root = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x * 3 + 2, y), (bs.x, bs.y)),
+            text='TR>',
+            manager=self.gui
+        )
         self.btn_transpose_down = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect((bs.x * 2 + 2, y), bs),
+            relative_rect=pygame.Rect((bs.x * 4 + 2, y), bs),
             text="<MOV",
             manager=self.gui,
         )
         self.btn_transpose_up = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect((bs.x * 3 + 2, y), bs),
+            relative_rect=pygame.Rect((bs.x * 5 + 2, y), bs),
             text="MOV>",
             manager=self.gui,
         )
@@ -1306,42 +1322,42 @@ class Core:
         #     manager=self.gui,
         # )
         self.btn_rotate = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect((bs.x * 4 + 2, y), bs),
+            relative_rect=pygame.Rect((bs.x * 6 + 2, y), bs),
             text="ROT",
             manager=self.gui,
         )
         self.btn_flip = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect((bs.x * 5 + 2, y), bs),
+            relative_rect=pygame.Rect((bs.x * 7 + 2, y), bs),
             text="FLIP",
             manager=self.gui,
         )
 
         if self.options.mpe:  # split only works with no overlap for now
             self.btn_split = pygame_gui.elements.UIButton(
-                relative_rect=pygame.Rect((bs.x * 6 + 2, y), (bs.x * 2, bs.y)),
+                relative_rect=pygame.Rect((bs.x * 8 + 2, y), (bs.x * 2, bs.y)),
                 text="SPLIT: " + ("ON" if self.split_state else "OFF"),
                 manager=self.gui,
             )
 
         # if self.options.experimental:
         self.btn_prev_scale = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect((bs.x * 8 + 2, y), (bs.x, bs.y)),
+            relative_rect=pygame.Rect((bs.x * 10 + 2, y), (bs.x, bs.y)),
             text='<SCL',
             manager=self.gui
         )
         self.btn_next_scale = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect((bs.x * 9 + 2, y), (bs.x, bs.y)),
+            relative_rect=pygame.Rect((bs.x * 11 + 2, y), (bs.x, bs.y)),
             text='SCL>',
             manager=self.gui
         )
 
         self.btn_prev_mode = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect((bs.x * 10 + 2, y), (bs.x, bs.y)),
+            relative_rect=pygame.Rect((bs.x * 12 + 2, y), (bs.x, bs.y)),
             text='<MOD',
             manager=self.gui
         )
         self.btn_next_mode = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect((bs.x * 11 + 2, y), (bs.x, bs.y)),
+            relative_rect=pygame.Rect((bs.x * 13 + 2, y), (bs.x, bs.y)),
             text='MOD>',
             manager=self.gui
         )
@@ -1695,6 +1711,18 @@ class Core:
         # TODO: make this work with hardware overlap (non-mpe)
         return self.options.mpe and self.split_state and self.split_out
 
+    def set_tonic(self, val):
+        odd = (self.tonic % 2 == 1)
+        self.tonic = val % 12
+        new_odd = (self.tonic % 2 == 1)
+        if odd != new_odd:
+            self.flipped = not self.flipped
+        if new_odd:
+            self.transpose = (self.tonic // 2 - 3) % 6
+            self.transpose -= 6
+        else:
+            self.transpose = (self.tonic // 2) % 6
+
     def logic(self, dt):
         # keys = pygame.key.get_pressed()
 
@@ -1811,6 +1839,12 @@ class Core:
                             self.dirty = self.dirty_lights = True
                         else:
                             pymsgbox.alert("You need to add another MIDI loopback device called 'split'")
+                    elif ev.ui_element == self.btn_prev_root:
+                        self.set_tonic((self.tonic - 1) % 12)
+                        self.dirty = self.dirty_lights = True
+                    elif ev.ui_element == self.btn_next_root:
+                        self.set_tonic((self.tonic + 1) % 12)
+                        self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_next_scale:
                         self.next_scale()
                         self.dirty = self.dirty_lights = True
@@ -1881,10 +1915,10 @@ class Core:
 
         # TODO: if notes changed
         if self.dirty_chord:
-            notes = set()
+            notes = []
             for i, note in enumerate(self.chord_notes):
                 if note:
-                    notes.add(NOTES[i])
+                    notes.append(NOTES[i % 12])
             if notes:
                 self.chord = mp.alg.detect(mp.chord(','.join(notes)))
                 try:
