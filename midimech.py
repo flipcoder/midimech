@@ -268,7 +268,8 @@ class Core:
                 self.launchpad.LedCtrlXY(x, y+1, lp_col[0], lp_col[1], lp_col[2])
 
     def reset_light(self, x, y, reset_red=True):
-        note = (self.get_note_index(x, y) - self.tonic) % 12
+        note = self.get_note_index(x, y)
+        # print(note)
         if self.is_split():
             split_chan = self.channel_from_split(x, self.board_h - y - 1)
             if split_chan:
@@ -297,7 +298,7 @@ class Core:
         self.red_lights[y][x] = False
 
     def reset_launchpad_light(self, x, y):
-        note = self.get_note_index(x, 8-y-1) % 12
+        note = self.get_note_index(x, 8-y-1)
         # if self.is_split():
         #     split_chan = self.channel_from_split(x, self.board_h - y - 1)
         #     if split_chan:
@@ -335,11 +336,11 @@ class Core:
             for x in range(self.board_w):
                 self.set_light(x, y, 0)
 
-    def get_octave(self, x, y):
-        try:
-            return self.octaves[y - self.board_h + self.flipped][x] + self.octave
-        except IndexError:
-            pass
+    # def get_octave(self, x, y):
+    #     try:
+    #         return self.octaves[y - self.board_h + self.flipped][x] + self.octave
+    #     except IndexError:
+    #         pass
 
     def xy_to_midi(self, x, y):
         row = self.board_h - y
@@ -352,23 +353,24 @@ class Core:
             r += 7
         return r
 
-    def get_note_index(self, x, y):
+    def get_note_index(self, x, y, transpose=True):
         y += self.flipped
         x += self.transpose
         ofs = (self.board_h - y) // 2 + BASE_OFFSET
         step = 2 if WHOLETONE else 1
+        tr = self.tonic if transpose else 0
         if y % 2 == 1:
-            return ((x - ofs) * step) % len(NOTES)
+            return ((x - ofs) * step - tr) % len(NOTES)
         else:
-            return ((x - ofs) * step + 7) % len(NOTES)
+            return ((x - ofs) * step + 7 - tr) % len(NOTES)
 
-    def get_note(self, x, y):
-        return NOTES[self.get_note_index(x, y)]
+    def get_note(self, x, y, transpose=True):
+        return NOTES[self.get_note_index(x, y, transpose=transpose)]
 
     def get_color(self, x, y):
         # return NOTE_COLORS[get_note_index(x, y)]
         note = self.get_note_index(x, y)
-        note = (note - self.tonic) % 12
+        # note = (note - self.tonic) % 12
         if self.is_split():
             split_chan = self.channel_from_split(x, self.board_h - y - 1)
             if split_chan:
@@ -482,8 +484,14 @@ class Core:
 
     # Given an x,y position, find the octave
     #  (used to initialize octaves 2D array)
-    def init_octave(self, x, y):
-        return int((x + 4 + self.transpose + y * 2.5) // 6)
+    def get_octave(self, x, y):
+        y = self.board_h - y - 1
+        if self.tonic % 2 == 0:
+            octave = int(x + 4 + self.transpose + y * 2.5) // 6
+        else:
+            y -= 1
+            octave = int(x + 4 + self.transpose + y * 2.5) // 6
+        return octave
 
     def init_board(self):
         # self.octaves = [
@@ -502,9 +510,12 @@ class Core:
         self.octaves = []
         for y in range(self.board_h + 1):  # 1 = flipping
             self.octaves.append([])
+            line = []
             for x in range(self.max_width):
-                self.octaves[y].append(self.init_octave(x, y))
-        self.octaves = list(reversed(self.octaves))
+                octave = self.get_octave(x, y)
+                self.octaves[y].append(octave)
+                line.append(octave)
+            # print(line)
 
         self.notes = [None] * 16  # polyphony
         for i, note in enumerate(self.notes):
@@ -1644,8 +1655,8 @@ class Core:
     def mark_xy(self, x, y, state, use_lights=False):
         if self.flipped:
             y -= 1
+        # print(x, y)
         idx = self.get_note_index(x, y)
-        octave = self.get_octave(x, y)
         try:
             self.board[y + self.flipped][x] = state
         except IndexError:
@@ -1663,20 +1674,22 @@ class Core:
             only_row = self.board_h - only_row - 1 - self.flipped  # flip
             try:
                 rows = [self.board[only_row]]
+                y = only_row
             except IndexError:
                 rows = self.board
-            y = only_row
+                y = 0
         else:
             rows = self.board
             y = 0
         for row in rows:
             x = 0
             for x in range(len(row)):
-                idx = self.get_note_index(x, y)
+                idx = self.get_note_index(x, y, transpose=False)
                 # print(x, y, midinote%12, idx)
                 if midinote % 12 == idx:
                     octave = self.get_octave(x, y)
                     if octave == midinote // 12:
+                        # print(octave)
                         self.board[y + self.flipped][x] = state
                         if use_lights:
                             if state:
@@ -1710,7 +1723,7 @@ class Core:
 
     def set_tonic(self, val):
         odd = (self.tonic % 2 == 1)
-        self.tonic = val % 12
+        self.tonic = val
         new_odd = (self.tonic % 2 == 1)
         if odd != new_odd:
             self.flipped = not self.flipped
@@ -1837,10 +1850,10 @@ class Core:
                         else:
                             print("You need to add another MIDI loopback device called 'split'")
                     elif ev.ui_element == self.btn_prev_root:
-                        self.set_tonic((self.tonic - 1) % 12)
+                        self.set_tonic(self.tonic - 1)
                         self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_next_root:
-                        self.set_tonic((self.tonic + 1) % 12)
+                        self.set_tonic(self.tonic + 1)
                         self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_next_scale:
                         self.next_scale()
@@ -1963,7 +1976,7 @@ class Core:
             x = 0
             for cell in row:
                 # write text
-                note = self.get_note(x, y)
+                note = self.get_note(x, y, False)
 
                 split_chan = self.channel_from_split(x, y)
 
