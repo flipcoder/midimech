@@ -2,6 +2,8 @@
 
 ![midimech](https://i.imgur.com/iNKaTi3.png)
 
+[![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://paypal.me/GradyOConnell?country.x=US&locale.x=en_US)
+
 **IN DEVELOPMENT**
 
 Midimech is an alternative musical note layout system for the LinnStrument and LaunchPad X.  It uses a wholetone-based isomorphic layout.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly convincing.  Lacking an isomorphic controller, I used to map this layout to my mechanical keyboard to play.  Because of this, my friends and I referred to it as "playing the mech".  The layout could also be referred to as Wholetone +5 or Diagonal Wicki-Hayden but I still prefer calling it mech.
