@@ -306,6 +306,8 @@ class Core:
         light_col = self.options.lights[note]
         # else:
         #     light_col = self.options.lights[note]
+        if self.scale_notes[note] == '.':
+            light_col = 7
         self.set_launchpad_light(x, y, light_col)
 
     def set_red_light(self, x, y, state=True):
