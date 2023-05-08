@@ -793,7 +793,8 @@ class Core:
                 self.velocity_curve_ = low + val2 * (high - low)
 
     def is_macro_button(self, x, y):
-        return x == 0 and y == 0
+        return False
+        # return x == 0 and y == 0
 
     def macro(self, x, y, val):
         if x == 0 and y == 0:
