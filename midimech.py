@@ -14,6 +14,7 @@ from src.options import Options
 from src.note import Note
 from src.settings import DeviceSettings
 from src.core import Core
+from src.gamepad import Gamepad
 
 with open(os.devnull, "w") as devnull:
     # suppress pygame messages

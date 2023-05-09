@@ -25,6 +25,7 @@ class Options:
     size: int = 128
     width: int = 16
     height: int = 8
+    vibrato: str = 'mod'
 
 DEFAULT_OPTIONS = Options()
 

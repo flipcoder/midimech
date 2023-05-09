@@ -3,6 +3,7 @@ class Note:
         # self.bend = 0.0
         # self.pressed = False
         # self.intensity = 0.0  # how much to light marker up (in app)
+        self.ipressure = 0 # 0, 127
         self.pressure = 0.0  # how much the note is being pressed
         # self.dirty = False
         self.location = None  # on board

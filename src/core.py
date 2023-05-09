@@ -14,6 +14,7 @@ from src.options import Options, DEFAULT_OPTIONS
 from src.note import Note
 from src.settings import DeviceSettings
 from src.articulation import Articulation
+from src.gamepad import Gamepad
 
 with open(os.devnull, "w") as devnull:
     # suppress pygame messages
@@ -122,12 +123,12 @@ class Core:
             self.send_cc(0, 22, col)
 
         if self.launchpad:
-            lp_col = COLOR_CODES[col]
+            lp_col = COLOR_CODES[col] / 4
             if 0 <= x < 8 and 0 <= y < 8:
                 if not self.is_macro_button(x, y):
                     self.launchpad.LedCtrlXY(x, y+1, lp_col[0], lp_col[1], lp_col[2])
                 else:
-                    self.launchpad.LedCtrlXY(x, y+1, 127, 127, 127)
+                    self.launchpad.LedCtrlXY(x, y+1, 63, 63, 63)
 
     def reset_light(self, x, y, reset_red=True):
         note = self.get_note_index(x, y)
@@ -176,16 +177,16 @@ class Core:
     def set_red_light(self, x, y, state=True):
         self.red_lights[y][x] = state
         if self.launchpad:
-            lp_col = ivec3(127, 0, 0)
+            lp_col = ivec3(63, 0, 0)
             if state:
                 self.launchpad.LedCtrlXY(x, y, lp_col[0], lp_col[1], lp_col[2])
 
     def set_launchpad_light(self, x, y, color):
-        col = COLOR_CODES[color]
+        col = COLOR_CODES[color] / 4
         if not self.is_macro_button(x, 8 - y - 1):
             self.launchpad.LedCtrlXY(x, 8-y, col[0], col[1], col[2])
         else:
-            self.launchpad.LedCtrlXY(x, 8-y, 127, 127, 127)
+            self.launchpad.LedCtrlXY(x, 8-y, 63, 63, 63)
 
     def setup_lights(self):
         for y in range(self.board_h):
@@ -397,6 +398,7 @@ class Core:
             self.notes[i] = Note()
 
         self.chord_notes = [False] * 127
+        self.note_set = set()
 
     def midi_write(self, dev, msg, ts=0):
         if dev:
@@ -514,6 +516,7 @@ class Core:
                 note.split = split_chan
 
         self.chord_notes[data[1]] = True
+        self.note_set.add(data[1])
         self.dirty_chord = True
 
         if self.is_split():
@@ -610,6 +613,7 @@ class Core:
             data[1] += 7
 
         self.chord_notes[data[1]] = False
+        self.note_set.remove(data[1])
         self.dirty_chord = True
 
         if self.is_split():
@@ -806,16 +810,14 @@ class Core:
 
     # uses button state events (mk3 pro)
     def cb_launchpad_in(self, event, timestamp=0):
-        # if (self.launchpad_mode == "pro" or self.launchpad_mode == "promk3") and event[0] == 255:
-        # if event[0] >= 255:
-        #     # I'm testing the mk3 method on an lpx, so I'll check this here
-        #     vel = event[2] if self.launchpad_mode == 'lpx' else event[1]
-        #     for note in self.notes:
-        #         if note.location:
-        #             print(note.midinote)
-        #             self.note_on([160, note.midinote, vel], timestamp, width=8, mpe=True)
-        
-        if self.launchpad_mode == 'lpx' and event[0] >= 255: # pressure
+        if (self.launchpad_mode == "pro" or self.launchpad_mode == "promk3") and event[0] >= 255:
+        # if event[0] >= 255: # uncomment this for testing pro behavior on launchpad X
+            # I'm testing the mk3 method on an lpx, so I'll check this here
+            vel = event[2] if self.launchpad_mode == 'lpx' else event[1]
+            for note in self.note_set:
+                self.midi_write(self.midi_out, [160, note, vel], timestamp)
+                self.articulation.pressure(vel / 127)
+        elif self.launchpad_mode == 'lpx' and event[0] >= 255: # pressure
             x = event[0] - 255
             y = 8 - (event[1] - 255)
             vel = event[2]
@@ -1053,6 +1055,8 @@ class Core:
         # ) or get_option(
         #     opts, "no_overlap", DEFAULT_OPTIONS.mpe
         # )
+        self.options.mpe = True
+        self.options.vibrato = get_option(opts, "vibrato", DEFAULT_OPTIONS.vibrato)
         self.options.midi_out = get_option(opts, "midi_out", DEFAULT_OPTIONS.midi_out)
         self.options.split_out = get_option(
             opts, "split_out", DEFAULT_OPTIONS.split_out
@@ -1358,6 +1362,13 @@ class Core:
         self.visualizer = None
         self.launchpad = None
         self.launchpad_mode = None
+        
+        self.gamepad = None
+        if self.options.experimental:
+            pygame.joystick.init()
+            if pygame.joystick.get_count() > 0:
+                self.gamepad = Gamepad(self, 0)
+                print('Gamepad initialized')
 
         innames = rtmidi2.get_in_ports()
         for i in range(len(innames)):
@@ -1469,13 +1480,35 @@ class Core:
         self.midi_write(self.linn_out, [176, 38, value_lsb])
         self.midi_write(self.linn_out, [176, 101, 127])
         self.midi_write(self.linn_out, [176, 100, 127])
-        time.sleep(0.1)
+        time.sleep(0.05)
 
     def mpe_rpn(self, on=True):
         if on:
             self.rpn(0, 1)
             self.rpn(100, 1)
             self.rpn(227, 0)
+
+            if self.options.hardware_split:
+                # left side channels
+                self.rpn(1, 1)
+                self.rpn(2, 0)
+                for x in range(3, 10):
+                    self.rpn(x, 1)
+                for x in range(10, 18):
+                    self.rpn(x, 0)
+
+                # right side channels
+                self.rpn(101, 16) # main=16
+                for x in range(110, 117):
+                    self.rpn(x, 1)
+                self.rpn(117, 0) # 16 off
+            else:
+                # left side only
+                self.rpn(1, 1)
+                self.rpn(2, 0)
+                for x in range(3, 18):
+                    self.rpn(x, 1)
+
         else:
             self.rpn(227, 5)
 
@@ -1682,6 +1715,16 @@ class Core:
                 except KeyError:
                     pass
 
+            else:
+                if self.gamepad and ev.type in (\
+                        pygame.JOYAXISMOTION,
+                        pygame.JOYBALLMOTION,
+                        pygame.JOYBUTTONDOWN,
+                        pygame.JOYBUTTONUP,
+                        pygame.JOYHATMOTION
+                    ):
+                        self.gamepad.event(ev)
+                
             if not self.options.lite:
                 if ev.type == pygame.MOUSEMOTION:
                     x, y = ev.pos
@@ -1776,6 +1819,9 @@ class Core:
         
         if self.launchpad:
             self.articulation.logic(dt)
+
+        if self.gamepad:
+            self.gamepad.logic(dt)
 
         # figure out the lowest note to highlight it
         # if self.options.show_lowest_note:
@@ -1992,6 +2038,31 @@ class Core:
                 x += 1
             y += 1
 
+        if self.gamepad:
+            pos = self.gamepad.positions()
+            # gp_pos.y = self.board_h - y - 1
+            
+            circ = [None] * 2
+            for i in range(2):
+                circ[i] = ivec2(
+                    int(pos[i].x * sz + b / 2 + sz / 2),
+                    int(self.menu_sz + pos[i].y * sz + b / 2 + sz / 2),
+                )
+                
+                pygame.gfxdraw.aacircle(
+                    self.screen.surface,
+                    circ[i].x + 1,
+                    circ[i].y - 1,
+                    rad,
+                    ivec3(0, 255, 0),
+                )
+                # pygame.gfxdraw.filled_circle(
+                #     self.screen.surface,
+                #     circ[i].x + 1,
+                #     circ[i].y - 1,
+                #     rad,
+                #     ivec3(0, 255, 0),
+                # )
 
         # if self.options.experimental:
         text = self.font.render(self.scale_name, True, ivec3(127))

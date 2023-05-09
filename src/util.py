@@ -102,7 +102,6 @@ def decompose_pitch_bend(pitch_bend_bytes):
     pitch_bend_norm = (pitch_bend_value - 8192) / 8192.0
     return pitch_bend_norm
 
-
 def compose_pitch_bend(pitch_bend_norm):
     pitch_bend_value = int((pitch_bend_norm + 1.0) * 8192)
     pitch_bend_bytes = [pitch_bend_value & 0x7F, (pitch_bend_value >> 7) & 0x7F]

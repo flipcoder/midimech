@@ -1,5 +1,5 @@
 from enum import Enum
-from src.util import sign
+from src.util import *
 from src.constants import *
 
 class Articulation:
@@ -8,7 +8,7 @@ class Articulation:
     def __init__(self, core):
         self.core = core
         self.value = 0.0
-        self.time_between_ticks = 0.05
+        self.time_between_ticks = 0.02
         self.timer = 0.0
         self.state = self.State(self.State.off)
 
@@ -27,6 +27,16 @@ class Articulation:
         
         self.mod = 0.0
         self.mod_changed = True
+        self.last_midi_message = None
+
+        self.mode = self.core.options.vibrato
+        if self.mode not in ('mod', 'pitch'):
+            print('Vibrato option must be mod or pitch. Using mod.')
+            self.mode = 'mod'
+        self.t = 0.0
+        self.vibrato_speed = 5.0
+        self.vibrato_depth = 1.0 / 4.0
+        self.vibrato_shift = 0.0 # 0.1
 
     def pressure(self, value):
         if not value or value <= 0.0:
@@ -88,7 +98,24 @@ class Articulation:
         #     return
 
         if self.mod_changed:
-            self.core.midi_write(self.core.midi_out, [0xb0, 1, int(self.mod * 127)])
+            if self.mode == 'mod':
+                msg = [0xb0, 1, int(self.mod * 127)]
+                if msg != self.last_midi_message:
+                    self.core.midi_write(self.core.midi_out, msg)
+                    self.last_midi_message = msg
+            elif self.mode == 'pitch':
+                if self.mod > 0.0:
+                    wave = self.mod * math.sin(math.tau * self.t * self.vibrato_speed) * self.vibrato_depth + self.vibrato_shift
+                    pb = compose_pitch_bend(wave)
+                    msg = [0xe0, pb[0], pb[1]]
+                    if msg != self.last_midi_message:
+                        self.core.midi_write(self.core.midi_out, msg)
+                        self.last_midi_message = msg
+                else:
+                    msg = [0xe0, 0, 0x40]
+                    if msg != self.last_midi_message:
+                        self.core.midi_write(self.core.midi_out, msg)
+                        self.last_midi_message = msg
             self.mod_changed = False
         
         # held_note_count = self.core.held_note_count()
@@ -97,6 +124,7 @@ class Articulation:
 
     def logic(self, dt):
         self.timer += dt
+        self.t += dt
         
         self.vibrato_window_t = max(0.0, self.vibrato_window_t - 1.0 * dt)
         if self.vibrato_window_t <= 0.0:
