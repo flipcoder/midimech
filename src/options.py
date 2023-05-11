@@ -5,7 +5,7 @@ class Options:
     version: int = 0
     lights: str = "4,7,3,7,3,3,7,3,7,3,7,3"
     split_lights: str = "4,7,5,7,5,5,7,5,7,5,7,5"
-    one_channel: bool = False
+    one_channel: int = 0
     lite: bool = False # lite mode (no gfx)
     velocity_curve: float = 1.0
     velocity_curve_low: float = 0.5
@@ -26,6 +26,8 @@ class Options:
     width: int = 16
     height: int = 8
     vibrato: str = 'mod'
+    jazz: bool = False
+    chord_analyzer: bool = True
 
 DEFAULT_OPTIONS = Options()
 

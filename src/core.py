@@ -397,6 +397,8 @@ class Core:
         for i, note in enumerate(self.notes):
             self.notes[i] = Note()
 
+        # These are midi numbers, not indicies, so they only have to be 127
+        self.left_chord_notes = [False] * 127
         self.chord_notes = [False] * 127
         self.note_set = set()
 
@@ -419,7 +421,7 @@ class Core:
         msg = (data[0] & 0xF0) >> 4
         aftertouch = (msg == 10)
         if self.options.one_channel:
-            data[0] = d0 & 0xF0  # send all to channel 0 if enabled
+            data[0] = (d0 & 0xF0) + (self.options.one_channel-1)  # send all to channel 0 if enabled
         row = None
         col = None
 
@@ -476,9 +478,11 @@ class Core:
         data[1] += (self.octave + self.octave_base) * 12
         data[1] += BASE_OFFSET
         midinote = data[1] - 24 + self.transpose * 2
-        split_chan = 0
+        side = self.channel_from_split(col, row, force=True)
         if self.is_split():
-            split_chan = self.channel_from_split(col, row)
+            split_chan = side
+        else:
+            split_chan = 0
         if not aftertouch:
             self.mark(midinote, 1, only_row=row)
         data[1] += self.out_octave * 12 + self.transpose * 2
@@ -515,9 +519,14 @@ class Core:
                 note.midinote = data[1]
                 note.split = split_chan
 
-        self.chord_notes[data[1]] = True
-        self.note_set.add(data[1])
-        self.dirty_chord = True
+            if self.options.jazz:
+                if side == 0:
+                    self.left_chord_notes[data[1]] = True
+                    # self.dirty_left_chord = True
+        
+            self.chord_notes[data[1]] = True
+            self.note_set.add(data[1])
+            self.dirty_chord = True
 
         if self.is_split():
             if split_chan == 0:
@@ -537,7 +546,7 @@ class Core:
         ch = d0 & 0x0F
         msg = (data[0] & 0xF0) >> 4
         if self.options.one_channel:
-            data[0] = d0 & 0xF0  # send all to channel 0 if enabled
+            data[0] = (d0 & 0xF0) + (self.options.one_channel-1)
         row = None
         col = None
 
@@ -605,15 +614,26 @@ class Core:
         data[1] += (self.octave + self.octave_base) * 12
         data[1] += BASE_OFFSET
         midinote = data[1] - 24 + self.transpose * 2
+        side = self.channel_from_split(col, row, force=True)
         if self.is_split():
-            split_chan = self.channel_from_split(col, row)
+            split_chan = side
+        else:
+            split_chan = 0
         self.mark(midinote, 0, only_row=row)
         data[1] += self.out_octave * 12 + self.transpose * 2
         if self.flipped:
             data[1] += 7
 
+        if self.options.jazz:
+            if side == 0:
+                self.left_chord_notes[data[1]] = False
+                # self.dirty_left_chord = True
+        
         self.chord_notes[data[1]] = False
-        self.note_set.remove(data[1])
+        try:
+            self.note_set.remove(data[1])
+        except KeyError:
+            pass
         self.dirty_chord = True
 
         if self.is_split():
@@ -632,7 +652,7 @@ class Core:
         ch = d0 & 0x0F
         msg = (data[0] & 0xF0) >> 4
         if self.options.one_channel:
-            data[0] = d0 & 0xF0  # send all to channel 0 if enabled
+            data[0] = (d0 & 0xF0) + (self.options.one_channel-1)
         row = None
         col = None
 
@@ -689,7 +709,7 @@ class Core:
         ch = d0 & 0x0F
         msg = (data[0] & 0xF0) >> 4
         if self.options.one_channel:
-            data[0] = d0 & 0xF0  # send all to channel 0 if enabled
+            data[0] = (d0 & 0xF0) + (self.options.one_channel-1)
         row = None
         col = None
         if not self.options.mpe:
@@ -1055,13 +1075,14 @@ class Core:
         # ) or get_option(
         #     opts, "no_overlap", DEFAULT_OPTIONS.mpe
         # )
-        self.options.mpe = True
         self.options.vibrato = get_option(opts, "vibrato", DEFAULT_OPTIONS.vibrato)
         self.options.midi_out = get_option(opts, "midi_out", DEFAULT_OPTIONS.midi_out)
         self.options.split_out = get_option(
             opts, "split_out", DEFAULT_OPTIONS.split_out
         )
         self.options.fps = get_option(opts, "fps", DEFAULT_OPTIONS.fps)
+        self.options.fps = get_option(opts, "jazz", DEFAULT_OPTIONS.jazz)
+        self.options.chord_analyzer = get_option(opts, "chord_analyzer", DEFAULT_OPTIONS.chord_analyzer)
         self.split_state = self.options.split = get_option(
             opts, "split", DEFAULT_OPTIONS.split
         )
@@ -1423,6 +1444,7 @@ class Core:
         self.dirty = True
         self.dirty_lights = True
         self.dirty_chord = False
+        # self.dirty_left_chord = False
 
         w = self.max_width
         h = self.board_h
@@ -1871,27 +1893,39 @@ class Core:
         # #     if self.config_save_timer <= 0.0:
         # #         save()
 
-        # TODO: if notes changed
-        if self.dirty_chord:
-            notes = []
-            for i, note in enumerate(self.chord_notes):
-                if note:
-                    notes.append(NOTES[i % 12])
-            if notes:
-                self.chord = mp.alg.detect(mp.chord(','.join(notes)))
-                try:
-                    self.chord = self.chord[0:self.chord.index(' sort')]
-                except ValueError:
-                    pass
-                if self.chord.startswith('note '):
-                    self.chord = self.chord[len('note '):-1]
-            else:
-                self.chord = ''
-            self.dirty_chord = False
-            self.dirty = True
+        # chord analysis for jazz mod
+        if self.options.jazz:
+            if self.dirty_chord:
+                self.left_chord = self.analyze(self.left_chord_notes)
+        
+        # chord analyzer
+        if self.options.chord_analyzer:
+            if self.dirty_chord:
+                self.chord = self.analyze(self.chord_notes)
+        
+        self.dirty_chord = False
         
         if not self.options.lite:
             self.gui.update(dt)
+
+    def analyze(self, chord_notes):
+        notes = []
+        r = ''
+        for i, note in enumerate(chord_notes):
+            if note:
+                notes.append(NOTES[i % 12])
+        if notes:
+            r = mp.alg.detect(mp.chord(','.join(notes)))
+            # try:
+            #     r = r[0:self.chord.index(' sort')]
+            # except ValueError:
+            #     pass
+            # if self.chord.startswith('note '):
+            #     r = r[len('note '):-1]
+        else:
+            r = ''
+        self.dirty = True
+        return r
 
     def sustainable_devices(self):
         if not self.is_split() or not self.options.sustain_split:

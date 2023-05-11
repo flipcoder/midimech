@@ -29,8 +29,10 @@ class Articulation:
         self.mod_changed = True
         self.last_midi_message = None
 
-        self.mode = self.core.options.vibrato
-        if self.mode not in ('mod', 'pitch'):
+        self.mode = self.core.options.vibrato.lower()
+        if self.mode in ('false', 'off'):
+            self.mode = None
+        elif self.mode not in ('mod', 'pitch'):
             print('Vibrato option must be mod or pitch. Using mod.')
             self.mode = 'mod'
         self.t = 0.0
@@ -116,7 +118,8 @@ class Articulation:
                     if msg != self.last_midi_message:
                         self.core.midi_write(self.core.midi_out, msg)
                         self.last_midi_message = msg
-            self.mod_changed = False
+            if self.mode:
+                self.mod_changed = False
         
         # held_note_count = self.core.held_note_count()
         # if held_note_count == 0:
