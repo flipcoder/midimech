@@ -1,7 +1,7 @@
 import os, sys, glm, copy, binascii, struct, math, traceback
-from util import *
 from dataclasses import dataclass
 import glm
+from src.constants import *
 
 with open(os.devnull, "w") as devnull:
     # suppress pygame messages
@@ -16,6 +16,9 @@ import pygame_gui
 from collections import OrderedDict
 from configparser import ConfigParser
 
+def error(msg):
+    print(msg)
+    sys.exit(1)
 
 def sign(val):
     tv = type(val)
@@ -86,3 +89,28 @@ def get_option(section, option, default):
     if typ is str:
         return section.get(option, default)
     print("Invalid option value for", option)
+
+# def invert_color(col): # ivec 255
+#     r = vec3(col) / 255.0
+#     for i in range(3):
+#         r[i] = 1.0 - r[i]
+#         r[i] *= 255
+#     return ivec3(r)
+
+def decompose_pitch_bend(pitch_bend_bytes):
+    pitch_bend_value = (pitch_bend_bytes[1] << 7) + pitch_bend_bytes[0]
+    pitch_bend_norm = (pitch_bend_value - 8192) / 8192.0
+    return pitch_bend_norm
+
+def compose_pitch_bend(pitch_bend_norm):
+    pitch_bend_value = int((pitch_bend_norm + 1.0) * 8192)
+    pitch_bend_bytes = [pitch_bend_value & 0x7F, (pitch_bend_value >> 7) & 0x7F]
+    return pitch_bend_bytes
+
+def decode_value(value):
+    lsb = value & 0x7F
+    msb = (value >> 7) & 0x7F
+    return msb, lsb
+
+# def pitch_bend_to_semitones(pitch_bend_value):
+#     return bend_semitones

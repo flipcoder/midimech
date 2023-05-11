@@ -1,6 +1,8 @@
-pygame
+pygame-ce
 pygame_gui
 pyglm
 rtmidi2
 launchpad-py
-pymsgbox
+musicpy
+pyyaml
+webcolors
