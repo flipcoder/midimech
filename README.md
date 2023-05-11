@@ -32,7 +32,7 @@ Copyright (c) 2023 Grady O'Connell
 
 LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 
-![Screenshot](https://i.imgur.com/eYsl3T4.png)
+![Screenshot](https://i.imgur.com/v25g9NO.png)
 
 ## Video
 
