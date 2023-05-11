@@ -11,12 +11,16 @@ Midimech is an alternative musical note layout system for the LinnStrument and L
 This project intends to bring the layout to wherever it is capable of being played, starting with the LinnStrument and Launchpad X.
 
 Midimech supports:
-- Usage as a virtual MIDI controller in your DAW
+- Use the mech layout on LinnStrument and LaunchPad X
+- Vibrato detection on LaunchPad X (wiggle your notes!)
 - Bigger range than the default LinnStrument layout
 - Synthesia/DAW visualization for learning songs
 - Diagonal split
 - Transposing and Octave shifting
-- Great for playing fast arpeggios and piano runs ;)
+- Chord Analyzer
+- 130+ Scales/Modes
+- Custom Lights
+- Great for playing fast arpeggios and piano runs
 
 **Please read the instructions and important notes before usage.  Have fun!**
 
@@ -62,13 +66,15 @@ That being said, I hope you enjoy it and have fun!
 
 ## Getting Started
 
-### Latest Builds (Windows)
+### Windows
 
 - [Download (Win)](https://github.com/flipcoder/midimech/releases)
 
+Note: These builds are not always up to date, but they're easier to get working.
+
 Alternatively, you can use the process below to run it from the repository.
 
-### Running from Git (for Mac/Linux)
+### Mac, Linux, and Running from Git
 
 - Download the project by typing the following commands in terminal:
 ```
@@ -263,7 +269,6 @@ In Synthesia settings, set it as an output device for note lights.
 
 ## Future Plans
 
-- Scale integration
 - Touchscreen support
 - Find a way to adjust vibrato sensitivity without affecting slides.  Roger Linn has indicated that this is probably impossible, but I have a few ideas to try.
 - Better velocity curve settings (right now its only basic options in the settings.ini).
@@ -279,12 +284,11 @@ This program is built using the following projects and libraries:
 - [PyMsgbox](https://github.com/asweigart/pymsgbox)
 - [PyGLM](https://github.com/Zuzu-Typ/PyGLM)
 - [Launchpad-Py](https://github.com/FMMT666/launchpad.py) by FMMT666 ([CC Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/))
+- [musicpy](https://github.com/Rainbow-Dreamer/musicpy)
 
 Thank you!
 
 ## Contact / Questions
 
 I'm on the LinnStrument Discord at https://discord.gg/h2BcrzmTXe.  Come hang out!
-
-
 
