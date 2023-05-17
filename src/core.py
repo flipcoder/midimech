@@ -454,7 +454,7 @@ class Core:
     def is_mpe(self):
         return self.options.one_channel == 0
 
-    def note_on(self, data, timestamp, width=None, curve=True, mpe=None):
+    def note_on(self, data, timestamp, width=None, curve=True, mpe=None, force_channel=None):
         # if mpe is None:
         #     mpe = self.options.mpe
         d0 = data[0]
@@ -462,8 +462,12 @@ class Core:
         ch = d0 & 0x0F
         msg = (data[0] & 0xF0) >> 4
         aftertouch = (msg == 10)
-        if not self.is_mpe():
+        
+        if force_channel:
+            data[0] = (d0 & 0xF0) + (force_channel-1)
+        elif not self.is_mpe():
             data[0] = (d0 & 0xF0) + (self.options.one_channel-1)
+        
         row = None
         col = None
 
@@ -500,6 +504,7 @@ class Core:
         # if mpe:
         row = data[1] // width
         col = data[1] % width
+        col_full = col + (left_width if within_hardware_split else 0)
         if within_hardware_split:
             data[1] += left_width
         data[1] = col + 30 + 2.5 * row
@@ -520,7 +525,7 @@ class Core:
         data[1] += (self.octave + self.octave_base) * 12
         data[1] += BASE_OFFSET
         midinote = data[1] - 24 + self.transpose * 2
-        side = self.channel_from_split(col, row, force=True)
+        side = self.channel_from_split(col_full, row, force=True)
         if self.is_split():
             split_chan = side
         else:
@@ -579,7 +584,7 @@ class Core:
         else:
             self.midi_write(self.midi_out, data, timestamp)
 
-    def note_off(self, data, timestamp, width=None, mpe=None):
+    def note_off(self, data, timestamp, width=None, mpe=None, force_channel=None):
         # if mpe is None:
         #     mpe = self.options.mpe
         
@@ -587,8 +592,10 @@ class Core:
         # print(data)
         ch = d0 & 0x0F
         msg = (data[0] & 0xF0) >> 4
-        if not self.is_mpe():
-            data[0] = (d0 & 0xF0) | (self.options.one_channel-1)
+        if force_channel:
+            data[0] = (d0 & 0xF0) + (force_channel-1)
+        elif not self.is_mpe():
+            data[0] = (d0 & 0xF0) + (self.options.one_channel-1)
         row = None
         col = None
 
@@ -639,6 +646,7 @@ class Core:
             #     data[1] += self.board_w
         row = data[1] // width
         col = data[1] % width
+        col_full = col + (left_width if within_hardware_split else 0)
         if within_hardware_split:
             data[1] += left_width
         data[1] = col + 30 + 2.5 * row
@@ -656,7 +664,7 @@ class Core:
         data[1] += (self.octave + self.octave_base) * 12
         data[1] += BASE_OFFSET
         midinote = data[1] - 24 + self.transpose * 2
-        side = self.channel_from_split(col, row, force=True)
+        side = self.channel_from_split(col_full, row, force=True)
         if self.is_split():
             split_chan = side
         else:
@@ -687,14 +695,16 @@ class Core:
             self.midi_write(self.midi_out, data, timestamp)
         # print('note off: ', data)
 
-    def device_to_xy(self, data):
+    def device_to_xy(self, data, force_channel=None):
         # mpe = self.options.mpe
         
         d0 = data[0]
         ch = d0 & 0x0F
         msg = (data[0] & 0xF0) >> 4
-        if not self.is_mpe():
-            data[0] = (d0 & 0xF0) | (self.options.one_channel-1)
+        if force_channel:
+            data[0] = (d0 & 0xF0) + (force_channel-1)
+        elif not self.is_mpe():
+            data[0] = (d0 & 0xF0) + (self.options.one_channel-1)
         row = None
         col = None
 
@@ -741,7 +751,7 @@ class Core:
         
         return col, row
     
-    def cb_midi_in(self, data, timestamp):
+    def cb_midi_in(self, data, timestamp, force_channel=None):
         """LinnStrument MIDI Callback"""
         # d4 = None
         # if len(data)==4:
@@ -751,8 +761,6 @@ class Core:
         # print(data)
         ch = d0 & 0x0F
         msg = (data[0] & 0xF0) >> 4
-        if not self.is_mpe():
-            data[0] = (d0 & 0xF0) | (self.options.one_channel-1)
         row = None
         col = None
         # if not self.options.mpe:
@@ -767,9 +775,16 @@ class Core:
         elif msg == 8:  # note off
             self.note_off(data, timestamp)
         elif 0xF0 <= msg <= 0xF7:  # sysex
+            # rewrite the output channel based on app's MPE settings
             self.midi_write(self.midi_out, data, timestamp)
         else:
             # pitch bend
+            # rewrite the output channel based on app's MPE settings
+            if force_channel:
+                data[0] = (d0 & 0xF0) + (force_channel-1)
+            elif not self.is_mpe():
+                data[0] = (d0 & 0xF0) + (self.options.one_channel-1)
+            
             skip = False
             if msg == 14:
                 if self.is_split():
@@ -894,7 +909,7 @@ class Core:
             vel = event[2]
             note = y * 8 + x
             if not self.is_macro_button(x,  8 - y - 1):
-                self.note_on([160, note, event[2]], timestamp, width=8)
+                self.note_on([160, note, event[2]], timestamp, width=8, force_channel=self.options.launchpad_channel)
                 self.articulation.pressure(vel / 127)
             else:
                 self.macro(x, 8 - y - 1, vel / 127)
@@ -905,7 +920,7 @@ class Core:
                 self.reset_launchpad_light(x, y)
                 if not self.is_macro_button(x, 8 - y - 1):
                     note = y * 8 + x
-                    self.note_off([128, note, event[2]], timestamp, width=8)
+                    self.note_off([128, note, event[2]], timestamp, width=8, force_channel=self.options.launchpad_channel)
                 else:
                     self.macro(x, 8 - y - 1, False)
         else: # note on
@@ -915,7 +930,7 @@ class Core:
                 note = y * 8 + x
                 self.set_launchpad_light(x, y, 0) # red
                 if not self.is_macro_button(x, 8 - y - 1):
-                    self.note_on([144, note, event[2]], timestamp, width=8)
+                    self.note_on([144, note, event[2]], timestamp, width=8, force_channel=self.options.launchpad_channel)
                 else:
                     self.macro(x, 8 - y - 1, True)
             else:
@@ -1157,14 +1172,20 @@ class Core:
             print("Invalid sustain split value. Options: left, right, both.")
             sys.exit(1)
 
+        hardware_split = False
         self.options.size = get_option(opts, "size", DEFAULT_OPTIONS.size)
         if self.options.size == 128:
             self.options.width = 16
         elif self.options.size == 200:
             self.options.width = 25
-            self.options.hardware_split = True
+            hardware_split = True
+
+        # Note: The default below is what is determined by size above.
+        # Overriding hardware_split is only useful for 128 user testing 200 behavior
+        self.options.hardware_split = get_option(opts, "hardware_split", hardware_split)
 
         self.options.launchpad = get_option(opts, 'launchpad', True)
+        self.options.launchpad_channel = get_option(opts, 'launchpad_channel', 1)
         self.options.experimental = get_option(opts, 'experimental', False)
         self.options.debug = get_option(opts, 'debug', False)
         self.options.stabilizer = get_option(opts, 'stabilizer', False)
