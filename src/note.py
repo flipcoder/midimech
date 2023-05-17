@@ -26,5 +26,3 @@ class Note:
     #             self.intensity = max(0.0, self.intensity - dt * FADE_SPEED)
 
 
-
-

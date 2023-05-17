@@ -4,6 +4,7 @@ from dataclasses import dataclass
 class Options:
     version: int = 0
     lights: str = "4,7,3,7,3,3,7,3,7,3,7,3"
+    colors: str = "red,darkred,orange,goldenrod,yellow,green,darkolivegreen,blue,darkslateblue,indigo,darkorchid,pink"
     split_lights: str = "4,7,5,7,5,5,7,5,7,5,7,5"
     one_channel: int = 0
     lite: bool = False # lite mode (no gfx)
