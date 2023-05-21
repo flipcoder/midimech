@@ -3,9 +3,14 @@ from dataclasses import dataclass
 @dataclass
 class Options:
     version: int = 0
+    # lights: str = "4,7,3,7,3,3,7,3,7,3,7,3"
     lights: str = "4,7,3,7,3,3,7,3,7,3,7,3"
-    colors: str = "red,darkred,orange,goldenrod,yellow,green,darkolivegreen,blue,darkslateblue,indigo,darkorchid,pink"
     split_lights: str = "4,7,5,7,5,5,7,5,7,5,7,5"
+    mark_light: int = 1
+    mark_color: str = "red"
+    # colors: str = "red,darkred,orange,goldenrod,yellow,green,darkolivegreen,blue,darkslateblue,indigo,darkorchid,pink"
+    colors: str = "cyan,green,green,green,green,green,green,green,green,green,green,green"
+    split_colors: str = "cyan,blue,blue,blue,blue,blue,blue,blue,blue,blue,blue,blue"
     one_channel: int = 0
     lite: bool = False # lite mode (no gfx)
     velocity_curve: float = 1.0

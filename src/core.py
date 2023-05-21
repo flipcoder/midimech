@@ -116,17 +116,17 @@ class Core:
         self.linn_out.send_cc(channel, cc, val)
         # self.linn_out.send_messages(0xb0, [(channel, cc, val)])
 
-    def set_light(self, x, y, col, index=None):  # col is [1,11], 0 resets
+    def set_light(self, x, y, col, index=None, mark=False):  # col is [1,11], 0 resets
         """Set light to color `col` at x, y if in range and connected"""
-        if y < 0 or y > self.board_h:
+        if y < 0 or y >= self.board_h:
             return
-        if x < 0 or x > self.board_w:
+        if x < 0 or x >= self.board_w:
             return
 
         if not index:
             index = self.get_note_index(x, y)
 
-        self.red_lights[y][x] = (col == 1)
+        self.mark_lights[y][x] = mark
         if self.linn_out:
             self.send_cc(0, 20, x + 1)
             self.send_cc(0, 21, self.board_h - y - 1)
@@ -169,7 +169,7 @@ class Core:
                 light_col = 7
 
         self.set_light(x, y, light_col, note)
-        self.red_lights[y][x] = False
+        self.mark_lights[y][x] = False
 
     def reset_launchpad_light(self, x, y):
         """Reset the launchpad light at x, y"""
@@ -184,11 +184,11 @@ class Core:
         #     light_col = self.options.lights[note]
         self.set_launchpad_light(x, y, note)
 
-    def set_red_light(self, x, y, state=True):
+    def set_mark_light(self, x, y, state=True):
         """Set launchpad light to touched color"""
-        self.red_lights[y][x] = state
+        self.mark_lights[y][x] = state
         if self.launchpad:
-            lp_col = ivec3(63, 0, 0)
+            lp_col = self.options.mark_color
             if state:
                 self.launchpad.LedCtrlXY(x, y, lp_col[0], lp_col[1], lp_col[2])
 
@@ -206,8 +206,8 @@ class Core:
         """Set all lights"""
         for y in range(self.board_h):
             for x in range(self.board_w):
-                if self.red_lights[y][x]:
-                    self.set_red_light(x, y, True)
+                if self.mark_lights[y][x]:
+                    self.set_mark_light(x, y, True)
                 else:
                     self.reset_light(x, y)
 
@@ -256,30 +256,33 @@ class Core:
         # return NOTE_COLORS[get_note_index(x, y)]
         note = self.get_note_index(x, y)
         # note = (note - self.tonic) % 12
-        if self.is_split():
-            split_chan = self.channel_from_split(x, self.board_h - y - 1)
-            if split_chan:
-                light_col = self.options.split_lights[note]
-                try:
-                    light_col = light_col if self.scale_notes[note]!='.' else 7
-                except IndexError:
-                    light_col = 7
-            else:
-                light_col = self.options.lights[note]
-                try:
-                    light_col = light_col if self.scale_notes[note]!='.' else 7
-                except IndexError:
-                    light_col = 7
+        # if self.is_split():
+        #     split_chan = self.channel_from_split(x, self.board_h - y - 1)
+        #     if split_chan:
+        #         light_col = self.options.split_lights[note]
+        #         try:
+        #             light_col = light_col if self.scale_notes[note]!='.' else 7
+        #         except IndexError:
+        #             light_col = 7
+        #     else:
+        #         light_col = self.options.lights[note]
+        #         try:
+        #             light_col = light_col if self.scale_notes[note]!='.' else 7
+        #         except IndexError:
+        #             light_col = 7
 
-        else:
-            light_col = self.options.lights[note]
-            try:
-                light_col = light_col if self.scale_notes[note]!='.' else 7
-            except IndexError:
-                light_col = 7
+        # else:
+        #     light_col = self.options.lights[note]
+        #     try:
+        #         light_col = light_col if self.scale_notes[note]!='.' else 7
+        #     except IndexError:
+        #         light_col = 7
 
         if self.scale_notes[note] != '.':
-            return self.options.colors[note]
+            if self.channel_from_split(x, self.board_h - y - 1):
+                return self.options.split_colors[note]
+            else:
+                return self.options.colors[note]
         else:
             return None
 
@@ -1083,6 +1086,10 @@ class Core:
         self.options.colors = list(self.options.colors.split(","))
         self.options.colors = list(map(lambda x: glm.ivec3(get_color(x)), self.options.colors))
 
+        self.options.split_colors = get_option(opts, "colors", DEFAULT_OPTIONS.split_colors)
+        self.options.split_colors = list(self.options.split_colors.split(","))
+        self.options.split_colors = list(map(lambda x: glm.ivec3(get_color(x)), self.options.split_colors))
+
         # LIGHT = ivec3(127)
         self.options.lights = get_option(opts, "lights", DEFAULT_OPTIONS.lights)
         if self.options.lights:
@@ -1102,6 +1109,8 @@ class Core:
 
         if len(self.options.colors) != 12:
             error("Invalid color configuration. Make sure you have 12 colors under the colors option or remove it.")
+        if len(self.options.split_colors) != 12:
+            error("Invalid split color configuration. Make sure you have 12 colors under the split_colors option or remove it.")
         if len(self.options.lights) != 12:
             error("Invalid light color configuration. Make sure you have 12 light colors under the lights option or remove it.")
         if len(self.options.split_lights) != 12:
@@ -1133,6 +1142,14 @@ class Core:
 
         if self.options.velocity_curve < EPSILON:  # if its near zero, set default
             self.options.velocity_curve = 1.0  # default
+
+        self.options.mark_light = get_option(
+            opts, "mark_light", DEFAULT_OPTIONS.mark_light
+        )
+        self.options.mark_color = get_option(
+            opts, "mark_color", DEFAULT_OPTIONS.mark_color
+        )
+        self.options.mark_color = glm.ivec3(get_color(self.options.mark_color))
 
         self.options.min_velocity = get_option(
             opts, "min_velocity", DEFAULT_OPTIONS.min_velocity
@@ -1534,7 +1551,7 @@ class Core:
         w = self.max_width
         h = self.board_h
         self.board = [[0 for x in range(w)] for y in range(h)]
-        self.red_lights = [[False for x in range(w)] for y in range(h)]
+        self.mark_lights = [[False for x in range(w)] for y in range(h)]
         self.launchpad_state = [[None for x in range(8)] for y in range(8)]
 
         self.font = pygame.font.Font(None, FONT_SZ)
@@ -1719,7 +1736,7 @@ class Core:
             pass
         if use_lights:
             if state:
-                self.set_light(x, y, 1)
+                self.set_light(x, y, self.options.mark_light, mark=True)
             else:
                 self.reset_light(x, y)
         self.dirty = True
@@ -1748,7 +1765,7 @@ class Core:
                         self.board[y + self.flipped][x] = state
                         if use_lights:
                             if state:
-                                self.set_light(x, y, 1)
+                                self.set_light(x, y, self.options.mark_light, mark=True)
                             else:
                                 self.reset_light(x, y)
             y += 1
