@@ -194,12 +194,16 @@ class Core:
 
     def set_launchpad_light(self, x, y, color):
         """Set launchpad light to color index"""
-        if color is not None:
-            col = self.options.colors[color] / 4
-        else:
-            col = glm.ivec3(0,0,0)
         if self.is_macro_button(x, 8 - y - 1):
             col = glm.ivec3(63,63,63)
+        else:
+            if color != -1: # not mark
+                if color is not None and self.scale_notes[color] != '.':
+                    col = self.options.colors[color] / 4
+                else:
+                    col = glm.ivec3(0,0,0)
+            else:
+                col = self.options.mark_color / 4
         self.launchpad.LedCtrlXY(x, 8-y, col[0], col[1], col[2])
 
     def setup_lights(self):
@@ -444,6 +448,10 @@ class Core:
 
     def midi_write(self, dev, msg, ts=0):
         """Write MIDI message `msg` to device `dev`"""
+        # if type(dev) in (list,tuple):
+        #     for d in dev:
+        #         self.midi_write(d, msg, ts)
+        #     return
         if dev:
             dev.send_raw(*msg)
 
@@ -931,7 +939,7 @@ class Core:
             y = 8 - event[1]
             if 0 <= x < 8 and 0 <= y < 8:
                 note = y * 8 + x
-                self.set_launchpad_light(x, y, 0) # red
+                self.set_launchpad_light(x, y, -1)
                 if not self.is_macro_button(x, 8 - y - 1):
                     self.note_on([144, note, event[2]], timestamp, width=8, force_channel=self.options.launchpad_channel)
                 else:
@@ -1086,7 +1094,7 @@ class Core:
         self.options.colors = list(self.options.colors.split(","))
         self.options.colors = list(map(lambda x: glm.ivec3(get_color(x)), self.options.colors))
 
-        self.options.split_colors = get_option(opts, "colors", DEFAULT_OPTIONS.split_colors)
+        self.options.split_colors = get_option(opts, "split_colors", DEFAULT_OPTIONS.split_colors)
         self.options.split_colors = list(self.options.split_colors.split(","))
         self.options.split_colors = list(map(lambda x: glm.ivec3(get_color(x)), self.options.split_colors))
 
@@ -1160,6 +1168,11 @@ class Core:
         self.options.show_lowest_note = get_option(
             opts, "show_lowest_note", DEFAULT_OPTIONS.show_lowest_note
         )
+
+        self.options.y_bend = get_option(
+            opts, "y_bend", DEFAULT_OPTIONS.y_bend
+        )
+
         # self.options.mpe = get_option(
         #     opts, "mpe", DEFAULT_OPTIONS.mpe
         # ) or get_option(
@@ -1177,9 +1190,9 @@ class Core:
             opts, "split", DEFAULT_OPTIONS.split
         )
         self.options.foot_in = get_option(opts, "foot_in", DEFAULT_OPTIONS.foot_in)
-        self.options.sustain = get_option(
-            opts, "sustain", DEFAULT_OPTIONS.sustain
-        )  # sustain scale
+        # self.options.sustain = get_option(
+        #     opts, "sustain", DEFAULT_OPTIONS.sustain
+        # )
 
         # which split the sustain affects
         self.options.sustain_split = get_option(
@@ -1529,14 +1542,22 @@ class Core:
                     lp = launchpad.LaunchpadLPX()
                     if lp.Open(1):
                         self.launchpad_mode = "lpx"
-                    lp.LedCtrlXY(0, 0, 0, 0, 63)
-                    lp.LedCtrlXY(1, 0, 0, 0, 63)
-                    lp.LedCtrlXY(2, 0, 63, 0, 63)
-                    lp.LedCtrlXY(3, 0, 63, 0, 63)
             if self.launchpad_mode is not None:
                 self.launchpad = lp
 
         self.done = False
+
+        if self.launchpad_mode == "lpx":
+            lp.LedCtrlXY(0, 0, 0, 0, 63)
+            lp.LedCtrlXY(1, 0, 0, 0, 63)
+            lp.LedCtrlXY(2, 0, 63, 0, 63)
+            lp.LedCtrlXY(3, 0, 63, 0, 63)
+
+        # if self.launchpad:
+        #     # use the alternate colors
+        #     self.options.colors = get_option(opts, "colors", DEFAULT_OPTIONS.colors_alt)
+        #     self.options.colors = list(self.options.colors.split(","))
+        #     self.options.colors = list(map(lambda x: glm.ivec3(get_color(x)), self.options.colors))
         
         if not self.midi_out:
             error(

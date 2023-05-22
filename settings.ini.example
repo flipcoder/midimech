@@ -1,9 +1,14 @@
+; Rename this file to settings.ini to apply settings.
+; Uncomment options and change them to customize look and behavior.
+
 [general]
-velocity_curve=1.0
-min_velocity=0
-max_velocity=127
 size=128
-midi_out=midimech
-split_out=split
-fps=60
-split=false
+;velocity_curve=1.0
+;lights=1,9,9,2,2,3,3,5,8,8,11,11
+;split_lights=4,7,5,7,5,5,7,5,7,5,7,5
+;colors=red,darkred,orange,goldenrod,yellow,green,darkolivegreen,blue,darkslateblue,indigo,darkorchid,pink
+;split_colors=cyan,blue,blue,blue,blue,blue,blue,blue,blue,blue,blue,blue
+;mark_light=1
+;mark_color=red
+;one_channel=0
+;lite=false
