@@ -89,5 +89,7 @@ class Options:
     # Allow Y axis to bend chromatically (not yet impl)
     y_bend: bool = False
 
+    bend_range: int = 24
+
 DEFAULT_OPTIONS = Options()
 

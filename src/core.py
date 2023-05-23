@@ -789,12 +789,11 @@ class Core:
             # rewrite the output channel based on app's MPE settings
             self.midi_write(self.midi_out, data, timestamp)
         else:
-            # pitch bend
             # rewrite the output channel based on app's MPE settings
             if force_channel:
-                data[0] = (d0 & 0xF0) + (force_channel-1)
+                data[0] = (d0 & 0xF0) | (force_channel-1)
             elif not self.is_mpe():
-                data[0] = (d0 & 0xF0) + (self.options.one_channel-1)
+                data[0] = (d0 & 0xF0) | (self.options.one_channel-1)
             
             skip = False
             if msg == 14:
@@ -831,6 +830,46 @@ class Core:
             # print('pitch', bend, semitones)
             # stabilized = True
             
+            # This block has to happen before the below block rewrites y axis to pitch bend
+            if self.options.y_bend:
+                pb_range = self.options.bend_range * 2
+                bend_threshold = 1 # units
+                if msg == 14:
+                    # if y-bending enabled, rewrite pitch bend based on y bend value
+                    note = self.notes[ch]
+                    # if note.y_bend > EPSILON:
+                    val = decompose_pitch_bend((data[1], data[2]))
+                    note.bend = val
+                    val += note.y_bend / pb_range
+                    data[1], data[2] = compose_pitch_bend(val)
+
+                if msg == 11 and data[1] == 74:
+                    # print(data[2])
+                    if data[2] > 127 - bend_threshold:
+                        bend = (data[2] - (127 - bend_threshold)) / bend_threshold
+                    elif data[2] <= bend_threshold:
+                        # bend down?
+                        # bend = -(bend_threshold - data[2]) / bend_threshold
+                        bend = None
+                    else:
+                        bend = None
+                    note = self.notes[ch]
+                    data = [0xe0 | ch,0,0]
+                    if force_channel:
+                        data[0] = 0xe0 | (force_channel-1)
+                    elif not self.is_mpe():
+                        data[0] = 0xe0 | (self.options.one_channel-1)
+                    if bend is not None:
+                        if bend > 0.9:
+                            bend = 1.0
+                        elif bend < -0.9:
+                            bend = -1.0
+                        note.y_bend = bend
+                        data[1], data[2] = compose_pitch_bend(note.bend + note.y_bend / pb_range)
+                    else:
+                        note.y_bend = 0.0
+                        data[1], data[2] = compose_pitch_bend(note.bend + note.y_bend / pb_range)
+
             if skip:
                 pass
             elif msg == 11 and data[1] == 64:  # sustain pedal
@@ -1126,6 +1165,9 @@ class Core:
 
         self.options.one_channel = get_option(
             opts, "one_channel", DEFAULT_OPTIONS.one_channel
+        )
+        self.options.bend_range = get_option(
+            opts, "bend_range", DEFAULT_OPTIONS.bend_range
         )
 
         if "--lite" in sys.argv:
@@ -1679,8 +1721,8 @@ class Core:
 
     def bend_rpn(self, on=True):
         if on:
-            self.rpn(19, 24)
-            self.rpn(119, 24)
+            self.rpn(19, self.options.bend_range)
+            self.rpn(119, self.options.bend_range)
         else:
             self.rpn(19, 48)
             self.rpn(119, 48)

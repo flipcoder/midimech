@@ -11,6 +11,10 @@ class Note:
         self.split = 0
         self.note = None
 
+        # apply additional bend?
+        self.bend = 0.0
+        self.y_bend = 0.0
+
     # def logic(self, dt):
     #     if self.pressed:  # pressed, fade to pressure value
     #         if self.intensity != self.pressure:
