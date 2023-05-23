@@ -6,7 +6,8 @@ class Options:
     # lights: str = "4,7,3,7,3,3,7,3,7,3,7,3"
 
     # LinnStrument light numbers
-    lights: str = "4,7,3,7,3,3,7,3,7,3,7,3"
+    # lights: str = "4,7,3,7,3,3,7,3,7,3,7,3"
+    lights: str = "1,9,9,2,2,3,3,5,8,8,11,11"
     # Same as above, for split
     split_lights: str = "4,7,5,7,5,5,7,5,7,5,7,5"
     
@@ -17,7 +18,9 @@ class Options:
     mark_color: str = "red"
     
     # Color scheme using webcolors
-    colors: str = "cyan,green,green,green,green,green,green,green,green,green,green,green"
+    # colors: str = "cyan,green,green,green,green,green,green,green,green,green,green,green"
+    # split_colors: str = "cyan,blue,blue,blue,blue,blue,blue,blue,blue,blue,blue,blue"
+    colors: str = "red,darkred,orange,goldenrod,yellow,green,darkolivegreen,blue,darkslateblue,indigo,darkorchid,pink"
     split_colors: str = "cyan,blue,blue,blue,blue,blue,blue,blue,blue,blue,blue,blue"
 
     # MPE Settings

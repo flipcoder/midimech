@@ -571,7 +571,7 @@ class Core:
             if note:
                 if note.location is None:
                     note.location = ivec2(0)
-                note.location.x = col
+                note.location.x = col_full
                 note.location.y = row
                 note.pressure = vel
                 note.midinote = data[1]
@@ -870,6 +870,7 @@ class Core:
                         note.y_bend = 0.0
                         data[1], data[2] = compose_pitch_bend(note.bend + note.y_bend / pb_range)
 
+
             if skip:
                 pass
             elif msg == 11 and data[1] == 64:  # sustain pedal
@@ -879,13 +880,23 @@ class Core:
                 else:
                     self.midi_write(self.midi_out, data, timestamp)
             elif self.is_split(): # everything else (if split)...
-                note = self.notes[ch]
+                # print('ch', ch)
+                try:
+                    note = self.notes[ch]
+                except:
+                    note = None
                 if ch == 0:
                     self.midi_write(self.midi_out, data, timestamp)
                     self.midi_write(self.split_out, data, timestamp)
-                elif note.location is not None:
-                    col = self.notes[ch].location.x
-                    row = self.notes[ch].location.y
+                # else:
+                #     split_chan = 1 if ch >= 8 else 0
+                #     if split_chan:
+                #         self.midi_write(self.split_out, data, timestamp)
+                #     else:
+                #         self.midi_write(self.midi_out, data, timestamp)
+                elif note and note.location is not None:
+                    col = note.location.x
+                    row = note.location.y
                     split_chan = self.channel_from_split(col, row)
                     if split_chan:
                         self.midi_write(self.split_out, data, timestamp)
@@ -1659,13 +1670,14 @@ class Core:
     def split_rpn(self, on=True):
         """Sets up RPN for hardware split (used on LinnStrument 200)"""
         if self.options.hardware_split:
-            self.rpn(200, 1 if on else 0)
+            self.rpn(200, 1 if on else 0) # split active
 
+            # lights
             self.send_cc(0, 20, 0)
             self.send_cc(0, 21, 1)
             self.send_cc(0, 22, 7 if on else 0)
         else:
-            self.rpn(200, 7)
+            self.rpn(200, 0)
 
     def rpn(self, num, value):
         if not self.linn_out:
