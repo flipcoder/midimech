@@ -5,3 +5,4 @@ test.py
 midimech.spec
 build/
 dist/
+.idea/

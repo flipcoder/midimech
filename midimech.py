@@ -10,14 +10,13 @@ import time
 
 from src.util import *
 from src.constants import *
-from src.options import Options
 from src.note import Note
 from src.settings import DeviceSettings
 from src.core import Core
 from src.gamepad import Gamepad
 
+# suppress pygame messages to keep console clean
 with open(os.devnull, "w") as devnull:
-    # suppress pygame messages
     stdout = sys.stdout
     sys.stdout = devnull
     import pygame, pygame.midi, pygame.gfxdraw
@@ -25,6 +24,7 @@ with open(os.devnull, "w") as devnull:
     sys.stdout = stdout
 import pygame_gui
 
+# pymsgbox crashes on Mac, so we can't use this right now
 # try:
 #     import pymsgbox
 # except ImportError:
@@ -50,9 +50,6 @@ try:
     import musicpy as mp
 except ImportError:
     error("The project dependencies have changed! Run the requirements setup command again!")
-
-
-DEFAULT_OPTIONS = Options()
 
 
 def main():

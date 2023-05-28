@@ -3,8 +3,8 @@ from dataclasses import dataclass
 import glm
 from src.constants import *
 
+# suppress pygame messages to keep console output clean
 with open(os.devnull, "w") as devnull:
-    # suppress pygame messages
     stdout = sys.stdout
     sys.stdout = devnull
     import pygame, pygame.midi, pygame.gfxdraw
@@ -15,6 +15,11 @@ import pygame_gui
 # import mido
 from collections import OrderedDict
 from configparser import ConfigParser
+
+try:
+    import webcolors
+except ImportError:
+    error("The project dependencies have changed! Run the requirements setup command again!")
 
 def error(msg):
     print(msg)
@@ -114,3 +119,8 @@ def decode_value(value):
 
 # def pitch_bend_to_semitones(pitch_bend_value):
 #     return bend_semitones
+
+def get_color(col):
+    if col.startswith("#"):
+        return webcolors.hex_to_rgb(col)
+    return webcolors.name_to_rgb(col)
