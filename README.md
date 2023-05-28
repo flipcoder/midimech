@@ -48,9 +48,9 @@ LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 - Less finger stretching than other layouts when playing chords, which may help ergonomically.
 - Arpeggios are quite smooth, as you're simply walking stacked shapes.
 
-## Chord Shapes
+## Cheat Sheet
 
-![Chord Shapes](https://i.imgur.com/DaqVFqP.png)
+![Cheat Sheet](https://i.imgur.com/FJgBnh5.png)
 
 ## Important Notes
 
