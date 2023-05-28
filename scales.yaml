@@ -18,6 +18,9 @@
     - Minor Pentatonic
 - name: Blues
   notes: 'x..x.xxx..x.'
+  modes:
+    - Minor Blues
+    - Major Blues
 - name: Melodic Minor
   notes: 'x.xx.x.x.x.x'
   modes:
