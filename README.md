@@ -52,6 +52,8 @@ LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 
 ![Cheat Sheet](https://i.imgur.com/FJgBnh5.png)
 
+[PDF Version](https://github.com/flipcoder/midimech-resources/blob/main/midimech-cheatsheet.pdf)
+
 ## Important Notes
 
 So far, this has mostly been tested on the LinnStrument 128 version.  If you own the 200-note version, please feel free to test it and let me know how this works for you.
