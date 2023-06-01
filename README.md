@@ -1,3 +1,4 @@
+
 # midimech
 
 ![midimech](https://i.imgur.com/iNKaTi3.png)
@@ -44,15 +45,12 @@ LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 - Like the LinnStrument's layout, it is also isomorphic (the same chord and scale shapes can be played anywhere)
 - The most common chords and scales are far easier to play and remember than other layouts.
 - Extended range compared to standard +5 tuning, making room for using a split.
-- Unlike piano, instrument splits can overlap.
 - Less finger stretching than other layouts when playing chords, which may help ergonomically.
 - Arpeggios are quite smooth, as you're simply walking stacked shapes.
 
 ## Cheat Sheet
 
-![Cheat Sheet](https://i.imgur.com/FJgBnh5.png)
-
-[PDF Version](https://github.com/flipcoder/midimech-resources/blob/main/midimech-cheatsheet.pdf)
+[View Full PDF](https://github.com/flipcoder/mech-theory/blob/main/midimech-cheatsheet.pdf)
 
 ## Important Notes
 
@@ -72,9 +70,9 @@ That being said, I hope you enjoy it and have fun!
 
 - [Download (Win)](https://github.com/flipcoder/midimech/releases)
 
-Note: These builds are not always up to date, but they're easier to get working.
+After downloading, make sure to follow the instructions under `Setup`.
 
-Alternatively, you can use the process below to run it from the repository.
+*Note: These builds are not always up to date.*
 
 ### Mac, Linux, and Running from Git
 
@@ -116,145 +114,95 @@ python3 midimech.py
 
 ### Layout
 
-Each row consists of a whole tone scale and each row is separated by fourths.  This has a number of advantages you'll see below.
+Each row consists of a whole tone scale and each row is separated by fourths.   The above cheat sheet document contains many common shapes used for chords and scales.  
 
-### Basic Scales
+### Scales
+  
+By default, the C major scale is colored.  You can highlight different notes by cycling the scale (SCL) and mode (MOD) buttons.  Notice how only the colors change, and not the note positions.
 
-The major/minor scales are shaped with the "3-4" pattern.  3 notes on first row, then 4 notes on next row, then repeat moving over 1 space, making runs fit across the fingers easily.
-Here's what it looks like:
+You can change the starting note of the scale by using the transpose (TR) buttons, as well as positioning the board using the move (MOV) buttons.
 
-```
-4567
-123
-```
+### Chords
 
-All the modes for this, (such as lydian, dorian, etc.) are accessible by picking a different starting note.
+Refer to the cheat sheet for a listing of many common chord shapes.
 
-For example, if you start the scale on 6, it becomes a minor scale.
-
-### Pentatonic Scales
-
-Similarly, the pentatonic scale modes fit the "2-3" pattern:
+To play a chord, simply position the dotted black square of the chord on the note you want to play, and make the shape with your fingers.  For example a C major chord is made by playing the notes:
 
 ```
-345
-12
+ G
+C E
 ```
 
-### Melodic Minor Scale
+## Velocity Curve
 
-Melodic minor has a "2-5" pattern:
-
-```
-34567
- 12
-```
-
-## More Scales
-
-Once you become comfortable with this layout, you can introduce the harder scales into your playing:
-
-### Blues Scale
-
-Here's a fun one.  Depending on the virtual instrument used, I prefer to visualize the blues scale as a 2-3 pattern and bending into the "blue note".
-
-The shape in that case is this:
+You can modify the velocity curve using a decimal value.  Lower values are more sensitive.  The default is 1.0.
 
 ```
-345
-12
+velocity_curve=0.5
 ```
 
-The '2' in this shape is the tonic of the blues scale and the blue note is accessed by bending between 4 and 5.  When playing the scale, start on the note position labeled '2' above.  Note that the numbers here are just the numbers inside the shape in order, so they do not correspond with actual intervals.
-
-To hold the blue note, simply wiggle your finger between 4 and 5 in the shape above or bend up from 4.  That usually sounds cool.
-
-If you're playing an instrument without bend, the blues scale looks like this:
+You can also clamp the midi velocity value to a min (default: 0) and max (default: 127).
 
 ```
-4 6
- 235
-  1
+min_velocity=0
+max_velocity=127
 ```
 
-Or:
+## Launchpad
 
+Supported launchpads are automatically detected on program start.  Support for these will improve over time.
+
+If you're on the LinnStrument and don't want your launchpad used, simply set it to false:
 ```
- 6
-235
- 1  4
-```
-
-### Harmonic Major Scale
-
-This is the same 3-4 pattern, but the 6th note is flat:
-
-```
-6
- 45 7
- 123
+launchpad=false
 ```
 
-Or:
+### Vibrato
 
+Midimech adds a cool feature to the Launchpad where it can detect wiggling a note to create a vibrato effect.  This is enabled by default and mapped to CC0.  If your synth supports CC0 vibrato, you should hear the vibrato activate by rocking your finger back and forth from left to right while pressing the note down.
+
+You can disable it in settings.ini using:
 ```
- 45 7
- 123  6
-```
-
-### Harmonic Minor Scale
-
-This one is a little tricky at first:
-
-```
- 6
-345 7
- 12
+vibrato=off
 ```
 
-Or:
+There is also experimental support for pitch wheel vibrato using:
 
 ```
-7
- 6
- 345
-  12
+vibrato=pitch
 ```
 
-You might prefer to think about this as a mode of Ionian Augmented intead, which is the 3-4 shape but with a sharp 5:
+## Color Schemes
+
+### LinnStrument Colors
+
+LinnStrument colors can be changed in the settings using `lights` and `split_lights` for each split respectively.
 
 ```
-5
- 4 67
- 123
+lights=1,9,9,2,2,3,3,5,8,8,11,11
+split_lights=4,7,5,7,5,5,7,5,7,5,7,5
 ```
+The color numbers here are the values used by the LinnStrument.
 
-Or:
+### LaunchPad & App Colors
 
-```
- 4 67
- 123 5
-```
-
-## Circle of 5ths (Advanced)
-
-### Key Signature
-
-A benefit of this layout is the ability to identify and switch key signatures easily based on position.  As you shift to the left, you add flats.  To the right, you add sharps.  You walk these in a zig-zag motion between both whole tone scales.  Follow the shape of these numbers to see the pattern (from 1 to 7).
+You can change the colors of the launchpad and in the app by setting `colors` and `split_colors` similarly as above.  This supports both hex values (starting with #) and common web color names.
 
 ```
- 2468
-1357
+colors=red,darkred,orange,goldenrod,yellow,green,darkolivegreen,blue,darkslateblue,indigo,darkorchid,pink
 ```
 
-If note 1 is C (no sharps or flats in key signature), moving to 3 adds 2 sharps to the key signature.  Simiarly if you're moving from 3 to 1, it adds two flats (or subtracts sharps).
+## Lite Mode (low GFX)
 
-### Brightness
+To activate lite mode, run midimech with `--lite` on the command line or set `lite=true` in your settings.
 
-Since the layout resembles the circle of 5ths, the further right you go from your tonic, the brighter than sound.  The further left, the darker the sound. This is because the layout resembles a staggered circle of 5ths which corresponds with musical brightness.
+This disables extra graphics and chord analysis in the app to reduce latency on low end systems.
 
-If you take the 3-4 pattern described above and shift your tonic inside of it, the further the tonic is to the left, the brighter the mode, from lydian all the way to locrian (left to right).  This happens with other scale shapes as well.
+## One Channel Mode
 
+MPE mode can be toggled in the app using the `MPE` button.
+
+To send to a specific midi channel, set `one_channel` to the specific channel number.  The default is 0, which indicates using MPE.  Clicking `MPE` in the app toggles this between 0 (MPE) and 1 (first channel), otherwise the value in settings is used.
 
 ## Visualizer
 
@@ -280,13 +228,14 @@ In Synthesia settings, set it as an output device for note lights.
 
 This program is built using the following projects and libraries:
 
-- [Pygame](https://github.com/pygame/pygame)
+- [Pygame](https://github.com/pygame/pygame) and [Pygame-CE](https://github.com/pygame-community/pygame-ce)
 - [Pygame_GUI](https://github.com/MyreMylar/pygame_gui)
 - [RtMidi2](https://github.com/gesellkammer/rtmidi2)
-- [PyMsgbox](https://github.com/asweigart/pymsgbox)
 - [PyGLM](https://github.com/Zuzu-Typ/PyGLM)
 - [Launchpad-Py](https://github.com/FMMT666/launchpad.py) by FMMT666 ([CC Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/))
-- [musicpy](https://github.com/Rainbow-Dreamer/musicpy)
+- [musicpy](https://github.com/Rainbow-Dreamer/musicpy) for Chord Analysis
+- [webcolors](https://pypi.org/project/webcolors/)
+- [pyyaml](https://pypi.org/project/PyYAML/)
 
 Thank you!
 
