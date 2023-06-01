@@ -50,7 +50,10 @@ LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 
 ## Cheat Sheet
 
-[View Full PDF](https://github.com/flipcoder/mech-theory/blob/main/mech-cheatsheet.pdf)
+![Page 1](https://raw.githubusercontent.com/flipcoder/mech-theory/main/mech-cheatsheet-0.png)
+![Page 2](https://raw.githubusercontent.com/flipcoder/mech-theory/main/mech-cheatsheet-1.png)
+
+[View PDF](https://github.com/flipcoder/mech-theory/blob/main/mech-cheatsheet.pdf)
 
 ## Important Notes
 
