@@ -7,12 +7,10 @@
 
 **IN DEVELOPMENT**
 
-Midimech is an alternative musical note layout system for the LinnStrument and LaunchPad X.  It uses a wholetone-based isomorphic layout.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly convincing.  Lacking an isomorphic controller, I used to map this layout to my mechanical keyboard to play.  Because of this, my friends and I referred to it as "playing the mech".  The layout could also be referred to as Wholetone +5 or Diagonal Wicki-Hayden but I still prefer calling it mech.
-
-This project intends to bring the layout to wherever it is capable of being played, starting with the LinnStrument and Launchpad X.
+Midimech is an alternative musical note layout system for the LinnStrument and LaunchPad X.  It uses a wholetone-based isomorphic layout.  I was surprised to find out this layout and its variants were not in common usage, despite being incredibly convincing.  This project intends to help popularize the layout and bring it to more people.
 
 Midimech supports:
-- Use the mech layout on LinnStrument and LaunchPad X
+- Using the mech layout on LinnStrument and LaunchPad X
 - Vibrato detection on LaunchPad X (wiggle your notes!)
 - Bigger range than the default LinnStrument layout
 - Synthesia/DAW visualization for learning songs
@@ -23,7 +21,7 @@ Midimech supports:
 - Custom Lights
 - Great for playing fast arpeggios and piano runs
 
-**Please read the instructions and important notes before usage.  Have fun!**
+**Please read the setup instructions and important notes before usage.  Have fun!**
 
 License: MIT (see *Attributions*)
 
@@ -55,15 +53,23 @@ LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 
 [View PDF](https://github.com/flipcoder/mech-theory/blob/main/mech-cheatsheet.pdf)
 
-## Important Notes
+## What is the Mech Layout?
 
-So far, this has mostly been tested on the LinnStrument 128 version.  If you own the 200-note version, please feel free to test it and let me know how this works for you.
+The name comes from the fact that originally when I discovered it, I didn't yet have an isomorphic controller, so my friends and I used to map it to our mechanical keyboards to play.  Because of this, we referred to it as "playing the mech".  After getting a LinnStrument and LaunchPad, I've continued using this name for the layout itself.  It could also be referred to as the "wholetone layout" or "grid-based Wicki-Hayden" but I still prefer calling it mech.
 
-Midimech sends midi commands to your midi controller and does NOT replace the firmware of your device.  It changes certain settings for the program to function and resets them to common values after ending the program.
+In the layout, each row consists of a whole tone scale and is separated by fourths.  The above cheat sheet document contains many common shapes used for chords and scales. 
 
-This program is *in development*, so some things may be buggy.  If a device persists in a different state after ending the program (such as if a crash occurs), try running the program again and closing it.  Otherwise try reconnecting or resetting it.
+The more you play it, the more you'll notice it is strangely easier than other instrument layouts to learn and play, making it quite fun.  Its relation to the circle of 5ths makes certain music theory concepts easier to visualize and apply as well.
 
-Because it changes the setup of the LinnStrument during usage, it is only recommended for people that are comfortable with setting up and configuring the Linnstrument.
+## Important Notes / Troubleshooting
+
+So far, this has mostly been tested on the LinnStrument 128 and LaunchPad X.  If you own the LinnStrument 200, it might be less stable, so let me know if you run into any issues.  I'm saving up for a LinnStrument 200 so hit that donate button if you want to help out. :)
+
+Midimech sends midi commands to your midi controller and does not replace the firmware of your device.  It changes certain settings for the program to function and resets them to common values after ending the program.
+
+This program is *in development*, so some things may be buggy.  If a device persists in a different state after ending the program (such as if a crash occurs), try running the program again and closing it.  Otherwise try reconnecting or resetting your LinnStrument.
+
+If you have issues with LinnStrument connectivity when the program starts, try recreating the virtual midi device before you start it.
 
 That being said, I hope you enjoy it and have fun!
 
@@ -114,10 +120,6 @@ python3 midimech.py
 - To enable the split, create another midi loopback device called "split" and restart midimech.  Click the SPLIT button.  One side should turn blue.
 
 ## How to Play
-
-### Layout
-
-Each row consists of a whole tone scale and each row is separated by fourths.   The above cheat sheet document contains many common shapes used for chords and scales.  
 
 ### Scales
   
