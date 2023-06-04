@@ -24,6 +24,9 @@ class Articulation:
         self.vibrato_window = 0.5
         self.pressure_ = 0.0
         self.wiggles = 0
+        self.wiggle_in_speed = 3.0
+        self.wiggle_out_speed = 1.0
+        self.wiggle_count = 2
         
         self.mod = 0.0
         self.mod_changed = True
@@ -33,8 +36,8 @@ class Articulation:
         if self.mode in ('false', 'off'):
             self.mode = None
         elif self.mode not in ('mod', 'pitch'):
-            print('Vibrato option must be mod or pitch. Using mod.')
-            self.mode = 'mod'
+            print('Vibrato option must be mod or pitch. Disabling.')
+            self.mode = 'off'
         self.t = 0.0
         self.vibrato_speed = 5.0
         self.vibrato_depth = 1.0 / 4.0
@@ -118,8 +121,7 @@ class Articulation:
                     if msg != self.last_midi_message:
                         self.core.midi_write(self.core.midi_out, msg)
                         self.last_midi_message = msg
-            if self.mode:
-                self.mod_changed = False
+            self.mod_changed = False
         
         # held_note_count = self.core.held_note_count()
         # if held_note_count == 0:
@@ -128,6 +130,9 @@ class Articulation:
     def logic(self, dt):
         self.timer += dt
         self.t += dt
+
+        if self.mode is None:
+            return
         
         self.vibrato_window_t = max(0.0, self.vibrato_window_t - 1.0 * dt)
         if self.vibrato_window_t <= 0.0:
@@ -136,13 +141,13 @@ class Articulation:
             if self.mod >= 0.0:
                 self.mod = 0.0
                 self.mod_changed = True
-        elif self.wiggles >= 2:
+        elif self.wiggles >= self.wiggle_count:
             if self.mod < 1.0:
-                self.mod = min(1.0, self.mod + 1.0 * dt)
+                self.mod = min(1.0, self.mod + 1.0 * dt * self.wiggle_in_speed)
                 self.mod_changed = True
         else:
             if self.mod > 0.0:
-                self.mod = max(0.0, self.mod - 1.0 * dt)
+                self.mod = max(0.0, self.mod - 1.0 * dt * self.wiggle_out_speed)
                 self.mod_changed = True
         
         if self.timer >= self.time_between_ticks:

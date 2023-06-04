@@ -8,12 +8,7 @@ from dataclasses import dataclass
 from glm import ivec2, vec2, ivec3, vec3
 import time
 
-from src.util import *
-from src.constants import *
-from src.note import Note
-from src.settings import DeviceSettings
 from src.core import Core
-from src.gamepad import Gamepad
 
 # suppress pygame messages to keep console clean
 with open(os.devnull, "w") as devnull:

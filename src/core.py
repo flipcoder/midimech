@@ -10,11 +10,12 @@ import time
 
 from src.util import *
 from src.constants import *
-from src.options import Options, DEFAULT_OPTIONS
+from src.settings import Settings, DEFAULT_OPTIONS
 from src.note import Note
-from src.settings import DeviceSettings
+from src.device import Device, DeviceSettings
+from src.launchpad import Launchpad
 from src.articulation import Articulation
-from src.gamepad import Gamepad
+# from src.gamepad import Gamepad
 
 with open(os.devnull, "w") as devnull:
     # suppress pygame messages (to keep console output clean)
@@ -64,6 +65,7 @@ class Core:
     def next_mode(self, ofs=1):
         """Go to next mode according to offset (ofs), wrapping around if necessary"""
         self.set_mode((self.mode_index + ofs) % self.scale_notes.count('x'))
+        self.dirty = self.dirty_lights = True
 
     def prev_scale(self, ofs=1):
         self.next_scale(-ofs)
@@ -73,6 +75,7 @@ class Core:
         self.scale_index = (self.scale_index + ofs) % len(self.scale_db)
         self.scale_name = self.scale_db[self.scale_index]['name']
         self.set_mode(0)
+        self.dirty = self.dirty_lights = True
     
     def set_mode(self, mode: int):
         """Set mode by index (0-indexed)"""
@@ -108,13 +111,18 @@ class Core:
             val = val**self.velocity_curve_
         return val
 
-    def send_cc(self, channel, cc, val):
+    def send_ls_cc(self, channel, cc, val):
         """Send CC to LinnStrument channel with value, if connected"""
         if not self.linn_out:
             return
         # msg = [0xb0 | channel, cc, val]
         self.linn_out.send_cc(channel, cc, val)
         # self.linn_out.send_messages(0xb0, [(channel, cc, val)])
+
+    def send_all_notes_off(self):
+        if not self.midi_out:
+            return
+        self.midi_write(self.midi_out, [0xb0, 123, 0], 0)
 
     def set_light(self, x, y, col, index=None, mark=False):  # col is [1,11], 0 resets
         """Set light to color `col` at x, y if in range and connected"""
@@ -128,20 +136,21 @@ class Core:
 
         self.mark_lights[y][x] = mark
         if self.linn_out:
-            self.send_cc(0, 20, x + 1)
-            self.send_cc(0, 21, self.board_h - y - 1)
-            self.send_cc(0, 22, col)
+            self.send_ls_cc(0, 20, x + 1)
+            self.send_ls_cc(0, 21, self.board_h - y - 1)
+            self.send_ls_cc(0, 22, col)
 
-        if self.launchpad and index is not None:
-            if self.scale_notes[index] != '.':
-                lp_col = self.options.colors[index] / 4
-            else:
-                lp_col = ivec3(0)
-            if 0 <= x < 8 and 0 <= y < 8:
-                if not self.is_macro_button(x, y):
-                    self.launchpad.LedCtrlXY(x, y+1, lp_col[0], lp_col[1], lp_col[2])
+        if index is not None:
+            for lp in self.launchpads:
+                if self.scale_notes[index] != '.':
+                    lp_col = self.options.colors[index] / 4
                 else:
-                    self.launchpad.LedCtrlXY(x, y+1, 63, 63, 63)
+                    lp_col = ivec3(0)
+                if 0 <= x < 8 and 0 <= y < 8:
+                    if not self.is_macro_button(x, y):
+                        lp.out.LedCtrlXY(x, y+1, lp_col[0], lp_col[1], lp_col[2])
+                    else:
+                        lp.out.LedCtrlXY(x, y+1, 63, 63, 63)
 
     def reset_light(self, x, y, reset_red=True):
         """Reset the light at x, y"""
@@ -171,7 +180,7 @@ class Core:
         self.set_light(x, y, light_col, note)
         self.mark_lights[y][x] = False
 
-    def reset_launchpad_light(self, x, y):
+    def reset_launchpad_light(self, x, y, launchpad=None):
         """Reset the launchpad light at x, y"""
         note = self.get_note_index(x, 8-y-1)
         # if self.is_split():
@@ -182,17 +191,18 @@ class Core:
         # light_col = self.options.lights[note]
         # else:
         #     light_col = self.options.lights[note]
-        self.set_launchpad_light(x, y, note)
+        for lp in ([launchpad] if launchpad else self.launchpads):
+            self.set_launchpad_light(x, y, note)
 
-    def set_mark_light(self, x, y, state=True):
+    def set_mark_light(self, x, y, state=True, launchpad=None):
         """Set launchpad light to touched color"""
         self.mark_lights[y][x] = state
-        if self.launchpad:
+        for lp in ([launchpad] if launchpad else self.launchpads):
             lp_col = self.options.mark_color
             if state:
-                self.launchpad.LedCtrlXY(x, y, lp_col[0], lp_col[1], lp_col[2])
+                lp.out.LedCtrlXY(x, y, lp_col[0], lp_col[1], lp_col[2])
 
-    def set_launchpad_light(self, x, y, color):
+    def set_launchpad_light(self, x, y, color, launchpad=None):
         """Set launchpad light to color index"""
         if self.is_macro_button(x, 8 - y - 1):
             col = glm.ivec3(63,63,63)
@@ -204,7 +214,9 @@ class Core:
                     col = glm.ivec3(0,0,0)
             else:
                 col = self.options.mark_color / 4
-        self.launchpad.LedCtrlXY(x, 8-y, col[0], col[1], col[2])
+
+        for lp in ([launchpad] if launchpad else self.launchpads):
+            lp.out.LedCtrlXY(x, 8-y, col[0], col[1], col[2])
 
     def setup_lights(self):
         """Set all lights"""
@@ -302,7 +314,9 @@ class Core:
         y /= int(self.button_sz)
 
         vel = vel / int(self.button_sz)
+        
         vel = 1 - vel
+        
         vel *= 127
         vel = clamp(0, 127, int(vel))
 
@@ -465,7 +479,7 @@ class Core:
     def is_mpe(self):
         return self.options.one_channel == 0
 
-    def note_on(self, data, timestamp, width=None, curve=True, mpe=None, force_channel=None):
+    def note_on(self, data, timestamp, width=None, curve=True, mpe=None, octave=0, transpose=0, force_channel=None):
         # if mpe is None:
         #     mpe = self.options.mpe
         d0 = data[0]
@@ -533,7 +547,8 @@ class Core:
         #     except IndexError:
         #         pass
         
-        data[1] += (self.octave + self.octave_base) * 12
+        data[1] += (self.octave + self.octave_base + octave) * 12
+        data[1] += transpose
         data[1] += BASE_OFFSET
         midinote = data[1] - 24 + self.transpose * 2
         side = self.channel_from_split(col_full, row, force=True)
@@ -577,9 +592,9 @@ class Core:
                 note.midinote = data[1]
                 note.split = split_chan
 
-            if self.options.jazz:
-                if side == 0:
-                    self.left_chord_notes[data[1]] = True
+            # if self.options.jazz:
+            #     if side == 0:
+            #         self.left_chord_notes[data[1]] = True
                     # self.dirty_left_chord = True
         
             self.chord_notes[data[1]] = True
@@ -595,7 +610,7 @@ class Core:
         else:
             self.midi_write(self.midi_out, data, timestamp)
 
-    def note_off(self, data, timestamp, width=None, mpe=None, force_channel=None):
+    def note_off(self, data, timestamp, width=None, mpe=None, octave=0, transpose=0, force_channel=None):
         # if mpe is None:
         #     mpe = self.options.mpe
         
@@ -672,8 +687,9 @@ class Core:
         #     except IndexError:
         #         pass
         
-        data[1] += (self.octave + self.octave_base) * 12
+        data[1] += (self.octave + self.octave_base + octave) * 12
         data[1] += BASE_OFFSET
+        data[1] += transpose
         midinote = data[1] - 24 + self.transpose * 2
         side = self.channel_from_split(col_full, row, force=True)
         if self.is_split():
@@ -685,9 +701,9 @@ class Core:
         if self.flipped:
             data[1] += 7
 
-        if self.options.jazz:
-            if side == 0:
-                self.left_chord_notes[data[1]] = False
+        # if self.options.jazz:
+        #     if side == 0:
+        #         self.left_chord_notes[data[1]] = False
                 # self.dirty_left_chord = True
         
         self.chord_notes[data[1]] = False
@@ -955,22 +971,23 @@ class Core:
         return True
 
     # uses button state events (mk3 pro)
-    def cb_launchpad_in(self, event, timestamp=0):
+    def cb_launchpad_in(self, lp, event, timestamp=0):
         """Launchpad MIDI Callback"""
-        if (self.launchpad_mode == "pro" or self.launchpad_mode == "promk3") and event[0] >= 255:
+        if (lp.mode == "pro" or lp.mode == "promk3") and event[0] >= 255:
         # if event[0] >= 255: # uncomment this for testing pro behavior on launchpad X
             # I'm testing the mk3 method on an lpx, so I'll check this here
-            vel = event[2] if self.launchpad_mode == 'lpx' else event[1]
+            vel = event[2] if lp.mode == 'lpx' else event[1]
             for note in self.note_set:
                 self.midi_write(self.midi_out, [160, note, vel], timestamp)
                 self.articulation.pressure(vel / 127)
-        elif self.launchpad_mode == 'lpx' and event[0] >= 255: # pressure
+        elif lp.mode == 'lpx' and event[0] >= 255: # pressure
             x = event[0] - 255
             y = 8 - (event[1] - 255)
             vel = event[2]
             note = y * 8 + x
+            note += 12
             if not self.is_macro_button(x,  8 - y - 1):
-                self.note_on([160, note, event[2]], timestamp, width=8, force_channel=self.options.launchpad_channel)
+                self.note_on([160, note, event[2]], timestamp, width=8, octave=lp.octave_separation, force_channel=self.options.launchpad_channel)
                 self.articulation.pressure(vel / 127)
             else:
                 self.macro(x, 8 - y - 1, vel / 127)
@@ -978,38 +995,36 @@ class Core:
             x = event[0]
             y = 8 - event[1]
             if 0 <= x < 8 and 0 <= y < 8:
-                self.reset_launchpad_light(x, y)
+                self.reset_launchpad_light(x, y, launchpad=lp)
                 if not self.is_macro_button(x, 8 - y - 1):
                     note = y * 8 + x
-                    self.note_off([128, note, event[2]], timestamp, width=8, force_channel=self.options.launchpad_channel)
+                    self.note_off([128, note, event[2]], timestamp, width=8, octave=lp.octave_separation, force_channel=self.options.launchpad_channel)
                 else:
                     self.macro(x, 8 - y - 1, False)
         else: # note on
             x = event[0]
             y = 8 - event[1]
             if 0 <= x < 8 and 0 <= y < 8:
-                note = y * 8 + x
-                self.set_launchpad_light(x, y, -1)
+                self.set_launchpad_light(x, y, -1, launchpad=lp)
                 if not self.is_macro_button(x, 8 - y - 1):
-                    self.note_on([144, note, event[2]], timestamp, width=8, force_channel=self.options.launchpad_channel)
+                    note = y * 8 + x
+                    self.note_on([144, note, event[2]], timestamp, width=8, octave=lp.octave_separation, force_channel=self.options.launchpad_channel)
                 else:
                     self.macro(x, 8 - y - 1, True)
             else:
-                if self.launchpad_mode == 'lpx':
+                # Launchpad X buttons
+                if lp.mode == 'lpx':
                     if x == 0:
                         self.octave += 1
-                        self.dirty = self.dirty_lights = True
                         self.clear_marks(use_lights=False)
                     elif x == 1:
                         self.octave -= 1
-                        self.dirty = self.dirty_lights = True
                         self.clear_marks(use_lights=False)
                     elif x == 2:
-                        self.transpose_board(-1)
-                        self.dirty = self.dirty_lights = True
+                        self.move_board(-1)
                     elif x == 3:
-                        self.transpose_board(1)
-                        self.dirty = self.dirty_lights = True
+                        self.move_board(1)
+                    # elif x == 4:
 
     # uses raw events (Launchpad X)
     # def cb_launchpad_in(self, event, timestamp=0):
@@ -1033,10 +1048,10 @@ class Core:
     #         self.note_on([160, note, event[2]], timestamp, width=8, mpe=True, curve=False)
     #     elif event[0] == 176:
     #         if event == [176, 93, 127, 0]:
-    #             self.transpose_board(-1)
+    #             self.move_board(-1)
     #             self.dirty = self.dirty_lights = True
     #         elif event == [176, 94, 127, 0]:
-    #             self.transpose_board(1)
+    #             self.move_board(1)
     #             self.dirty = self.dirty_lights = True
             
         # if events[0] >= 255:
@@ -1138,7 +1153,7 @@ class Core:
 
         # print('Scale Count:', scale_count)
 
-        self.options = Options()
+        self.options = Settings()
 
         self.options.colors = get_option(opts, "colors", DEFAULT_OPTIONS.colors)
         self.options.colors = list(self.options.colors.split(","))
@@ -1237,7 +1252,7 @@ class Core:
             opts, "split_out", DEFAULT_OPTIONS.split_out
         )
         self.options.fps = get_option(opts, "fps", DEFAULT_OPTIONS.fps)
-        self.options.fps = get_option(opts, "jazz", DEFAULT_OPTIONS.jazz)
+        # self.options.fps = get_option(opts, "jazz", DEFAULT_OPTIONS.jazz)
         self.options.chord_analyzer = get_option(opts, "chord_analyzer", DEFAULT_OPTIONS.chord_analyzer)
         self.split_state = self.options.split = get_option(
             opts, "split", DEFAULT_OPTIONS.split
@@ -1252,7 +1267,7 @@ class Core:
             opts, "sustain_split", "both"
         )  # left, right, both
         if self.options.sustain_split not in ("left", "right", "both"):
-            print("Invalid sustain split value. Options: left, right, both.")
+            print("Invalid sustain split value. Settings: left, right, both.")
             sys.exit(1)
 
         hardware_split = False
@@ -1391,22 +1406,22 @@ class Core:
         self.btn_octave_up = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x + 2, y), bs), text="OCT>", manager=self.gui
         )
-        self.btn_prev_root = pygame_gui.elements.UIButton(
+        self.btn_transpose_down = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x * 2 + 2, y), (bs.x, bs.y)),
             text='<TR',
             manager=self.gui
         )
-        self.btn_next_root = pygame_gui.elements.UIButton(
+        self.btn_transpose_up = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x * 3 + 2, y), (bs.x, bs.y)),
             text='TR>',
             manager=self.gui
         )
-        self.btn_transpose_down = pygame_gui.elements.UIButton(
+        self.btn_move_left = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x * 4 + 2, y), bs),
             text="<MOV",
             manager=self.gui,
         )
-        self.btn_transpose_up = pygame_gui.elements.UIButton(
+        self.btn_move_right = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x * 5 + 2, y), bs),
             text="MOV>",
             manager=self.gui,
@@ -1549,15 +1564,13 @@ class Core:
 
         self.midi_in = None
         self.visualizer = None
-        self.launchpad = None
-        self.launchpad_mode = None
         
-        self.gamepad = None
-        if self.options.experimental:
-            pygame.joystick.init()
-            if pygame.joystick.get_count() > 0:
-                self.gamepad = Gamepad(self, 0)
-                print('Gamepad initialized')
+        # self.gamepad = None
+        # if self.options.experimental:
+        #     pygame.joystick.init()
+        #     if pygame.joystick.get_count() > 0:
+        #         self.gamepad = Gamepad(self, 0)
+        #         print('Gamepad initialized')
 
         innames = rtmidi2.get_in_ports()
         for i in range(len(innames)):
@@ -1579,32 +1592,37 @@ class Core:
                 self.foot_in.open_port(i)
                 self.foot_in.callback = self.cb_foot
 
+        self.launchpads = []
         if self.options.launchpad:
-            lp = None
-            if self.options.experimental:
-                lp = launchpad.LaunchpadPro()
-                if lp.Check(0):
-                    if lp.Open(0):
-                        self.launchpad_mode = "pro"
+            launchpads = []
+            lp = launchpad.LaunchpadPro()
+            if lp.Check(0):
+                if lp.Open(0):
+                    self.launchpads += [Launchpad(lp, "pro")]
             if launchpad.LaunchpadProMk3().Check(0):
                 lp = launchpad.LaunchpadProMk3()
                 if lp.Open(0):
-                    self.launchpad_mode = "promk3"
-            if not self.launchpad_mode:
-                if launchpad.LaunchpadLPX().Check(1):
+                    self.launchpads += [Launchpad(lp, "promk3", 0)]
+            if launchpad.LaunchpadLPX().Check(1):
+                lp = launchpad.LaunchpadLPX()
+                if lp.Open(1):
+                    self.launchpads += [Launchpad(lp, "lpx", 0)]
+                if launchpad.LaunchpadLPX().Check(3):
                     lp = launchpad.LaunchpadLPX()
-                    if lp.Open(1):
-                        self.launchpad_mode = "lpx"
-            if self.launchpad_mode is not None:
-                self.launchpad = lp
+                    if lp.Open(3): # second
+                        self.launchpads += [Launchpad(lp, "lpx", 1, 1)]
+
+        if self.launchpads:
+            print('Launchpads:', len(self.launchpads))
 
         self.done = False
 
-        if self.launchpad_mode == "lpx":
-            lp.LedCtrlXY(0, 0, 0, 0, 63)
-            lp.LedCtrlXY(1, 0, 0, 0, 63)
-            lp.LedCtrlXY(2, 0, 63, 0, 63)
-            lp.LedCtrlXY(3, 0, 63, 0, 63)
+        for lp in self.launchpads:
+            if lp.mode == "lpx":
+                lp.out.LedCtrlXY(0, 0, 0, 0, 63)
+                lp.out.LedCtrlXY(1, 0, 0, 0, 63)
+                lp.out.LedCtrlXY(2, 0, 63, 0, 63)
+                lp.out.LedCtrlXY(3, 0, 63, 0, 63)
 
         # if self.launchpad:
         #     # use the alternate colors
@@ -1633,8 +1651,8 @@ class Core:
         # self.retro_font = pygame.font.Font("PressStart2P.ttf", FONT_SZ)
         self.clock = pygame.time.Clock()
 
-        # if transpose_board:
-        #     self.transpose_board(transpose_board)
+        # if move_board:
+        #     self.move_board(move_board)
 
         # self.setup_lights()
 
@@ -1673,9 +1691,9 @@ class Core:
             self.rpn(200, 1 if on else 0) # split active
 
             # lights
-            self.send_cc(0, 20, 0)
-            self.send_cc(0, 21, 1)
-            self.send_cc(0, 22, 7 if on else 0)
+            self.send_ls_cc(0, 20, 0)
+            self.send_ls_cc(0, 21, 1)
+            self.send_ls_cc(0, 22, 7 if on else 0)
         else:
             self.rpn(200, 0)
 
@@ -1747,9 +1765,9 @@ class Core:
             self.rpn(137, 13)
 
             # turn transpose light off
-            self.send_cc(0, 20, 0)
-            self.send_cc(0, 21, 4)
-            self.send_cc(0, 22, 7)
+            self.send_ls_cc(0, 20, 0)
+            self.send_ls_cc(0, 21, 4)
+            self.send_ls_cc(0, 22, 7)
 
         else:
             self.rpn(36, 5)
@@ -1760,12 +1778,14 @@ class Core:
     # def test(self):
     #     self.transpose_rpn()
 
-    def transpose_board(self, val):
+    def move_board(self, val):
+        self.send_all_notes_off()
+        
         aval = abs(val)
         if aval > 1:  # more than one shift
             sval = sign(val)
             for rpt in range(aval):
-                self.transpose_board(sval)
+                self.move_board(sval)
                 self.transpose += sval
         elif val == 1:  # shift right (add column left)
             for y in range(len(self.board)):
@@ -1775,6 +1795,7 @@ class Core:
             for y in range(len(self.board)):
                 self.board[y] = self.board[y][1:] + [0]
             self.transpose += val
+        self.dirty = self.dirty_lights = True
 
     def quit(self):
         self.reset_lights()
@@ -1797,7 +1818,7 @@ class Core:
                     # else:
                     self.reset_light(x, y)
             y += 1
-        self.dirty = True
+        self.dirty = self.dirty_lights = True
 
     def mark_xy(self, x, y, state, use_lights=False):
         if self.flipped:
@@ -1879,11 +1900,12 @@ class Core:
             self.transpose -= 6
         else:
             self.transpose = (self.tonic // 2) % 6
+        self.dirty = self.dirty_lights = True
 
     def logic(self, dt):
         # keys = pygame.key.get_pressed()
 
-        if self.launchpad:
+        for lp in self.launchpads:
             # while True:
             #     events = self.launchpad.EventRaw()
             #     if events != []:
@@ -1892,9 +1914,9 @@ class Core:
             #     else:
             #         break
             while True:
-                event = self.launchpad.ButtonStateXY(returnPressure = True)
+                event = lp.out.ButtonStateXY(returnPressure = True)
                 if event:
-                    self.cb_launchpad_in(event)
+                    self.cb_launchpad_in(lp, event)
                 else:
                     break
         
@@ -1930,15 +1952,15 @@ class Core:
                 except KeyError:
                     pass
 
-            else:
-                if self.gamepad and ev.type in (\
-                        pygame.JOYAXISMOTION,
-                        pygame.JOYBALLMOTION,
-                        pygame.JOYBUTTONDOWN,
-                        pygame.JOYBUTTONUP,
-                        pygame.JOYHATMOTION
-                    ):
-                        self.gamepad.event(ev)
+            # else:
+                # if self.gamepad and ev.type in (\
+                #         pygame.JOYAXISMOTION,
+                #         pygame.JOYBALLMOTION,
+                #         pygame.JOYBUTTONDOWN,
+                #         pygame.JOYBUTTONUP,
+                #         pygame.JOYHATMOTION
+                #     ):
+                #         self.gamepad.event(ev)
                 
             if not self.options.lite:
                 if ev.type == pygame.MOUSEMOTION:
@@ -1965,13 +1987,11 @@ class Core:
                         self.octave += 1
                         self.dirty = self.dirty_lights = True
                         self.clear_marks(use_lights=False)
-                    elif ev.ui_element == self.btn_transpose_down:
-                        self.transpose_board(-1)
-                        self.dirty = self.dirty_lights = True
+                    elif ev.ui_element == self.btn_move_left:
+                        self.move_board(-1)
                         self.clear_marks(use_lights=False)
-                    elif ev.ui_element == self.btn_transpose_up:
-                        self.transpose_board(1)
-                        self.dirty = self.dirty_lights = True
+                    elif ev.ui_element == self.btn_move_right:
+                        self.move_board(1)
                         self.clear_marks(use_lights=False)
                     # elif ev.ui_element == self.btn_mode:
                     #     # TODO: toggle mode
@@ -1992,11 +2012,9 @@ class Core:
                             self.transpose -= 3
                             self.rotated = True
                         self.clear_marks(use_lights=False)
-                        self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_flip:
                         self.flipped = not self.flipped
                         self.clear_marks(use_lights=False)
-                        self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_split:
                         if self.split_out:
                             self.split_state = not self.split_state
@@ -2015,24 +2033,18 @@ class Core:
                         )
                         self.midi_mode_rpn()
                         self.dirty = True
-                    elif ev.ui_element == self.btn_prev_root:
+                    elif ev.ui_element == self.btn_transpose_down:
                         self.set_tonic(self.tonic - 1)
-                        self.dirty = self.dirty_lights = True
-                    elif ev.ui_element == self.btn_next_root:
+                    elif ev.ui_element == self.btn_transpose_up:
                         self.set_tonic(self.tonic + 1)
-                        self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_next_scale:
                         self.next_scale()
-                        self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_prev_scale:
                         self.prev_scale()
-                        self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_next_mode:
                         self.next_mode()
-                        self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_prev_mode:
                         self.prev_mode()
-                        self.dirty = self.dirty_lights = True
                 # elif ev.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
                 #     if ev.ui_element == self.slider_velocity:
                 #         global self.options.velocity_curve
@@ -2041,11 +2053,11 @@ class Core:
 
                 self.gui.process_events(ev)
         
-        if self.launchpad:
+        if self.launchpads:
             self.articulation.logic(dt)
 
-        if self.gamepad:
-            self.gamepad.logic(dt)
+        # if self.gamepad:
+        #     self.gamepad.logic(dt)
 
         # figure out the lowest note to highlight it
         # if self.options.show_lowest_note:
@@ -2102,9 +2114,9 @@ class Core:
             #     note.logic(dt)
 
             # chord analysis for jazz mod
-            if self.options.jazz:
-                if self.dirty_chord:
-                    self.left_chord = self.analyze(self.left_chord_notes)
+            # if self.options.jazz:
+            #     if self.dirty_chord:
+            #         self.left_chord = self.analyze(self.left_chord_notes)
             
             # chord analyzer
             if self.options.chord_analyzer:
@@ -2279,31 +2291,31 @@ class Core:
                 x += 1
             y += 1
 
-        if self.gamepad:
-            pos = self.gamepad.positions()
-            # gp_pos.y = self.board_h - y - 1
+        # if self.gamepad:
+        #     pos = self.gamepad.positions()
+        #     # gp_pos.y = self.board_h - y - 1
             
-            circ = [None] * 2
-            for i in range(2):
-                circ[i] = ivec2(
-                    int(pos[i].x * sz + b / 2 + sz / 2),
-                    int(self.menu_sz + pos[i].y * sz + b / 2 + sz / 2),
-                )
+        #     circ = [None] * 2
+        #     for i in range(2):
+        #         circ[i] = ivec2(
+        #             int(pos[i].x * sz + b / 2 + sz / 2),
+        #             int(self.menu_sz + pos[i].y * sz + b / 2 + sz / 2),
+        #         )
                 
-                pygame.gfxdraw.aacircle(
-                    self.screen.surface,
-                    circ[i].x + 1,
-                    circ[i].y - 1,
-                    rad,
-                    ivec3(0, 255, 0),
-                )
-                # pygame.gfxdraw.filled_circle(
-                #     self.screen.surface,
-                #     circ[i].x + 1,
-                #     circ[i].y - 1,
-                #     rad,
-                #     ivec3(0, 255, 0),
-                # )
+        #         pygame.gfxdraw.aacircle(
+        #             self.screen.surface,
+        #             circ[i].x + 1,
+        #             circ[i].y - 1,
+        #             rad,
+        #             ivec3(0, 255, 0),
+        #         )
+        #         # pygame.gfxdraw.filled_circle(
+        #         #     self.screen.surface,
+        #         #     circ[i].x + 1,
+        #         #     circ[i].y - 1,
+        #         #     rad,
+        #         #     ivec3(0, 255, 0),
+        #         # )
 
         # if self.options.experimental:
         text = self.font.render(self.scale_name, True, ivec3(127))
@@ -2405,9 +2417,10 @@ class Core:
         return 0
 
     def deinit(self):
-        if self.launchpad:
-            self.launchpad.Reset()
-            self.launchpad.LedSetMode(0)
+        for lp in self.launchpads:
+            if lp.out:
+                lp.out.Reset()
+                lp.out.LedSetMode(0)
         for out in self.out:
             out.close()
             out.abort()
