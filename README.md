@@ -55,11 +55,11 @@ LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 
 ## What is the Mech Layout?
 
-The name comes from the fact that originally when I discovered it, I didn't yet have an isomorphic controller, so my friends and I used to map it to our mechanical keyboards to play.  Because of this, we referred to it as "playing the mech".  After getting a LinnStrument and LaunchPad, I've continued using this name for the layout itself.  It could also be referred to as the "wholetone layout" or "grid-based Wicki-Hayden" but I still prefer calling it mech.
+When I originally discovered this layout, I didn't yet have an isomorphic controller, so my friends and I would map it to my mechanical keyboard to play.  Because of this, we referred to it as "playing the mech".  After getting a LinnStrument and LaunchPad, I've continued using this name for the layout itself.  It could also be referred to as the "wholetone layout" or "grid-based Wicki-Hayden" but I still prefer calling it mech.
 
-In the layout, each row consists of a whole tone scale and is separated by fourths.  The above cheat sheet document contains many common shapes used for chords and scales. 
+In the layout, each row consists of a whole tone scale separated by fourths.  The above cheat sheet document contains many common chord and scale shapes. 
 
-The more you play it, the more you'll notice it is strangely easier than other instrument layouts to learn and play, making it quite fun.  Its relation to the circle of 5ths makes certain music theory concepts easier to visualize and apply as well.
+The more you play, the more you'll notice it is much easier than other instrument layouts to learn and play, making it quite fun.  Its relation to the circle of 5ths makes certain music theory concepts easier to visualize and apply as well.
 
 ## Important Notes / Troubleshooting
 
