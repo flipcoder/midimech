@@ -122,7 +122,10 @@ class Core:
     def send_all_notes_off(self):
         if not self.midi_out:
             return
-        self.midi_write(self.midi_out, [0xb0, 123, 0], 0)
+        # for ch in range(0,15):
+        ch = 0
+        self.midi_write(self.midi_out, [0xb0 | ch, 120, 0], 0)
+        self.midi_write(self.midi_out, [0xb0 | ch, 123, 0], 0)
 
     def set_light(self, x, y, col, index=None, mark=False):  # col is [1,11], 0 resets
         """Set light to color `col` at x, y if in range and connected"""
@@ -933,6 +936,8 @@ class Core:
             self.mark(data[1] + self.vis_octave * 12, 1, True)
         elif msg == 8:  # note off
             self.mark(data[1] + self.vis_octave * 12, 0, True)
+        # else:
+            # print(msg, data)
 
     def cb_foot(self, data, timestamp):
         """Foot controller MIDI Callback"""
@@ -1818,7 +1823,9 @@ class Core:
                     # else:
                     self.reset_light(x, y)
             y += 1
-        self.dirty = self.dirty_lights = True
+        self.dirty = True
+        if use_lights:
+            self.dirty_lights = True
 
     def mark_xy(self, x, y, state, use_lights=False):
         if self.flipped:
@@ -1927,6 +1934,9 @@ class Core:
             elif ev.type == pygame.KEYDOWN:
                 if ev.key == pygame.K_ESCAPE:
                     self.quit()
+                elif ev.key == pygame.K_F1:
+                    self.clear_marks(use_lights=True)
+                    self.send_all_notes_off()
                 else:
                     try:
                         n = self.keys[ev.key]
@@ -2011,9 +2021,11 @@ class Core:
                         else:
                             self.transpose -= 3
                             self.rotated = True
+                        self.dirty = self.dirty_lights = True
                         self.clear_marks(use_lights=False)
                     elif ev.ui_element == self.btn_flip:
                         self.flipped = not self.flipped
+                        self.dirty = self.dirty_lights = True
                         self.clear_marks(use_lights=False)
                     elif ev.ui_element == self.btn_split:
                         if self.split_out:
