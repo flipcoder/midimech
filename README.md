@@ -3,7 +3,7 @@
 
 ![midimech](https://i.imgur.com/iNKaTi3.png)
 
-[![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://paypal.me/GradyOConnell?country.x=US&locale.x=en_US)
+<a href="https://www.buymeacoffee.com/flipcoder" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
 
 **IN DEVELOPMENT**
 
