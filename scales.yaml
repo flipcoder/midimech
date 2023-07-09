@@ -125,3 +125,6 @@
   notes: 'x.x.xx.xxx.x'
 - name: Minor Bebop
   notes: 'x.xxxx.x.xx.'
+- name: Chromatic
+  notes: 'xxxxxxxxxxxx'
+  duplicates: true

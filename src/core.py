@@ -574,9 +574,9 @@ class Core:
         x = col
         midinote = row_offset * y + column_offset * x
         midinote += 32
+        midinote += 12 * octave
         if self.flipped:
             midinote += 7
-        data[1] = midinote
 
         # print(x, y, midinote)
         # return
@@ -606,11 +606,25 @@ class Core:
         # data[1] += BASE_OFFSET
         # midinote = data[1] - 24 + self.transpose * 2
         col_full = x + (left_width if within_hardware_split else 0)
+        
+        # figure out if note is on left or right side
         side = self.channel_from_split(col_full, row, force=True)
+
+        # if the note is on the right side, we shift by the current octave split
+        if side == 1:
+            octave_split = self.options.octave_split
+            if octave_split != 0:
+                midinote += 12 * octave_split
+
+        # if we have a split set up, set the side found above to split_chan,
+        #   otherwise everything should be in the same region
         if self.is_split():
             split_chan = side
         else:
             split_chan = 0
+
+        data[1] = midinote
+        
         if not aftertouch:
             self.mark(midinote - 24, 1, only_row=row)
         # data[1] += self.out_octave * 12 + self.transpose * 2
@@ -663,6 +677,7 @@ class Core:
             else:
                 self.midi_write(self.split_out, data, timestamp)
         else:
+            # print(data[1]) # midi note number
             self.midi_write(self.midi_out, data, timestamp)
 
     def note_off(self, data, timestamp, width=None, mpe=None, octave=0, transpose=0, force_channel=None):
@@ -758,17 +773,27 @@ class Core:
         x = col
         midinote = row_offset * y + column_offset * x
         midinote += 32
+        midinote += 12 * octave
         if self.flipped:
             midinote += 7
         # print('off', x, y, midinote)
-        data[1] = midinote
         
         col_full = x + (left_width if within_hardware_split else 0)
         side = self.channel_from_split(col_full, y, force=True)
+
+        # if the note is on the right side, we shift by the current octave split
+        if side == 1:
+            octave_split = self.options.octave_split
+            if octave_split != 0:
+                midinote += 12 * octave_split
+        
         if self.is_split():
             split_chan = side
         else:
             split_chan = 0
+
+        data[1] = midinote
+        
         self.mark(midinote - 24, 0, only_row=y)
         # data[1] += self.out_octave * 12 + self.transpose * 2
         # if self.flipped:
@@ -1354,6 +1379,9 @@ class Core:
             print("Invalid sustain split value. Settings: left, right, both.")
             sys.exit(1)
 
+        self.options.octave_separation = get_option(opts, "octave_separation", DEFAULT_OPTIONS.octave_separation)
+        self.options.octave_split = get_option(opts, "octave_split", DEFAULT_OPTIONS.octave_split)
+
         hardware_split = False
         self.options.size = get_option(opts, "size", DEFAULT_OPTIONS.size)
         if self.options.size == 128:
@@ -1682,7 +1710,7 @@ class Core:
             lp = launchpad.LaunchpadPro()
             if lp.Check(0):
                 if lp.Open(0):
-                    self.launchpads += [Launchpad(lp, "pro")]
+                    self.launchpads += [Launchpad(lp, "pro", 0)]
             if launchpad.LaunchpadProMk3().Check(0):
                 lp = launchpad.LaunchpadProMk3()
                 if lp.Open(0):
@@ -1694,7 +1722,7 @@ class Core:
                 if launchpad.LaunchpadLPX().Check(3):
                     lp = launchpad.LaunchpadLPX()
                     if lp.Open(3): # second
-                        self.launchpads += [Launchpad(lp, "lpx", 1, 1)]
+                        self.launchpads += [Launchpad(lp, "lpx", 1, self.options.octave_separation)]
 
         if self.launchpads:
             print('Launchpads:', len(self.launchpads))

@@ -100,5 +100,11 @@ class Settings:
     column_offset: int = 2
     base_offset: int = 4
 
+    # octave separation between multiple launchpads
+    octave_separation: int = 1
+    
+    # octave splitting the linn and transposing octaves on the right side
+    octave_split: int = 0
+
 DEFAULT_OPTIONS = Settings()
 
