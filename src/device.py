@@ -9,5 +9,8 @@ class DeviceSettings:
     bend: int
 
 class Device:
-    pass
+    def __init__(self, core):
+        self.core = core
+        self.octave = 0
+        self.transpose = 0
 

@@ -91,7 +91,7 @@ class Settings:
     
     chord_analyzer: bool = True
 
-    # Allow Y axis to bend chromatically (not yet impl)
+    # Allow Y axis to bend chromatically
     y_bend: bool = False
 
     bend_range: int = 24

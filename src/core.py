@@ -47,6 +47,7 @@ except ImportError:
     error("The project dependencies have changed! Run the requirements setup command again!")
 
 class Core:
+    CORE = None
     
     def rotate_mode(self, notes: str, mode: int):
         """Rotates a mode string (see: scales.yaml strings with x and .)"""
@@ -135,7 +136,7 @@ class Core:
             return
 
         if not index:
-            index = self.get_note_index(x, y)
+            index = self.get_note_index(x, y, transpose=False)
 
         self.mark_lights[y][x] = mark
         if self.linn_out:
@@ -169,8 +170,8 @@ class Core:
 
     def reset_light(self, x, y, reset_red=True):
         """Reset the light at x, y"""
-        note = self.get_note_index(x, y)
-        # print(note)
+        note = self.get_note_index(x, y, transpose=False)
+        
         if self.is_split():
             split_chan = self.channel_from_split(x, self.board_h - y - 1)
             if split_chan:
@@ -197,7 +198,7 @@ class Core:
 
     def reset_launchpad_light(self, x, y, launchpad=None):
         """Reset the launchpad light at x, y"""
-        note = self.get_note_index(x, 8-y-1)
+        note = self.get_note_index(x, 8-y-1, transpose=False)
         # if self.is_split():
         #     split_chan = self.channel_from_split(x, self.board_h - y - 1)
         #     if split_chan:
@@ -270,28 +271,30 @@ class Core:
     #     except IndexError:
     #         pass
 
-    def xy_to_midi(self, x, y):
+    def xy_to_midi(self, x, y, transpose=True):
         """x, y coordinate to midi note based on layout (this can be improved)"""
         y = self.board_h - y - 1
         column_offset = self.options.column_offset
         row_offset = self.options.row_offset
         xx = x + self.options.base_offset
-        r = row_offset * y + column_offset * xx
+        r = row_offset * y + (column_offset * (xx + self.position.x))
         r += 24
         if self.flipped:
             r += 7
+        r += self.tonic if transpose else 0
         # print(x, y, r)
         return r
 
     def get_note_index(self, x, y, transpose=True):
         """Get the note index (0-11) for a given x, y"""
         y += self.flipped
-        x += self.transpose
+        x += self.position.x
         column_offset = self.options.column_offset
         row_offset = self.options.row_offset
         y = self.board_h - y - 1
         x += self.options.base_offset
-        return (row_offset * y + column_offset * x) % len(NOTES)
+        tr = self.tonic if transpose else 0
+        return (row_offset * y + column_offset * x + tr) % len(NOTES)
         # ofs = (self.board_h - y) // 2 + BASE_OFFSET
         # step = 2 if WHOLETONE else 1
         # tr = self.tonic if transpose else 0
@@ -307,7 +310,7 @@ class Core:
     def get_color(self, x, y):
         """Get color for x, y"""
         # return NOTE_COLORS[get_note_index(x, y)]
-        note = self.get_note_index(x, y)
+        note = self.get_note_index(x, y, transpose=False)
         # note = (note - self.tonic) % 12
         # if self.is_split():
         #     split_chan = self.channel_from_split(x, self.board_h - y - 1)
@@ -448,11 +451,11 @@ class Core:
         # if self.flipped:
         #     if self.tonic % 2 == 0:
         #         y -= 1
-        #     octave = int(x + 4 + self.transpose + y * 2.5) // 6
+        #     octave = int(x + 4 + self.position.x + y * 2.5) // 6
         # else:
         if self.tonic % 2:
             y -= 1
-        octave = int(x + 4 + self.transpose + y * 2.5) // 6
+        octave = int(x + 4 + self.position.x + y * 2.5) // 6
         return octave
 
     def held_note_count(self):
@@ -574,9 +577,12 @@ class Core:
         x = col
         midinote = row_offset * y + column_offset * x
         midinote += 32
-        midinote += 12 * octave
         if self.flipped:
             midinote += 7
+        visual_midinote = midinote
+        midinote += 12 * (octave + self.octave)
+        midinote += self.options.column_offset * self.position.x
+        midinote += transpose + self.tonic
 
         # print(x, y, midinote)
         # return
@@ -604,7 +610,7 @@ class Core:
         # data[1] += (self.octave + self.octave_base + octave) * 12
         # data[1] += transpose
         # data[1] += BASE_OFFSET
-        # midinote = data[1] - 24 + self.transpose * 2
+        # midinote = data[1] - 24 + self.position.x * 2
         col_full = x + (left_width if within_hardware_split else 0)
         
         # figure out if note is on left or right side
@@ -626,8 +632,8 @@ class Core:
         data[1] = midinote
         
         if not aftertouch:
-            self.mark(midinote - 24, 1, only_row=row)
-        # data[1] += self.out_octave * 12 + self.transpose * 2
+            self.mark(visual_midinote - 24, 1, only_row=row)
+        # data[1] += self.out_octave * 12 + self.position.x * 2
         # if self.flipped:
         #     data[1] += 7
         
@@ -760,7 +766,7 @@ class Core:
         # data[1] += (self.octave + self.octave_base + octave) * 12
         # data[1] += BASE_OFFSET
         # data[1] += transpose
-        # midinote = data[1] - 24 + self.transpose * 2
+        # midinote = data[1] - 24 + self.position.x * 2
 
         row = data[1] // width
         col = data[1] % width
@@ -773,9 +779,12 @@ class Core:
         x = col
         midinote = row_offset * y + column_offset * x
         midinote += 32
-        midinote += 12 * octave
         if self.flipped:
             midinote += 7
+        visual_midinote = midinote
+        midinote += 12 * (octave + self.octave)
+        midinote += self.options.column_offset * self.position.x
+        midinote += transpose + self.tonic
         # print('off', x, y, midinote)
         
         col_full = x + (left_width if within_hardware_split else 0)
@@ -794,8 +803,8 @@ class Core:
 
         data[1] = midinote
         
-        self.mark(midinote - 24, 0, only_row=y)
-        # data[1] += self.out_octave * 12 + self.transpose * 2
+        self.mark(visual_midinote - 24, 0, only_row=y)
+        # data[1] += self.out_octave * 12 + self.position.x * 2
         # if self.flipped:
         #     data[1] += 7
 
@@ -1087,7 +1096,7 @@ class Core:
             note = y * 8 + x
             note += 12
             if not self.is_macro_button(x,  8 - y - 1):
-                self.note_on([160, note, event[2]], timestamp, width=8, octave=lp.octave_separation, force_channel=self.options.launchpad_channel)
+                self.note_on([160, note, event[2]], timestamp, width=8, transpose=lp.transpose, octave=lp.get_octave(), force_channel=self.options.launchpad_channel)
                 self.articulation.pressure(vel / 127)
             else:
                 self.macro(x, 8 - y - 1, vel / 127)
@@ -1098,7 +1107,7 @@ class Core:
                 self.reset_launchpad_light(x, y, launchpad=lp)
                 if not self.is_macro_button(x, 8 - y - 1):
                     note = y * 8 + x
-                    self.note_off([128, note, event[2]], timestamp, width=8, octave=lp.octave_separation, force_channel=self.options.launchpad_channel)
+                    self.note_off([128, note, event[2]], timestamp, width=8, transpose=lp.transpose, octave=lp.get_octave(), force_channel=self.options.launchpad_channel)
                 else:
                     self.macro(x, 8 - y - 1, False)
         else: # note on
@@ -1108,23 +1117,12 @@ class Core:
                 self.set_launchpad_light(x, y, -1, launchpad=lp)
                 if not self.is_macro_button(x, 8 - y - 1):
                     note = y * 8 + x
-                    self.note_on([144, note, event[2]], timestamp, width=8, octave=lp.octave_separation, force_channel=self.options.launchpad_channel)
+                    self.note_on([144, note, event[2]], timestamp, width=8, transpose=lp.transpose, octave=lp.get_octave(), force_channel=self.options.launchpad_channel)
                 else:
                     self.macro(x, 8 - y - 1, True)
             else:
                 # Launchpad X buttons
-                if lp.mode == 'lpx':
-                    if x == 0:
-                        self.octave += 1
-                        self.clear_marks(use_lights=False)
-                    elif x == 1:
-                        self.octave -= 1
-                        self.clear_marks(use_lights=False)
-                    elif x == 2:
-                        self.move_board(-1)
-                    elif x == 3:
-                        self.move_board(1)
-                    # elif x == 4:
+                lp.button(x, 8 - y - 1)
 
     # uses raw events (Launchpad X)
     # def cb_launchpad_in(self, event, timestamp=0):
@@ -1212,6 +1210,8 @@ class Core:
         self.quit()
 
     def __init__(self):
+        Core.CORE = self
+        
         signal.signal(signal.SIGINT, self.sig)
         signal.signal(signal.SIGTERM, self.sig)
          
@@ -1448,7 +1448,8 @@ class Core:
             -2
         )  # this is for both the visualizer and the keyboard simulator marking atm
         self.octave_base = -2
-        self.transpose = 0
+        # self.position.x = 0
+        self.position = glm.ivec2(0, 0) # only x is used right now
         self.rotated = False  # transpose -3 whole steps
         self.flipped = False  # vertically shift +1
         self.config_save_timer = 1.0
@@ -1710,19 +1711,19 @@ class Core:
             lp = launchpad.LaunchpadPro()
             if lp.Check(0):
                 if lp.Open(0):
-                    self.launchpads += [Launchpad(lp, "pro", 0)]
+                    self.launchpads += [Launchpad(self, lp, "pro", 0)]
             if launchpad.LaunchpadProMk3().Check(0):
                 lp = launchpad.LaunchpadProMk3()
                 if lp.Open(0):
-                    self.launchpads += [Launchpad(lp, "promk3", 0)]
+                    self.launchpads += [Launchpad(self, lp, "promk3", 0)]
             if launchpad.LaunchpadLPX().Check(1):
                 lp = launchpad.LaunchpadLPX()
                 if lp.Open(1):
-                    self.launchpads += [Launchpad(lp, "lpx", 0)]
+                    self.launchpads += [Launchpad(self, lp, "lpx", 0)]
                 if launchpad.LaunchpadLPX().Check(3):
                     lp = launchpad.LaunchpadLPX()
                     if lp.Open(3): # second
-                        self.launchpads += [Launchpad(lp, "lpx", 1, self.options.octave_separation)]
+                        self.launchpads += [Launchpad(self, lp, "lpx", 1, self.options.octave_separation)]
 
         if self.launchpads:
             print('Launchpads:', len(self.launchpads))
@@ -1730,11 +1731,7 @@ class Core:
         self.done = False
 
         for lp in self.launchpads:
-            if lp.mode == "lpx":
-                lp.out.LedCtrlXY(0, 0, 0, 0, 63)
-                lp.out.LedCtrlXY(1, 0, 0, 0, 63)
-                lp.out.LedCtrlXY(2, 0, 63, 0, 63)
-                lp.out.LedCtrlXY(3, 0, 63, 0, 63)
+            lp.set_lights()
 
         # if self.launchpad:
         #     # use the alternate colors
@@ -1899,18 +1896,19 @@ class Core:
         
         aval = abs(val)
         if aval > 1:  # more than one shift
-            sval = sign(val)
-            for rpt in range(aval):
-                self.move_board(sval)
-                self.transpose += sval
+            assert False
+            # sval = sign(val)
+            # for rpt in range(aval):
+            #     self.move_board(sval)
+            #     self.position.x += sval
         elif val == 1:  # shift right (add column left)
             for y in range(len(self.board)):
                 self.board[y] = [0] + self.board[y][:-1]
-            self.transpose += val
+            self.position.x += val
         elif val == -1:  # shift left (add column right)
             for y in range(len(self.board)):
                 self.board[y] = self.board[y][1:] + [0]
-            self.transpose += val
+            self.position.x += val
         self.dirty = self.dirty_lights = True
 
     def quit(self):
@@ -2008,16 +2006,23 @@ class Core:
         return self.split_state and self.split_out
 
     def set_tonic(self, val):
-        odd = (self.tonic % 2 == 1)
+        self.send_all_notes_off()
+        
         self.tonic = val
-        new_odd = (self.tonic % 2 == 1)
-        if odd != new_odd:
-            self.flipped = not self.flipped
-        if new_odd:
-            self.transpose = (self.tonic // 2 - 3) % 6
-            self.transpose -= 6
-        else:
-            self.transpose = (self.tonic // 2) % 6
+        # print('val', val)
+        # odd = (self.tonic % 2 == 1)
+        # self.tonic = val
+        # print('new tonic', self.tonic)
+        # new_odd = (self.tonic % 2 == 1)
+        # # if odd != new_odd:
+        # #     self.flipped = not self.flipped
+        # if new_odd:
+        #     self.position.x = (self.tonic // 2 - 3) % 6
+        #     self.position.x -= 6
+        # else:
+        #     self.position.x = (self.tonic // 2) % 6
+        # print('new pos', self.position.x)
+        
         self.dirty = self.dirty_lights = True
 
     def logic(self, dt):
@@ -2127,10 +2132,10 @@ class Core:
                     #     self.dirty = True
                     elif ev.ui_element == self.btn_rotate:
                         if self.rotated:
-                            self.transpose += 3
+                            self.position.x += 3
                             self.rotated = False
                         else:
-                            self.transpose -= 3
+                            self.position.x -= 3
                             self.rotated = True
                         self.dirty = self.dirty_lights = True
                         self.clear_marks(use_lights=False)
@@ -2300,7 +2305,7 @@ class Core:
             x = 0
             for cell in row:
                 # write text
-                note = self.get_note(x, y, False)
+                note = self.get_note(x, y, True)
 
                 split_chan = self.channel_from_split(x, y)
 
