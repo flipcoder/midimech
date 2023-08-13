@@ -13,7 +13,7 @@ class Launchpad(Device):
 
     def button(self, x, y):
         if self.mode == 'lpx':
-            if y == 0:
+            if y == -1:
                 if x == 0:
                     self.octave += 1
                     self.core.clear_marks(use_lights=False)
