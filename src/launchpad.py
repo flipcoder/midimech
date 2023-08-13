@@ -17,9 +17,11 @@ class Launchpad(Device):
                 if x == 0:
                     self.octave += 1
                     self.core.clear_marks(use_lights=False)
+                    self.core.send_all_notes_off()
                 elif x == 1:
                     self.octave -= 1
                     self.core.clear_marks(use_lights=False)
+                    self.core.send_all_notes_off()
                 elif x == 2:
                     self.core.move_board(-1)
                     # self.pos.x -= 1
@@ -38,6 +40,15 @@ class Launchpad(Device):
                     self.core.next_mode()
                 elif y == 3:
                     self.core.prev_mode()
+                elif y == 4:
+                    self.core.next_bank()
+                elif y == 5:
+                    self.core.prev_bank()
+                elif y == 6:
+                    self.core.next_program()
+                elif y == 7:
+                    self.core.prev_program()
+
 
     def set_lights(self):
         if self.mode == "lpx":
@@ -52,6 +63,10 @@ class Launchpad(Device):
             self.out.LedCtrlXY(8, 2, 63, 63, 0)
             self.out.LedCtrlXY(8, 3, 0, 63, 63)
             self.out.LedCtrlXY(8, 4, 0, 63, 63)
+            self.out.LedCtrlXY(8, 5, 63, 24, 63)
+            self.out.LedCtrlXY(8, 6, 63, 24, 63)
+            self.out.LedCtrlXY(8, 7, 24, 63, 63)
+            self.out.LedCtrlXY(8, 8, 24, 63, 63)
 
 
 

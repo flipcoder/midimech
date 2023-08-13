@@ -60,6 +60,31 @@ class Core:
             mode -= 1
         return notes
 
+    def prev_bank(self):
+        return self.next_bank(-1)
+    
+    def next_bank(self, ofs=1):
+        if not self.midi_out:
+            return False
+        self.bank = max(0, min(127, self.bank + ofs))
+        msb = (self.bank >> 7) & 0x7f
+        lsb = self.bank & 0x7f
+        self.midi_out.send_cc(0, 0, msb)
+        self.midi_out.send_cc(0, 32, lsb)
+        print('Bank Select: ', self.bank)
+        return True
+    
+    def prev_program(self):
+        return self.next_program(-1)
+    
+    def next_program(self, ofs=1):
+        if not self.midi_out:
+            return False
+        self.program = max(0, min(127, self.program + ofs))
+        self.midi_write(self.midi_out, [0xc0, self.program], 0)
+        print('Program Change:', self.program)
+        return True
+
     def prev_mode(self, ofs=1):
         self.next_mode(-ofs)
 
@@ -1110,6 +1135,9 @@ class Core:
                     self.note_off([128, note, event[2]], timestamp, width=8, transpose=lp.transpose, octave=lp.get_octave(), force_channel=self.options.launchpad_channel)
                 else:
                     self.macro(x, 8 - y - 1, False)
+            else:
+                # Launchpad X buttons
+                lp.button(x, 8 - y - 1)
         else: # note on
             x = event[0]
             y = 8 - event[1]
@@ -1120,9 +1148,6 @@ class Core:
                     self.note_on([144, note, event[2]], timestamp, width=8, transpose=lp.transpose, octave=lp.get_octave(), force_channel=self.options.launchpad_channel)
                 else:
                     self.macro(x, 8 - y - 1, True)
-            else:
-                # Launchpad X buttons
-                lp.button(x, 8 - y - 1)
 
     # uses raw events (Launchpad X)
     # def cb_launchpad_in(self, event, timestamp=0):
@@ -1470,6 +1495,9 @@ class Core:
         self.scale_notes = self.scale_db[self.scale_index]['notes']
         self.scale_root = 0
         self.tonic = 0
+        
+        self.program = 0
+        self.bank = 0
 
         self.articulation = Articulation(self)
 
