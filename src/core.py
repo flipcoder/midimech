@@ -564,22 +564,23 @@ class Core:
         within_hardware_split = False
         if width is None:
             if self.options.hardware_split:
-                if self.board_w == 25: # 200
-                    left_width = 11
-                    right_width = 14
-                    if ch >= 8:
-                        width = right_width
-                        within_hardware_split = True
-                    else:
-                        width = left_width
+                # if self.board_w == 25: # 200
+                left_width = self.split_point
+                right_width = self.board_w - left_width
+                # print('hardware splits', left_width, right_width)
+                if ch >= 8:
+                    width = right_width
+                    within_hardware_split = True
                 else:
-                    left_width = 8
-                    right_width = 8
-                    if ch >= 8:
-                        width = right_width
-                        within_hardware_split = True
-                    else:
-                        width = left_width
+                    width = left_width
+                # else:
+                #     left_width = 8
+                #     right_width = 8
+                #     if ch >= 8:
+                #         width = right_width
+                #         within_hardware_split = True
+                #     else:
+                #         width = left_width
             else:
                 width = self.board_w
             # else: # 128
@@ -604,6 +605,8 @@ class Core:
         midinote += 32
         if self.flipped:
             midinote += 7
+        if within_hardware_split:
+            midinote += self.options.column_offset * left_width
         visual_midinote = midinote
         midinote += 12 * (octave + self.octave)
         midinote += self.options.column_offset * self.position.x
@@ -739,22 +742,23 @@ class Core:
         within_hardware_split = False
         if width is None:
             if self.options.hardware_split:
-                if self.board_w == 25: # 200
-                    left_width = 11
-                    right_width = 14
-                    if ch >= 8:
-                        width = right_width
-                        within_hardware_split = True
-                    else:
-                        width = left_width
+                # if self.board_w == 25: # 200
+                left_width = self.split_point
+                right_width = self.board_w - left_width
+                # print('hardware splits', left_width, right_width)
+                if ch >= 8:
+                    width = right_width
+                    within_hardware_split = True
                 else:
-                    left_width = 8
-                    right_width = 8
-                    if ch >= 8:
-                        width = right_width
-                        within_hardware_split = True
-                    else:
-                        width = left_width
+                    width = left_width
+                # else:
+                #     left_width = 8
+                #     right_width = 8
+                #     if ch >= 8:
+                #         width = right_width
+                #         within_hardware_split = True
+                #     else:
+                #         width = left_width
             else:
                 width = self.board_w
         
@@ -795,6 +799,7 @@ class Core:
 
         row = data[1] // width
         col = data[1] % width
+        # print('xy', col, row)
         # col_full = col + (left_width if within_hardware_split else 0)
         # midinote = self.xy_to_midi(col, row)
         # y = self.board_h - row - 1
@@ -806,12 +811,14 @@ class Core:
         midinote += 32
         if self.flipped:
             midinote += 7
+        if within_hardware_split:
+            midinote += self.options.column_offset * left_width
         visual_midinote = midinote
         midinote += 12 * (octave + self.octave)
         midinote += self.options.column_offset * self.position.x
         midinote += transpose + self.tonic
         # print('off', x, y, midinote)
-        
+
         col_full = x + (left_width if within_hardware_split else 0)
         side = self.channel_from_split(col_full, y, force=True)
 
@@ -1411,8 +1418,14 @@ class Core:
         self.options.size = get_option(opts, "size", DEFAULT_OPTIONS.size)
         if self.options.size == 128:
             self.options.width = 16
+            self.split_point = None
         elif self.options.size == 200:
             self.options.width = 25
+            self.split_point = 11
+            hardware_split = True
+        elif self.options.size < 0: # test hardware split
+            self.options.width = 16
+            self.split_point = -self.options.size
             hardware_split = True
 
         # Note: The default below is what is determined by size above.
@@ -1826,6 +1839,7 @@ class Core:
         """Sets up RPN for hardware split (used on LinnStrument 200)"""
         if self.options.hardware_split:
             self.rpn(200, 1 if on else 0) # split active
+            self.rpn(202, self.split_point + 1)
 
             # lights
             self.send_ls_cc(0, 20, 0)
@@ -1833,6 +1847,7 @@ class Core:
             self.send_ls_cc(0, 22, 7 if on else 0)
         else:
             self.rpn(200, 0)
+            self.rpn(202, self.split_point if self.split_point else 8)
 
     def rpn(self, num, value):
         if not self.linn_out:
