@@ -9,71 +9,73 @@ class Launchpad(Device):
         self.index = index
         self.octave_separation = octave_separation
 
+        print("Launchpad", mode, 'Connected! (#' + str(index) + ")")
+
         # self.pos = glm.ivec2(0, 0)
 
     def button(self, x, y):
         # if self.mode == 'lpx':
         if y == -1:
             if x == 0:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("OCT+")
                 self.octave += 1
                 self.core.clear_marks(use_lights=False)
                 self.core.send_all_notes_off()
             elif x == 1:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("OCT-")
                 self.octave -= 1
                 self.core.clear_marks(use_lights=False)
                 self.core.send_all_notes_off()
             elif x == 2:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("MOV-")
                 self.core.move_board(-1)
                 # self.pos.x -= 1
             elif x == 3:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("MOV+")
                 self.core.move_board(1)
             elif x == 4:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("TRA-")
                 self.core.set_tonic(self.core.tonic - 1)
             elif x == 5:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("TRA+")
                 self.core.set_tonic(self.core.tonic + 1)
         if x == 8:
             if y == 0:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("SCL+")
                 self.core.next_scale()
             elif y == 1:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("SCL-")
                 self.core.prev_scale()
             elif y == 2:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("MOD+")
                 self.core.next_mode()
             elif y == 3:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("MOD-")
                 self.core.prev_mode()
             elif y == 4:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("BANK+")
                 self.core.next_bank()
             elif y == 5:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("BANK-")
                 self.core.prev_bank()
             elif y == 6:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("PROG+")
                 self.core.next_program()
             elif y == 7:
-                if self.core.options.debug:
+                if True:#self.core.options.debug:
                     print("PROG-")
                 self.core.prev_program()
 

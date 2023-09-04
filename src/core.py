@@ -1750,25 +1750,31 @@ class Core:
                 self.foot_in.callback = self.cb_foot
 
         self.launchpads = []
+        num_launchpads = 0
         if self.options.launchpad:
             launchpads = []
             lp = launchpad.LaunchpadPro()
             if lp.Check(0):
                 if lp.Open(0):
-                    self.launchpads += [Launchpad(self, lp, "pro", 0)]
-            if launchpad.LaunchpadProMk3().Check(0):
-                lp = launchpad.LaunchpadProMk3()
+                    self.launchpads += [Launchpad(self, lp, "pro", num_launchpads)]
+                    num_launchpads += 1
+            lp = launchpad.LaunchpadProMk3()
+            if lp.Check(0):
                 if lp.Open(0):
-                    self.launchpads += [Launchpad(self, lp, "promk3", 0)]
-            if launchpad.LaunchpadLPX().Check(1):
+                    self.launchpads += [Launchpad(self, lp, "promk3", num_launchpads)]
+                    num_launchpads += 1
+            lp = launchpad.LaunchpadLPX()
+            if lp.Check(1):
                 lp = launchpad.LaunchpadLPX()
                 if lp.Open(1):
-                    self.launchpads += [Launchpad(self, lp, "lpx", 0)]
+                    self.launchpads += [Launchpad(self, lp, "lpx", num_launchpads)]
+                    num_launchpads += 1
                 if launchpad.LaunchpadLPX().Check(3):
                     lp = launchpad.LaunchpadLPX()
                     if lp.Open(3): # second
-                        self.launchpads += [Launchpad(self, lp, "lpx", 1, self.options.octave_separation)]
-
+                        self.launchpads += [Launchpad(self, lp, "lpx", num_launchpads, self.options.octave_separation)]
+                        num_launchpads += 1
+        
         if self.launchpads:
             print('Launchpads:', len(self.launchpads))
 
