@@ -19,7 +19,7 @@ class Settings:
     
     # Color scheme using webcolors
     # split_colors: str = "cyan,blue,blue,blue,blue,blue,blue,blue,blue,blue,blue,blue"
-    launchpad_colors: str = ''
+    launchpad_colors: str = '5,1,9,1,13,122,1,37,45,94,1,95'
     
     colors: str = "red,darkred,orange,goldenrod,yellow,green,darkolivegreen,blue,darkslateblue,indigo,darkorchid,pink"
     # colors: str = "cyan,green,green,green,green,green,green,green,green,green,green,green"

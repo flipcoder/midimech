@@ -1706,7 +1706,10 @@ class Core:
             if "linnstrument" in name_lower:
                 print("Instrument (Out): " + name)
                 self.linn_out = rtmidi2.MidiOut()
-                self.linn_out.open_port(i)
+                try:
+                    self.linn_out.open_port(i)
+                except:
+                    print("Unable to open LinnStrument")
             elif self.options.split_out and self.options.split_out in name_lower:
                 print("Split (Out): " + name)
                 self.split_out = rtmidi2.MidiOut()
