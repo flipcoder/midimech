@@ -153,6 +153,13 @@ class Core:
         self.midi_write(self.midi_out, [0xb0 | ch, 120, 0], 0)
         self.midi_write(self.midi_out, [0xb0 | ch, 123, 0], 0)
 
+    def ls_color(self, x, y, col):
+        """Set LinnStrument pad color"""
+        if self.linn_out:
+            self.send_ls_cc(0, 20, x + 1)
+            self.send_ls_cc(0, 21, self.board_h - y - 1)
+            self.send_ls_cc(0, 22, col)
+
     def set_light(self, x, y, col, index=None, mark=False):  # col is [1,11], 0 resets
         """Set light to color `col` at x, y if in range and connected"""
         if y < 0 or y >= self.board_h:
@@ -164,10 +171,8 @@ class Core:
             index = self.get_note_index(x, y, transpose=False)
 
         self.mark_lights[y][x] = mark
-        if self.linn_out:
-            self.send_ls_cc(0, 20, x + 1)
-            self.send_ls_cc(0, 21, self.board_h - y - 1)
-            self.send_ls_cc(0, 22, col)
+        
+        self.ls_color(x, y, col)
 
         if index is not None:
             for lp in self.launchpads:
@@ -1753,15 +1758,15 @@ class Core:
         num_launchpads = 0
         if self.options.launchpad:
             launchpads = []
-            lp = launchpad.LaunchpadPro()
-            if lp.Check(0):
-                if lp.Open(0):
-                    self.launchpads += [Launchpad(self, lp, "pro", num_launchpads)]
-                    num_launchpads += 1
             lp = launchpad.LaunchpadProMk3()
             if lp.Check(0):
                 if lp.Open(0):
                     self.launchpads += [Launchpad(self, lp, "promk3", num_launchpads)]
+                    num_launchpads += 1
+            lp = launchpad.LaunchpadPro()
+            if lp.Check(0):
+                if lp.Open(0):
+                    self.launchpads += [Launchpad(self, lp, "pro", num_launchpads)]
                     num_launchpads += 1
             lp = launchpad.LaunchpadLPX()
             if lp.Check(1):
@@ -2026,7 +2031,7 @@ class Core:
                     octave = self.get_octave(x, y)
                     if octave == midinote // 12:
                         # print(octave)
-                        self.board[y + self.flipped][x] = state
+                        self.board[y + self.flipped][x + self.position.x] = state
                         if use_lights:
                             if state:
                                 self.set_light(x, y, self.options.mark_light, mark=True)
