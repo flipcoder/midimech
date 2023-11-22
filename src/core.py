@@ -10,11 +10,12 @@ import time
 
 from src.util import *
 from src.constants import *
-from src.options import Options, DEFAULT_OPTIONS
+from src.settings import Settings, DEFAULT_OPTIONS
 from src.note import Note
-from src.settings import DeviceSettings
+from src.device import Device, DeviceSettings
+from src.launchpad import Launchpad
 from src.articulation import Articulation
-from src.gamepad import Gamepad
+# from src.gamepad import Gamepad
 
 with open(os.devnull, "w") as devnull:
     # suppress pygame messages (to keep console output clean)
@@ -46,6 +47,7 @@ except ImportError:
     error("The project dependencies have changed! Run the requirements setup command again!")
 
 class Core:
+    CORE = None
     
     def rotate_mode(self, notes: str, mode: int):
         """Rotates a mode string (see: scales.yaml strings with x and .)"""
@@ -58,12 +60,38 @@ class Core:
             mode -= 1
         return notes
 
+    def prev_bank(self):
+        return self.next_bank(-1)
+    
+    def next_bank(self, ofs=1):
+        if not self.midi_out:
+            return False
+        self.bank = max(0, min(127, self.bank + ofs))
+        msb = (self.bank >> 7) & 0x7f
+        lsb = self.bank & 0x7f
+        self.midi_out.send_cc(0, 0, msb)
+        self.midi_out.send_cc(0, 32, lsb)
+        print('Bank Select: ', self.bank)
+        return True
+    
+    def prev_program(self):
+        return self.next_program(-1)
+    
+    def next_program(self, ofs=1):
+        if not self.midi_out:
+            return False
+        self.program = max(0, min(127, self.program + ofs))
+        self.midi_write(self.midi_out, [0xc0, self.program], 0)
+        print('Program Change:', self.program)
+        return True
+
     def prev_mode(self, ofs=1):
         self.next_mode(-ofs)
 
     def next_mode(self, ofs=1):
         """Go to next mode according to offset (ofs), wrapping around if necessary"""
         self.set_mode((self.mode_index + ofs) % self.scale_notes.count('x'))
+        self.dirty = self.dirty_lights = True
 
     def prev_scale(self, ofs=1):
         self.next_scale(-ofs)
@@ -73,6 +101,7 @@ class Core:
         self.scale_index = (self.scale_index + ofs) % len(self.scale_db)
         self.scale_name = self.scale_db[self.scale_index]['name']
         self.set_mode(0)
+        self.dirty = self.dirty_lights = True
     
     def set_mode(self, mode: int):
         """Set mode by index (0-indexed)"""
@@ -108,13 +137,28 @@ class Core:
             val = val**self.velocity_curve_
         return val
 
-    def send_cc(self, channel, cc, val):
+    def send_ls_cc(self, channel, cc, val):
         """Send CC to LinnStrument channel with value, if connected"""
         if not self.linn_out:
             return
         # msg = [0xb0 | channel, cc, val]
         self.linn_out.send_cc(channel, cc, val)
         # self.linn_out.send_messages(0xb0, [(channel, cc, val)])
+
+    def send_all_notes_off(self):
+        if not self.midi_out:
+            return
+        # for ch in range(0,15):
+        ch = 0
+        self.midi_write(self.midi_out, [0xb0 | ch, 120, 0], 0)
+        self.midi_write(self.midi_out, [0xb0 | ch, 123, 0], 0)
+
+    def ls_color(self, x, y, col):
+        """Set LinnStrument pad color"""
+        if self.linn_out:
+            self.send_ls_cc(0, 20, x + 1)
+            self.send_ls_cc(0, 21, self.board_h - y - 1)
+            self.send_ls_cc(0, 22, col)
 
     def set_light(self, x, y, col, index=None, mark=False):  # col is [1,11], 0 resets
         """Set light to color `col` at x, y if in range and connected"""
@@ -124,29 +168,40 @@ class Core:
             return
 
         if not index:
-            index = self.get_note_index(x, y)
+            index = self.get_note_index(x, y, transpose=False)
 
         self.mark_lights[y][x] = mark
-        if self.linn_out:
-            self.send_cc(0, 20, x + 1)
-            self.send_cc(0, 21, self.board_h - y - 1)
-            self.send_cc(0, 22, col)
+        
+        self.ls_color(x, y, col)
 
-        if self.launchpad and index is not None:
-            if self.scale_notes[index] != '.':
-                lp_col = self.options.colors[index] / 4
-            else:
-                lp_col = ivec3(0)
-            if 0 <= x < 8 and 0 <= y < 8:
-                if not self.is_macro_button(x, y):
-                    self.launchpad.LedCtrlXY(x, y+1, lp_col[0], lp_col[1], lp_col[2])
+        if index is not None:
+            for lp in self.launchpads:
+                if self.scale_notes[index] != '.':
+                    if self.options.launchpad_colors:
+                        lp_col = self.options.launchpad_colors[index]
+                    else:
+                        lp_col = self.options.colors[index] / 4
                 else:
-                    self.launchpad.LedCtrlXY(x, y+1, 63, 63, 63)
+                    if self.options.launchpad_colors:
+                        lp_col = 0
+                    else:
+                        lp_col = ivec3(0)
+                if 0 <= x < 8 and 0 <= y < 8:
+                    if not self.is_macro_button(x, y):
+                        if self.options.launchpad_colors:
+                            lp.out.LedCtrlXYByCode(x, y+1, lp_col)
+                        else:
+                            lp.out.LedCtrlXY(x, y+1, lp_col[0], lp_col[1], None if lp_col[2] == 0 else lp_col[2])
+                    else:
+                        if self.options.launchpad_colors:
+                            lp.out.LedCtrlXYByCode(x, y+1, 3)
+                        else:
+                            lp.out.LedCtrlXY(x, y+1, 63, 63, 63)
 
     def reset_light(self, x, y, reset_red=True):
         """Reset the light at x, y"""
-        note = self.get_note_index(x, y)
-        # print(note)
+        note = self.get_note_index(x, y, transpose=False)
+        
         if self.is_split():
             split_chan = self.channel_from_split(x, self.board_h - y - 1)
             if split_chan:
@@ -171,9 +226,9 @@ class Core:
         self.set_light(x, y, light_col, note)
         self.mark_lights[y][x] = False
 
-    def reset_launchpad_light(self, x, y):
+    def reset_launchpad_light(self, x, y, launchpad=None):
         """Reset the launchpad light at x, y"""
-        note = self.get_note_index(x, 8-y-1)
+        note = self.get_note_index(x, 8-y-1, transpose=False)
         # if self.is_split():
         #     split_chan = self.channel_from_split(x, self.board_h - y - 1)
         #     if split_chan:
@@ -182,29 +237,48 @@ class Core:
         # light_col = self.options.lights[note]
         # else:
         #     light_col = self.options.lights[note]
-        self.set_launchpad_light(x, y, note)
+        for lp in ([launchpad] if launchpad else self.launchpads):
+            self.set_launchpad_light(x, y, note)
 
-    def set_mark_light(self, x, y, state=True):
+    def set_mark_light(self, x, y, state=True, launchpad=None):
         """Set launchpad light to touched color"""
         self.mark_lights[y][x] = state
-        if self.launchpad:
+        for lp in ([launchpad] if launchpad else self.launchpads):
             lp_col = self.options.mark_color
             if state:
-                self.launchpad.LedCtrlXY(x, y, lp_col[0], lp_col[1], lp_col[2])
+                lp.out.LedCtrlXY(x, y, lp_col[0], lp_col[1], lp_col[2])
 
-    def set_launchpad_light(self, x, y, color):
+    # `color` below is an scale index (0, 1, 2...)
+    def set_launchpad_light(self, x, y, color, launchpad=None):
         """Set launchpad light to color index"""
         if self.is_macro_button(x, 8 - y - 1):
-            col = glm.ivec3(63,63,63)
+            if self.options.launchpad_colors:
+                col = 1
+            else:
+                col = glm.ivec3(63,63,63)
         else:
             if color != -1: # not mark
                 if color is not None and self.scale_notes[color] != '.':
-                    col = self.options.colors[color] / 4
+                    if self.options.launchpad_colors:
+                        col = self.options.launchpad_colors[color]
+                    else:
+                        col = self.options.colors[color] / 4
                 else:
-                    col = glm.ivec3(0,0,0)
+                    if self.options.launchpad_colors:
+                        col = 0
+                    else:
+                        col = glm.ivec3(0,0,0)
             else:
-                col = self.options.mark_color / 4
-        self.launchpad.LedCtrlXY(x, 8-y, col[0], col[1], col[2])
+                if self.options.launchpad_colors:
+                    col = 1
+                else:
+                    col = self.options.mark_color / 4
+
+        for lp in ([launchpad] if launchpad else self.launchpads):
+            if self.options.launchpad_colors:
+                lp.out.LedCtrlXYByCode(x, 8-y, col)
+            else:
+                lp.out.LedCtrlXY(x, 8-y, col[0], col[1], col[2])
 
     def setup_lights(self):
         """Set all lights"""
@@ -227,29 +301,37 @@ class Core:
     #     except IndexError:
     #         pass
 
-    def xy_to_midi(self, x, y):
+    def xy_to_midi(self, x, y, transpose=True):
         """x, y coordinate to midi note based on layout (this can be improved)"""
-        row = self.board_h - y
-        r = x % self.board_w + 25.5 + 2.5 * row  # FIXME: make this simpler
-        r *= 2
-        r = int(r)
-        r += (self.octave + self.octave_base) * 12
-        r += self.transpose * 2
+        y = self.board_h - y - 1
+        column_offset = self.options.column_offset
+        row_offset = self.options.row_offset
+        xx = x + self.options.base_offset
+        r = row_offset * y + (column_offset * (xx + self.position.x))
+        r += 24
         if self.flipped:
             r += 7
+        r += self.tonic if transpose else 0
+        # print(x, y, r)
         return r
 
     def get_note_index(self, x, y, transpose=True):
         """Get the note index (0-11) for a given x, y"""
         y += self.flipped
-        x += self.transpose
-        ofs = (self.board_h - y) // 2 + BASE_OFFSET
-        step = 2 if WHOLETONE else 1
+        x += self.position.x
+        column_offset = self.options.column_offset
+        row_offset = self.options.row_offset
+        y = self.board_h - y - 1
+        x += self.options.base_offset
         tr = self.tonic if transpose else 0
-        if y % 2 == 1:
-            return ((x - ofs) * step - tr) % len(NOTES)
-        else:
-            return ((x - ofs) * step + 7 - tr) % len(NOTES)
+        return (row_offset * y + column_offset * x + tr) % len(NOTES)
+        # ofs = (self.board_h - y) // 2 + BASE_OFFSET
+        # step = 2 if WHOLETONE else 1
+        # tr = self.tonic if transpose else 0
+        # if y % 2 == 1:
+        #     return ((x - ofs) * step - tr) % len(NOTES)
+        # else:
+        #     return ((x - ofs) * step + 7 - tr) % len(NOTES)
 
     def get_note(self, x, y, transpose=True):
         """Get note name for x, y"""
@@ -258,7 +340,7 @@ class Core:
     def get_color(self, x, y):
         """Get color for x, y"""
         # return NOTE_COLORS[get_note_index(x, y)]
-        note = self.get_note_index(x, y)
+        note = self.get_note_index(x, y, transpose=False)
         # note = (note - self.tonic) % 12
         # if self.is_split():
         #     split_chan = self.channel_from_split(x, self.board_h - y - 1)
@@ -302,7 +384,9 @@ class Core:
         y /= int(self.button_sz)
 
         vel = vel / int(self.button_sz)
+        
         vel = 1 - vel
+        
         vel *= 127
         vel = clamp(0, 127, int(vel))
 
@@ -397,11 +481,11 @@ class Core:
         # if self.flipped:
         #     if self.tonic % 2 == 0:
         #         y -= 1
-        #     octave = int(x + 4 + self.transpose + y * 2.5) // 6
+        #     octave = int(x + 4 + self.position.x + y * 2.5) // 6
         # else:
         if self.tonic % 2:
             y -= 1
-        octave = int(x + 4 + self.transpose + y * 2.5) // 6
+        octave = int(x + 4 + self.position.x + y * 2.5) // 6
         return octave
 
     def held_note_count(self):
@@ -465,7 +549,7 @@ class Core:
     def is_mpe(self):
         return self.options.one_channel == 0
 
-    def note_on(self, data, timestamp, width=None, curve=True, mpe=None, force_channel=None):
+    def note_on(self, data, timestamp, width=None, curve=True, mpe=None, octave=0, transpose=0, force_channel=None):
         # if mpe is None:
         #     mpe = self.options.mpe
         d0 = data[0]
@@ -485,22 +569,23 @@ class Core:
         within_hardware_split = False
         if width is None:
             if self.options.hardware_split:
-                if self.board_w == 25: # 200
-                    left_width = 11
-                    right_width = 14
-                    if ch >= 8:
-                        width = right_width
-                        within_hardware_split = True
-                    else:
-                        width = left_width
+                # if self.board_w == 25: # 200
+                left_width = self.split_point
+                right_width = self.board_w - left_width
+                # print('hardware splits', left_width, right_width)
+                if ch >= 8:
+                    width = right_width
+                    within_hardware_split = True
                 else:
-                    left_width = 8
-                    right_width = 8
-                    if ch >= 8:
-                        width = right_width
-                        within_hardware_split = True
-                    else:
-                        width = left_width
+                    width = left_width
+                # else:
+                #     left_width = 8
+                #     right_width = 8
+                #     if ch >= 8:
+                #         width = right_width
+                #         within_hardware_split = True
+                #     else:
+                #         width = left_width
             else:
                 width = self.board_w
             # else: # 128
@@ -512,40 +597,78 @@ class Core:
             print("Channel:", ch)
             print("---")
 
-        # if mpe:
         row = data[1] // width
         col = data[1] % width
         col_full = col + (left_width if within_hardware_split else 0)
+        # midinote = self.xy_to_midi(col, row)
+        # y = self.board_h - row - 1
+        column_offset = self.options.column_offset
+        row_offset = self.options.row_offset
+        y = row
+        x = col
+        midinote = row_offset * y + column_offset * x
+        midinote += 32
+        if self.flipped:
+            midinote += 7
         if within_hardware_split:
-            data[1] += left_width
-        data[1] = col + 30 + 2.5 * row
-        data[1] *= 2
-        data[1] = int(data[1])
-        if within_hardware_split:
-            data[1] += left_width * 2
-            # print(data[1])
-        # else:
-        #     row = ch % 8
-        #     col = ch // 8
-        #     data[1] *= 2
-        #     try:
-        #         data[1] -= row * 5
-        #     except IndexError:
-        #         pass
+            midinote += self.options.column_offset * left_width
+        visual_midinote = midinote
+        midinote += 12 * (octave + self.octave)
+        midinote += self.options.column_offset * self.position.x
+        midinote += transpose + self.tonic
+
+        # print(x, y, midinote)
+        # return
+
+        # # if mpe:
         
-        data[1] += (self.octave + self.octave_base) * 12
-        data[1] += BASE_OFFSET
-        midinote = data[1] - 24 + self.transpose * 2
+        # col_full = col + (left_width if within_hardware_split else 0)
+        # if within_hardware_split:
+        #     data[1] += left_width
+        # data[1] = col + 30 + 2.5 * row
+        # data[1] *= 2
+        # data[1] = int(data[1])
+        # if within_hardware_split:
+        #     data[1] += left_width * 2
+        #     # print(data[1])
+        # # else:
+        # #     row = ch % 8
+        # #     col = ch // 8
+        # #     data[1] *= 2
+        # #     try:
+        # #         data[1] -= row * 5
+        # #     except IndexError:
+        # #         pass
+        
+        # data[1] += (self.octave + self.octave_base + octave) * 12
+        # data[1] += transpose
+        # data[1] += BASE_OFFSET
+        # midinote = data[1] - 24 + self.position.x * 2
+        col_full = x + (left_width if within_hardware_split else 0)
+        
+        # figure out if note is on left or right side
         side = self.channel_from_split(col_full, row, force=True)
+
+        # if the note is on the right side, we shift by the current octave split
+        if side == 1:
+            octave_split = self.options.octave_split
+            if octave_split != 0:
+                midinote += 12 * octave_split
+
+        # if we have a split set up, set the side found above to split_chan,
+        #   otherwise everything should be in the same region
         if self.is_split():
             split_chan = side
         else:
             split_chan = 0
+
+        data[1] = midinote
+        
         if not aftertouch:
-            self.mark(midinote, 1, only_row=row)
-        data[1] += self.out_octave * 12 + self.transpose * 2
-        if self.flipped:
-            data[1] += 7
+            self.mark(visual_midinote - 24, 1, only_row=row)
+        # data[1] += self.out_octave * 12 + self.position.x * 2
+        # if self.flipped:
+        #     data[1] += 7
         
         # velocity (or pressure if aftertouch)
         vel = data[2] / 127
@@ -571,19 +694,19 @@ class Core:
             if note:
                 if note.location is None:
                     note.location = ivec2(0)
-                note.location.x = col_full
-                note.location.y = row
+                note.location.x = x
+                note.location.y = y
                 note.pressure = vel
-                note.midinote = data[1]
+                note.midinote = midinote
                 note.split = split_chan
 
-            if self.options.jazz:
-                if side == 0:
-                    self.left_chord_notes[data[1]] = True
+            # if self.options.jazz:
+            #     if side == 0:
+            #         self.left_chord_notes[data[1]] = True
                     # self.dirty_left_chord = True
         
-            self.chord_notes[data[1]] = True
-            self.note_set.add(data[1])
+            self.chord_notes[midinote] = True
+            self.note_set.add(midinote)
             self.dirty_chord = True
 
         if self.is_split():
@@ -593,9 +716,10 @@ class Core:
             else:
                 self.midi_write(self.split_out, data, timestamp)
         else:
+            # print(data[1]) # midi note number
             self.midi_write(self.midi_out, data, timestamp)
 
-    def note_off(self, data, timestamp, width=None, mpe=None, force_channel=None):
+    def note_off(self, data, timestamp, width=None, mpe=None, octave=0, transpose=0, force_channel=None):
         # if mpe is None:
         #     mpe = self.options.mpe
         
@@ -623,71 +747,107 @@ class Core:
         within_hardware_split = False
         if width is None:
             if self.options.hardware_split:
-                if self.board_w == 25: # 200
-                    left_width = 11
-                    right_width = 14
-                    if ch >= 8:
-                        width = right_width
-                        within_hardware_split = True
-                    else:
-                        width = left_width
+                # if self.board_w == 25: # 200
+                left_width = self.split_point
+                right_width = self.board_w - left_width
+                # print('hardware splits', left_width, right_width)
+                if ch >= 8:
+                    width = right_width
+                    within_hardware_split = True
                 else:
-                    left_width = 8
-                    right_width = 8
-                    if ch >= 8:
-                        width = right_width
-                        within_hardware_split = True
-                    else:
-                        width = left_width
+                    width = left_width
+                # else:
+                #     left_width = 8
+                #     right_width = 8
+                #     if ch >= 8:
+                #         width = right_width
+                #         within_hardware_split = True
+                #     else:
+                #         width = left_width
             else:
                 width = self.board_w
         
-        # if not mpe:
-        #     row = ch % 8
-        #     col = ch // 8
-        # if mpe:
-            # row and col within the current split
-            # row = data[1] // width
-            # col = data[1] % width
-            # print(data[1])
-            # # data[1] = data[1] % width + 30 + 2.5 * row
-            # data[1] *= 2
-            # data[1] = int(data[1])
-            # if self.options.hardware_split and ch >= 8:
-            #     data[1] += self.board_w
+        # # if not mpe:
+        # #     row = ch % 8
+        # #     col = ch // 8
+        # # if mpe:
+        #     # row and col within the current split
+        #     # row = data[1] // width
+        #     # col = data[1] % width
+        #     # print(data[1])
+        #     # # data[1] = data[1] % width + 30 + 2.5 * row
+        #     # data[1] *= 2
+        #     # data[1] = int(data[1])
+        #     # if self.options.hardware_split and ch >= 8:
+        #     #     data[1] += self.board_w
+        # row = data[1] // width
+        # col = data[1] % width
+        # col_full = col + (left_width if within_hardware_split else 0)
+        # if within_hardware_split:
+        #     data[1] += left_width
+        # data[1] = col + 30 + 2.5 * row
+        # data[1] *= 2
+        # data[1] = int(data[1])
+        # if within_hardware_split:
+        #     data[1] += left_width * 2
+        # # else:
+        # #     data[1] *= 2
+        # #     try:
+        # #         data[1] -= row * 5
+        # #     except IndexError:
+        # #         pass
+        
+        # data[1] += (self.octave + self.octave_base + octave) * 12
+        # data[1] += BASE_OFFSET
+        # data[1] += transpose
+        # midinote = data[1] - 24 + self.position.x * 2
+
         row = data[1] // width
         col = data[1] % width
-        col_full = col + (left_width if within_hardware_split else 0)
+        # print('xy', col, row)
+        # col_full = col + (left_width if within_hardware_split else 0)
+        # midinote = self.xy_to_midi(col, row)
+        # y = self.board_h - row - 1
+        column_offset = self.options.column_offset
+        row_offset = self.options.row_offset
+        y = row
+        x = col
+        midinote = row_offset * y + column_offset * x
+        midinote += 32
+        if self.flipped:
+            midinote += 7
         if within_hardware_split:
-            data[1] += left_width
-        data[1] = col + 30 + 2.5 * row
-        data[1] *= 2
-        data[1] = int(data[1])
-        if within_hardware_split:
-            data[1] += left_width * 2
-        # else:
-        #     data[1] *= 2
-        #     try:
-        #         data[1] -= row * 5
-        #     except IndexError:
-        #         pass
+            midinote += self.options.column_offset * left_width
+        visual_midinote = midinote
+        midinote += 12 * (octave + self.octave)
+        midinote += self.options.column_offset * self.position.x
+        midinote += transpose + self.tonic
+        # print('off', x, y, midinote)
+
+        col_full = x + (left_width if within_hardware_split else 0)
+        side = self.channel_from_split(col_full, y, force=True)
+
+        # if the note is on the right side, we shift by the current octave split
+        if side == 1:
+            octave_split = self.options.octave_split
+            if octave_split != 0:
+                midinote += 12 * octave_split
         
-        data[1] += (self.octave + self.octave_base) * 12
-        data[1] += BASE_OFFSET
-        midinote = data[1] - 24 + self.transpose * 2
-        side = self.channel_from_split(col_full, row, force=True)
         if self.is_split():
             split_chan = side
         else:
             split_chan = 0
-        self.mark(midinote, 0, only_row=row)
-        data[1] += self.out_octave * 12 + self.transpose * 2
-        if self.flipped:
-            data[1] += 7
 
-        if self.options.jazz:
-            if side == 0:
-                self.left_chord_notes[data[1]] = False
+        data[1] = midinote
+        
+        self.mark(visual_midinote - 24, 0, only_row=y)
+        # data[1] += self.out_octave * 12 + self.position.x * 2
+        # if self.flipped:
+        #     data[1] += 7
+
+        # if self.options.jazz:
+        #     if side == 0:
+        #         self.left_chord_notes[data[1]] = False
                 # self.dirty_left_chord = True
         
         self.chord_notes[data[1]] = False
@@ -706,61 +866,61 @@ class Core:
             self.midi_write(self.midi_out, data, timestamp)
         # print('note off: ', data)
 
-    def device_to_xy(self, data, force_channel=None):
-        # mpe = self.options.mpe
+    # def device_to_xy(self, data, force_channel=None):
+    #     # mpe = self.options.mpe
         
-        d0 = data[0]
-        ch = d0 & 0x0F
-        msg = (data[0] & 0xF0) >> 4
-        if force_channel:
-            data[0] = (d0 & 0xF0) + (force_channel-1)
-        elif not self.is_mpe():
-            data[0] = (d0 & 0xF0) + (self.options.one_channel-1)
-        row = None
-        col = None
+    #     d0 = data[0]
+    #     ch = d0 & 0x0F
+    #     msg = (data[0] & 0xF0) >> 4
+    #     if force_channel:
+    #         data[0] = (d0 & 0xF0) + (force_channel-1)
+    #     elif not self.is_mpe():
+    #         data[0] = (d0 & 0xF0) + (self.options.one_channel-1)
+    #     row = None
+    #     col = None
 
-        within_hardware_split = False
-        if self.options.hardware_split:
-            if self.board_w == 25: # 200
-                left_width = 11
-                right_width = 14
-                if ch >= 8:
-                    width = right_width
-                    within_hardware_split = True
-                else:
-                    width = left_width
-            else:
-                left_width = 8
-                right_width = 8
-                if ch >= 8:
-                    width = right_width
-                    within_hardware_split = True
-                else:
-                    width = left_width
-        else:
-            width = self.board_w
+    #     within_hardware_split = False
+    #     if self.options.hardware_split:
+    #         if self.board_w == 25: # 200
+    #             left_width = 11
+    #             right_width = 14
+    #             if ch >= 8:
+    #                 width = right_width
+    #                 within_hardware_split = True
+    #             else:
+    #                 width = left_width
+    #         else:
+    #             left_width = 8
+    #             right_width = 8
+    #             if ch >= 8:
+    #                 width = right_width
+    #                 within_hardware_split = True
+    #             else:
+    #                 width = left_width
+    #     else:
+    #         width = self.board_w
         
-        # if not mpe:
-        #     row = ch % 8
-        #     col = ch // 8
-        # if mpe:
-        row = data[1] // width
-        col = data[1] % width
-        if within_hardware_split:
-            data[1] += left_width
-        data[1] = col + 30 + 2.5 * row
-        data[1] *= 2
-        data[1] = int(data[1])
-        if within_hardware_split:
-            data[1] += left_width * 2
-        # else:
-        #     data[1] *= 2
-        #     try:
-        #         data[1] -= row * 5
-        #     except IndexError:
-        #         pass
+    #     # if not mpe:
+    #     #     row = ch % 8
+    #     #     col = ch // 8
+    #     # if mpe:
+    #     row = data[1] // width
+    #     col = data[1] % width
+    #     if within_hardware_split:
+    #         data[1] += left_width
+    #     data[1] = col + 30 + 2.5 * row
+    #     data[1] *= 2
+    #     data[1] = int(data[1])
+    #     if within_hardware_split:
+    #         data[1] += left_width * 2
+    #     # else:
+    #     #     data[1] *= 2
+    #     #     try:
+    #     #         data[1] -= row * 5
+    #     #     except IndexError:
+    #     #         pass
         
-        return col, row
+    #     return col, row
     
     def cb_midi_in(self, data, timestamp, force_channel=None):
         """LinnStrument MIDI Callback"""
@@ -917,6 +1077,8 @@ class Core:
             self.mark(data[1] + self.vis_octave * 12, 1, True)
         elif msg == 8:  # note off
             self.mark(data[1] + self.vis_octave * 12, 0, True)
+        # else:
+            # print(msg, data)
 
     def cb_foot(self, data, timestamp):
         """Foot controller MIDI Callback"""
@@ -955,22 +1117,23 @@ class Core:
         return True
 
     # uses button state events (mk3 pro)
-    def cb_launchpad_in(self, event, timestamp=0):
+    def cb_launchpad_in(self, lp, event, timestamp=0):
         """Launchpad MIDI Callback"""
-        if (self.launchpad_mode == "pro" or self.launchpad_mode == "promk3") and event[0] >= 255:
+        if (lp.mode == "pro" or lp.mode == "promk3") and event[0] >= 255:
         # if event[0] >= 255: # uncomment this for testing pro behavior on launchpad X
             # I'm testing the mk3 method on an lpx, so I'll check this here
-            vel = event[2] if self.launchpad_mode == 'lpx' else event[1]
+            vel = event[2] if lp.mode == 'lpx' else event[1]
             for note in self.note_set:
                 self.midi_write(self.midi_out, [160, note, vel], timestamp)
                 self.articulation.pressure(vel / 127)
-        elif self.launchpad_mode == 'lpx' and event[0] >= 255: # pressure
+        elif lp.mode == 'lpx' and event[0] >= 255: # pressure
             x = event[0] - 255
             y = 8 - (event[1] - 255)
             vel = event[2]
             note = y * 8 + x
+            note += 12
             if not self.is_macro_button(x,  8 - y - 1):
-                self.note_on([160, note, event[2]], timestamp, width=8, force_channel=self.options.launchpad_channel)
+                self.note_on([160, note, event[2]], timestamp, width=8, transpose=lp.transpose, octave=lp.get_octave(), force_channel=self.options.launchpad_channel)
                 self.articulation.pressure(vel / 127)
             else:
                 self.macro(x, 8 - y - 1, vel / 127)
@@ -978,38 +1141,25 @@ class Core:
             x = event[0]
             y = 8 - event[1]
             if 0 <= x < 8 and 0 <= y < 8:
-                self.reset_launchpad_light(x, y)
+                self.reset_launchpad_light(x, y, launchpad=lp)
                 if not self.is_macro_button(x, 8 - y - 1):
                     note = y * 8 + x
-                    self.note_off([128, note, event[2]], timestamp, width=8, force_channel=self.options.launchpad_channel)
+                    self.note_off([128, note, event[2]], timestamp, width=8, transpose=lp.transpose, octave=lp.get_octave(), force_channel=self.options.launchpad_channel)
                 else:
                     self.macro(x, 8 - y - 1, False)
+            else:
+                # Launchpad X buttons
+                lp.button(x, 8 - y - 1)
         else: # note on
             x = event[0]
             y = 8 - event[1]
             if 0 <= x < 8 and 0 <= y < 8:
-                note = y * 8 + x
-                self.set_launchpad_light(x, y, -1)
+                self.set_launchpad_light(x, y, -1, launchpad=lp)
                 if not self.is_macro_button(x, 8 - y - 1):
-                    self.note_on([144, note, event[2]], timestamp, width=8, force_channel=self.options.launchpad_channel)
+                    note = y * 8 + x
+                    self.note_on([144, note, event[2]], timestamp, width=8, transpose=lp.transpose, octave=lp.get_octave(), force_channel=self.options.launchpad_channel)
                 else:
                     self.macro(x, 8 - y - 1, True)
-            else:
-                if self.launchpad_mode == 'lpx':
-                    if x == 0:
-                        self.octave += 1
-                        self.dirty = self.dirty_lights = True
-                        self.clear_marks(use_lights=False)
-                    elif x == 1:
-                        self.octave -= 1
-                        self.dirty = self.dirty_lights = True
-                        self.clear_marks(use_lights=False)
-                    elif x == 2:
-                        self.transpose_board(-1)
-                        self.dirty = self.dirty_lights = True
-                    elif x == 3:
-                        self.transpose_board(1)
-                        self.dirty = self.dirty_lights = True
 
     # uses raw events (Launchpad X)
     # def cb_launchpad_in(self, event, timestamp=0):
@@ -1033,10 +1183,10 @@ class Core:
     #         self.note_on([160, note, event[2]], timestamp, width=8, mpe=True, curve=False)
     #     elif event[0] == 176:
     #         if event == [176, 93, 127, 0]:
-    #             self.transpose_board(-1)
+    #             self.move_board(-1)
     #             self.dirty = self.dirty_lights = True
     #         elif event == [176, 94, 127, 0]:
-    #             self.transpose_board(1)
+    #             self.move_board(1)
     #             self.dirty = self.dirty_lights = True
             
         # if events[0] >= 255:
@@ -1097,6 +1247,8 @@ class Core:
         self.quit()
 
     def __init__(self):
+        Core.CORE = self
+        
         signal.signal(signal.SIGINT, self.sig)
         signal.signal(signal.SIGTERM, self.sig)
          
@@ -1138,11 +1290,20 @@ class Core:
 
         # print('Scale Count:', scale_count)
 
-        self.options = Options()
+        self.options = Settings()
+
+        self.options.column_offset = get_option(opts, "column_offset", DEFAULT_OPTIONS.column_offset)
+        self.options.row_offset = get_option(opts, "row_offset", DEFAULT_OPTIONS.row_offset)
+        self.options.base_offset = get_option(opts, "base_offset", DEFAULT_OPTIONS.base_offset)
 
         self.options.colors = get_option(opts, "colors", DEFAULT_OPTIONS.colors)
         self.options.colors = list(self.options.colors.split(","))
         self.options.colors = list(map(lambda x: glm.ivec3(get_color(x)), self.options.colors))
+
+        self.options.launchpad_colors = get_option(opts, "launchpad_colors", DEFAULT_OPTIONS.launchpad_colors)
+        if self.options.launchpad_colors:
+            self.options.launchpad_colors = list(self.options.launchpad_colors.split(","))
+            self.options.launchpad_colors = list(int(x) for x in self.options.launchpad_colors)
 
         self.options.split_colors = get_option(opts, "split_colors", DEFAULT_OPTIONS.split_colors)
         self.options.split_colors = list(self.options.split_colors.split(","))
@@ -1237,7 +1398,7 @@ class Core:
             opts, "split_out", DEFAULT_OPTIONS.split_out
         )
         self.options.fps = get_option(opts, "fps", DEFAULT_OPTIONS.fps)
-        self.options.fps = get_option(opts, "jazz", DEFAULT_OPTIONS.jazz)
+        # self.options.fps = get_option(opts, "jazz", DEFAULT_OPTIONS.jazz)
         self.options.chord_analyzer = get_option(opts, "chord_analyzer", DEFAULT_OPTIONS.chord_analyzer)
         self.split_state = self.options.split = get_option(
             opts, "split", DEFAULT_OPTIONS.split
@@ -1252,15 +1413,24 @@ class Core:
             opts, "sustain_split", "both"
         )  # left, right, both
         if self.options.sustain_split not in ("left", "right", "both"):
-            print("Invalid sustain split value. Options: left, right, both.")
+            print("Invalid sustain split value. Settings: left, right, both.")
             sys.exit(1)
+
+        self.options.octave_separation = get_option(opts, "octave_separation", DEFAULT_OPTIONS.octave_separation)
+        self.options.octave_split = get_option(opts, "octave_split", DEFAULT_OPTIONS.octave_split)
 
         hardware_split = False
         self.options.size = get_option(opts, "size", DEFAULT_OPTIONS.size)
         if self.options.size == 128:
             self.options.width = 16
+            self.split_point = None
         elif self.options.size == 200:
             self.options.width = 25
+            self.split_point = 11
+            hardware_split = True
+        elif self.options.size < 0: # test hardware split
+            self.options.width = 16
+            self.split_point = -self.options.size
             hardware_split = True
 
         # Note: The default below is what is determined by size above.
@@ -1321,7 +1491,8 @@ class Core:
             -2
         )  # this is for both the visualizer and the keyboard simulator marking atm
         self.octave_base = -2
-        self.transpose = 0
+        # self.position.x = 0
+        self.position = glm.ivec2(0, 0) # only x is used right now
         self.rotated = False  # transpose -3 whole steps
         self.flipped = False  # vertically shift +1
         self.config_save_timer = 1.0
@@ -1342,6 +1513,9 @@ class Core:
         self.scale_notes = self.scale_db[self.scale_index]['notes']
         self.scale_root = 0
         self.tonic = 0
+        
+        self.program = 0
+        self.bank = 0
 
         self.articulation = Articulation(self)
 
@@ -1391,22 +1565,22 @@ class Core:
         self.btn_octave_up = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x + 2, y), bs), text="OCT>", manager=self.gui
         )
-        self.btn_prev_root = pygame_gui.elements.UIButton(
+        self.btn_transpose_down = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x * 2 + 2, y), (bs.x, bs.y)),
             text='<TR',
             manager=self.gui
         )
-        self.btn_next_root = pygame_gui.elements.UIButton(
+        self.btn_transpose_up = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x * 3 + 2, y), (bs.x, bs.y)),
             text='TR>',
             manager=self.gui
         )
-        self.btn_transpose_down = pygame_gui.elements.UIButton(
+        self.btn_move_left = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x * 4 + 2, y), bs),
             text="<MOV",
             manager=self.gui,
         )
-        self.btn_transpose_up = pygame_gui.elements.UIButton(
+        self.btn_move_right = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x * 5 + 2, y), bs),
             text="MOV>",
             manager=self.gui,
@@ -1537,7 +1711,10 @@ class Core:
             if "linnstrument" in name_lower:
                 print("Instrument (Out): " + name)
                 self.linn_out = rtmidi2.MidiOut()
-                self.linn_out.open_port(i)
+                try:
+                    self.linn_out.open_port(i)
+                except:
+                    print("Unable to open LinnStrument")
             elif self.options.split_out and self.options.split_out in name_lower:
                 print("Split (Out): " + name)
                 self.split_out = rtmidi2.MidiOut()
@@ -1549,15 +1726,13 @@ class Core:
 
         self.midi_in = None
         self.visualizer = None
-        self.launchpad = None
-        self.launchpad_mode = None
         
-        self.gamepad = None
-        if self.options.experimental:
-            pygame.joystick.init()
-            if pygame.joystick.get_count() > 0:
-                self.gamepad = Gamepad(self, 0)
-                print('Gamepad initialized')
+        # self.gamepad = None
+        # if self.options.experimental:
+        #     pygame.joystick.init()
+        #     if pygame.joystick.get_count() > 0:
+        #         self.gamepad = Gamepad(self, 0)
+        #         print('Gamepad initialized')
 
         innames = rtmidi2.get_in_ports()
         for i in range(len(innames)):
@@ -1579,32 +1754,39 @@ class Core:
                 self.foot_in.open_port(i)
                 self.foot_in.callback = self.cb_foot
 
+        self.launchpads = []
+        num_launchpads = 0
         if self.options.launchpad:
-            lp = None
-            if self.options.experimental:
-                lp = launchpad.LaunchpadPro()
-                if lp.Check(0):
-                    if lp.Open(0):
-                        self.launchpad_mode = "pro"
-            if launchpad.LaunchpadProMk3().Check(0):
-                lp = launchpad.LaunchpadProMk3()
+            launchpads = []
+            lp = launchpad.LaunchpadProMk3()
+            if lp.Check(0):
                 if lp.Open(0):
-                    self.launchpad_mode = "promk3"
-            if not self.launchpad_mode:
-                if launchpad.LaunchpadLPX().Check(1):
+                    self.launchpads += [Launchpad(self, lp, "promk3", num_launchpads)]
+                    num_launchpads += 1
+            lp = launchpad.LaunchpadPro()
+            if lp.Check(0):
+                if lp.Open(0):
+                    self.launchpads += [Launchpad(self, lp, "pro", num_launchpads)]
+                    num_launchpads += 1
+            lp = launchpad.LaunchpadLPX()
+            if lp.Check(1):
+                lp = launchpad.LaunchpadLPX()
+                if lp.Open(1):
+                    self.launchpads += [Launchpad(self, lp, "lpx", num_launchpads)]
+                    num_launchpads += 1
+                if launchpad.LaunchpadLPX().Check(3):
                     lp = launchpad.LaunchpadLPX()
-                    if lp.Open(1):
-                        self.launchpad_mode = "lpx"
-            if self.launchpad_mode is not None:
-                self.launchpad = lp
+                    if lp.Open(3): # second
+                        self.launchpads += [Launchpad(self, lp, "lpx", num_launchpads, self.options.octave_separation)]
+                        num_launchpads += 1
+        
+        if self.launchpads:
+            print('Launchpads:', len(self.launchpads))
 
         self.done = False
 
-        if self.launchpad_mode == "lpx":
-            lp.LedCtrlXY(0, 0, 0, 0, 63)
-            lp.LedCtrlXY(1, 0, 0, 0, 63)
-            lp.LedCtrlXY(2, 0, 63, 0, 63)
-            lp.LedCtrlXY(3, 0, 63, 0, 63)
+        for lp in self.launchpads:
+            lp.set_lights()
 
         # if self.launchpad:
         #     # use the alternate colors
@@ -1633,8 +1815,8 @@ class Core:
         # self.retro_font = pygame.font.Font("PressStart2P.ttf", FONT_SZ)
         self.clock = pygame.time.Clock()
 
-        # if transpose_board:
-        #     self.transpose_board(transpose_board)
+        # if move_board:
+        #     self.move_board(move_board)
 
         # self.setup_lights()
 
@@ -1671,13 +1853,15 @@ class Core:
         """Sets up RPN for hardware split (used on LinnStrument 200)"""
         if self.options.hardware_split:
             self.rpn(200, 1 if on else 0) # split active
+            self.rpn(202, self.split_point + 1)
 
             # lights
-            self.send_cc(0, 20, 0)
-            self.send_cc(0, 21, 1)
-            self.send_cc(0, 22, 7 if on else 0)
+            self.send_ls_cc(0, 20, 0)
+            self.send_ls_cc(0, 21, 1)
+            self.send_ls_cc(0, 22, 7 if on else 0)
         else:
             self.rpn(200, 0)
+            self.rpn(202, self.split_point if self.split_point else 8)
 
     def rpn(self, num, value):
         if not self.linn_out:
@@ -1733,25 +1917,29 @@ class Core:
 
     def bend_rpn(self, on=True):
         if on:
+            # set bend range for both split
             self.rpn(19, self.options.bend_range)
             self.rpn(119, self.options.bend_range)
         else:
+            # reset bend range for both splits
             self.rpn(19, 48)
             self.rpn(119, 48)
     
     def transpose_rpn(self, on=True):
         if on:
+            # set transpose in both splits
             self.rpn(36, 2)
             self.rpn(37, 13)
             self.rpn(136, 2)
             self.rpn(137, 13)
 
             # turn transpose light off
-            self.send_cc(0, 20, 0)
-            self.send_cc(0, 21, 4)
-            self.send_cc(0, 22, 7)
+            self.send_ls_cc(0, 20, 0)
+            self.send_ls_cc(0, 21, 4)
+            self.send_ls_cc(0, 22, 7)
 
         else:
+            # reset transpose in both splits
             self.rpn(36, 5)
             self.rpn(37, 7)
             self.rpn(136, 5)
@@ -1760,21 +1948,25 @@ class Core:
     # def test(self):
     #     self.transpose_rpn()
 
-    def transpose_board(self, val):
+    def move_board(self, val):
+        self.send_all_notes_off()
+        
         aval = abs(val)
         if aval > 1:  # more than one shift
-            sval = sign(val)
-            for rpt in range(aval):
-                self.transpose_board(sval)
-                self.transpose += sval
+            assert False
+            # sval = sign(val)
+            # for rpt in range(aval):
+            #     self.move_board(sval)
+            #     self.position.x += sval
         elif val == 1:  # shift right (add column left)
             for y in range(len(self.board)):
                 self.board[y] = [0] + self.board[y][:-1]
-            self.transpose += val
+            self.position.x += val
         elif val == -1:  # shift left (add column right)
             for y in range(len(self.board)):
                 self.board[y] = self.board[y][1:] + [0]
-            self.transpose += val
+            self.position.x += val
+        self.dirty = self.dirty_lights = True
 
     def quit(self):
         self.reset_lights()
@@ -1798,6 +1990,8 @@ class Core:
                     self.reset_light(x, y)
             y += 1
         self.dirty = True
+        if use_lights:
+            self.dirty_lights = True
 
     def mark_xy(self, x, y, state, use_lights=False):
         if self.flipped:
@@ -1837,7 +2031,7 @@ class Core:
                     octave = self.get_octave(x, y)
                     if octave == midinote // 12:
                         # print(octave)
-                        self.board[y + self.flipped][x] = state
+                        self.board[y + self.flipped][x + self.position.x] = state
                         if use_lights:
                             if state:
                                 self.set_light(x, y, self.options.mark_light, mark=True)
@@ -1869,21 +2063,29 @@ class Core:
         return self.split_state and self.split_out
 
     def set_tonic(self, val):
-        odd = (self.tonic % 2 == 1)
+        self.send_all_notes_off()
+        
         self.tonic = val
-        new_odd = (self.tonic % 2 == 1)
-        if odd != new_odd:
-            self.flipped = not self.flipped
-        if new_odd:
-            self.transpose = (self.tonic // 2 - 3) % 6
-            self.transpose -= 6
-        else:
-            self.transpose = (self.tonic // 2) % 6
+        # print('val', val)
+        # odd = (self.tonic % 2 == 1)
+        # self.tonic = val
+        # print('new tonic', self.tonic)
+        # new_odd = (self.tonic % 2 == 1)
+        # # if odd != new_odd:
+        # #     self.flipped = not self.flipped
+        # if new_odd:
+        #     self.position.x = (self.tonic // 2 - 3) % 6
+        #     self.position.x -= 6
+        # else:
+        #     self.position.x = (self.tonic // 2) % 6
+        # print('new pos', self.position.x)
+        
+        self.dirty = self.dirty_lights = True
 
     def logic(self, dt):
         # keys = pygame.key.get_pressed()
 
-        if self.launchpad:
+        for lp in self.launchpads:
             # while True:
             #     events = self.launchpad.EventRaw()
             #     if events != []:
@@ -1892,9 +2094,9 @@ class Core:
             #     else:
             #         break
             while True:
-                event = self.launchpad.ButtonStateXY(returnPressure = True)
+                event = lp.out.ButtonStateXY(returnPressure = True)
                 if event:
-                    self.cb_launchpad_in(event)
+                    self.cb_launchpad_in(lp, event)
                 else:
                     break
         
@@ -1905,6 +2107,9 @@ class Core:
             elif ev.type == pygame.KEYDOWN:
                 if ev.key == pygame.K_ESCAPE:
                     self.quit()
+                elif ev.key == pygame.K_F1:
+                    self.clear_marks(use_lights=True)
+                    self.send_all_notes_off()
                 else:
                     try:
                         n = self.keys[ev.key]
@@ -1930,15 +2135,15 @@ class Core:
                 except KeyError:
                     pass
 
-            else:
-                if self.gamepad and ev.type in (\
-                        pygame.JOYAXISMOTION,
-                        pygame.JOYBALLMOTION,
-                        pygame.JOYBUTTONDOWN,
-                        pygame.JOYBUTTONUP,
-                        pygame.JOYHATMOTION
-                    ):
-                        self.gamepad.event(ev)
+            # else:
+                # if self.gamepad and ev.type in (\
+                #         pygame.JOYAXISMOTION,
+                #         pygame.JOYBALLMOTION,
+                #         pygame.JOYBUTTONDOWN,
+                #         pygame.JOYBUTTONUP,
+                #         pygame.JOYHATMOTION
+                #     ):
+                #         self.gamepad.event(ev)
                 
             if not self.options.lite:
                 if ev.type == pygame.MOUSEMOTION:
@@ -1965,13 +2170,11 @@ class Core:
                         self.octave += 1
                         self.dirty = self.dirty_lights = True
                         self.clear_marks(use_lights=False)
-                    elif ev.ui_element == self.btn_transpose_down:
-                        self.transpose_board(-1)
-                        self.dirty = self.dirty_lights = True
+                    elif ev.ui_element == self.btn_move_left:
+                        self.move_board(-1)
                         self.clear_marks(use_lights=False)
-                    elif ev.ui_element == self.btn_transpose_up:
-                        self.transpose_board(1)
-                        self.dirty = self.dirty_lights = True
+                    elif ev.ui_element == self.btn_move_right:
+                        self.move_board(1)
                         self.clear_marks(use_lights=False)
                     # elif ev.ui_element == self.btn_mode:
                     #     # TODO: toggle mode
@@ -1986,17 +2189,17 @@ class Core:
                     #     self.dirty = True
                     elif ev.ui_element == self.btn_rotate:
                         if self.rotated:
-                            self.transpose += 3
+                            self.position.x += 3
                             self.rotated = False
                         else:
-                            self.transpose -= 3
+                            self.position.x -= 3
                             self.rotated = True
-                        self.clear_marks(use_lights=False)
                         self.dirty = self.dirty_lights = True
+                        self.clear_marks(use_lights=False)
                     elif ev.ui_element == self.btn_flip:
                         self.flipped = not self.flipped
-                        self.clear_marks(use_lights=False)
                         self.dirty = self.dirty_lights = True
+                        self.clear_marks(use_lights=False)
                     elif ev.ui_element == self.btn_split:
                         if self.split_out:
                             self.split_state = not self.split_state
@@ -2015,24 +2218,18 @@ class Core:
                         )
                         self.midi_mode_rpn()
                         self.dirty = True
-                    elif ev.ui_element == self.btn_prev_root:
+                    elif ev.ui_element == self.btn_transpose_down:
                         self.set_tonic(self.tonic - 1)
-                        self.dirty = self.dirty_lights = True
-                    elif ev.ui_element == self.btn_next_root:
+                    elif ev.ui_element == self.btn_transpose_up:
                         self.set_tonic(self.tonic + 1)
-                        self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_next_scale:
                         self.next_scale()
-                        self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_prev_scale:
                         self.prev_scale()
-                        self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_next_mode:
                         self.next_mode()
-                        self.dirty = self.dirty_lights = True
                     elif ev.ui_element == self.btn_prev_mode:
                         self.prev_mode()
-                        self.dirty = self.dirty_lights = True
                 # elif ev.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
                 #     if ev.ui_element == self.slider_velocity:
                 #         global self.options.velocity_curve
@@ -2041,11 +2238,11 @@ class Core:
 
                 self.gui.process_events(ev)
         
-        if self.launchpad:
+        if self.launchpads:
             self.articulation.logic(dt)
 
-        if self.gamepad:
-            self.gamepad.logic(dt)
+        # if self.gamepad:
+        #     self.gamepad.logic(dt)
 
         # figure out the lowest note to highlight it
         # if self.options.show_lowest_note:
@@ -2102,9 +2299,9 @@ class Core:
             #     note.logic(dt)
 
             # chord analysis for jazz mod
-            if self.options.jazz:
-                if self.dirty_chord:
-                    self.left_chord = self.analyze(self.left_chord_notes)
+            # if self.options.jazz:
+            #     if self.dirty_chord:
+            #         self.left_chord = self.analyze(self.left_chord_notes)
             
             # chord analyzer
             if self.options.chord_analyzer:
@@ -2165,7 +2362,7 @@ class Core:
             x = 0
             for cell in row:
                 # write text
-                note = self.get_note(x, y, False)
+                note = self.get_note(x, y, True)
 
                 split_chan = self.channel_from_split(x, y)
 
@@ -2279,31 +2476,31 @@ class Core:
                 x += 1
             y += 1
 
-        if self.gamepad:
-            pos = self.gamepad.positions()
-            # gp_pos.y = self.board_h - y - 1
+        # if self.gamepad:
+        #     pos = self.gamepad.positions()
+        #     # gp_pos.y = self.board_h - y - 1
             
-            circ = [None] * 2
-            for i in range(2):
-                circ[i] = ivec2(
-                    int(pos[i].x * sz + b / 2 + sz / 2),
-                    int(self.menu_sz + pos[i].y * sz + b / 2 + sz / 2),
-                )
+        #     circ = [None] * 2
+        #     for i in range(2):
+        #         circ[i] = ivec2(
+        #             int(pos[i].x * sz + b / 2 + sz / 2),
+        #             int(self.menu_sz + pos[i].y * sz + b / 2 + sz / 2),
+        #         )
                 
-                pygame.gfxdraw.aacircle(
-                    self.screen.surface,
-                    circ[i].x + 1,
-                    circ[i].y - 1,
-                    rad,
-                    ivec3(0, 255, 0),
-                )
-                # pygame.gfxdraw.filled_circle(
-                #     self.screen.surface,
-                #     circ[i].x + 1,
-                #     circ[i].y - 1,
-                #     rad,
-                #     ivec3(0, 255, 0),
-                # )
+        #         pygame.gfxdraw.aacircle(
+        #             self.screen.surface,
+        #             circ[i].x + 1,
+        #             circ[i].y - 1,
+        #             rad,
+        #             ivec3(0, 255, 0),
+        #         )
+        #         # pygame.gfxdraw.filled_circle(
+        #         #     self.screen.surface,
+        #         #     circ[i].x + 1,
+        #         #     circ[i].y - 1,
+        #         #     rad,
+        #         #     ivec3(0, 255, 0),
+        #         # )
 
         # if self.options.experimental:
         text = self.font.render(self.scale_name, True, ivec3(127))
@@ -2405,10 +2602,12 @@ class Core:
         return 0
 
     def deinit(self):
-        if self.launchpad:
-            self.launchpad.Reset()
-            self.launchpad.LedSetMode(0)
+        for lp in self.launchpads:
+            if lp.out:
+                lp.out.Reset()
+                lp.out.LedSetMode(0)
         for out in self.out:
             out.close()
             out.abort()
         self.out = []
+
