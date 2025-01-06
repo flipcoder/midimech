@@ -2317,9 +2317,10 @@ class Core:
         r = ''
         for i, note in enumerate(chord_notes):
             if note:
-                notes.append(NOTES[i % 12])
+                n = mp.degree_to_note(i)
+                notes.append(n)
         if notes:
-            r = mp.alg.detect(mp.chord(','.join(notes)))
+            r = mp.alg.detect(mp.chord(notes))
             # try:
             #     r = r[0:self.chord.index(' sort')]
             # except ValueError:
