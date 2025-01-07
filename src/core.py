@@ -478,13 +478,6 @@ class Core:
     def get_octave(self, x, y):
         """Get octave for x, y"""
         y = self.board_h - y - 1
-        # if self.flipped:
-        #     if self.tonic % 2 == 0:
-        #         y -= 1
-        #     octave = int(x + 4 + self.position.x + y * 2.5) // 6
-        # else:
-        if self.tonic % 2:
-            y -= 1
         octave = int(x + 4 + self.position.x + y * 2.5) // 6
         return octave
 
