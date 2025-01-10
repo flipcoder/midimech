@@ -2017,7 +2017,7 @@ class Core:
             y = 0
         for row in rows:
             x = 0
-            for x in range(len(row)):
+            for x in range(-1 * self.position.x, len(row)-self.position.x): #this band aids bug for 1 move right                
                 idx = self.get_note_index(x, y, transpose=False)
                 # print(x, y, midinote%12, idx)
                 if midinote % 12 == idx:
@@ -2164,10 +2164,10 @@ class Core:
                         self.dirty = self.dirty_lights = True
                         self.clear_marks(use_lights=False)
                     elif ev.ui_element == self.btn_move_left:
-                        self.move_board(-1)
+                        self.move_board(1)
                         self.clear_marks(use_lights=False)
                     elif ev.ui_element == self.btn_move_right:
-                        self.move_board(1)
+                        self.move_board(-1)
                         self.clear_marks(use_lights=False)
                     # elif ev.ui_element == self.btn_mode:
                     #     # TODO: toggle mode
