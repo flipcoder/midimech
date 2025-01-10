@@ -93,6 +93,15 @@ class Core:
         self.set_mode((self.mode_index + ofs) % self.scale_notes.count('x'))
         self.dirty = self.dirty_lights = True
 
+    def toggle_sharps_flats(self, ofs=1):
+        if (self.use_sharps):
+            self.use_sharps = False
+            self.NOTES = NOTES_FLATS
+        else:
+            self.use_sharps = True
+            self.NOTES = NOTES_SHARPS
+        self.dirty = self.dirty_lights = True
+
     def prev_scale(self, ofs=1):
         self.next_scale(-ofs)
 
@@ -324,7 +333,7 @@ class Core:
         y = self.board_h - y - 1
         x += self.options.base_offset
         tr = self.tonic if transpose else 0
-        return (row_offset * y + column_offset * x + tr) % len(NOTES)
+        return (row_offset * y + column_offset * x + tr) % len(self.NOTES)
         # ofs = (self.board_h - y) // 2 + BASE_OFFSET
         # step = 2 if WHOLETONE else 1
         # tr = self.tonic if transpose else 0
@@ -335,7 +344,7 @@ class Core:
 
     def get_note(self, x, y, transpose=True):
         """Get note name for x, y"""
-        return NOTES[self.get_note_index(x, y, transpose=transpose)]
+        return self.NOTES[self.get_note_index(x, y, transpose=transpose)]
 
     def get_color(self, x, y):
         """Get color for x, y"""
@@ -1629,6 +1638,11 @@ class Core:
             text='MOD>',
             manager=self.gui
         )
+        self.btn_sharps_flats = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x * 16 + 2, y), (bs.x, bs.y)),
+            text='#/b',
+            manager=self.gui
+        )
         # self.next_scale = pygame_gui.elements.UIButton(
         #     relative_rect=pygame.Rect((bs.x * 11 + 2, y), (bs.x, bs.y)),
         #     text='SCL>',
@@ -1695,6 +1709,9 @@ class Core:
         self.linn_out = None
         self.midi_out = None
         self.split_out = None
+        self.use_sharps = True
+        self.NOTES = NOTES_SHARPS
+
 
         outnames = rtmidi2.get_out_ports()
         for i in range(len(outnames)):
@@ -2223,6 +2240,8 @@ class Core:
                         self.next_mode()
                     elif ev.ui_element == self.btn_prev_mode:
                         self.prev_mode()
+                    elif ev.ui_element == self.btn_sharps_flats:
+                        self.toggle_sharps_flats()
                 # elif ev.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
                 #     if ev.ui_element == self.slider_velocity:
                 #         global self.options.velocity_curve
