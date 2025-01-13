@@ -77,7 +77,7 @@ That being said, I hope you enjoy it and have fun!
 
 ### Windows
 
-- [Download (Win)](https://github.com/flipcoder/midimech/releases)
+- [Download (Win)](https://github.com/zass30/midimech/releases)
 
 After downloading, make sure to follow the instructions under `Setup`.
 
@@ -87,7 +87,7 @@ After downloading, make sure to follow the instructions under `Setup`.
 
 - Download the project by typing the following commands in terminal:
 ```
-git clone https://github.com/flipcoder/midimech
+git clone https://github.com/zass30/midimech
 ```
 
 - Switch to the new project folder:
