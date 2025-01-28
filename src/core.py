@@ -1056,11 +1056,8 @@ class Core:
                 #         self.midi_write(self.split_out, data, timestamp)
                 #     else:
                 #         self.midi_write(self.midi_out, data, timestamp)
-                elif note and note.location is not None:
-                    col = note.location.x
-                    row = note.location.y
-                    split_chan = self.channel_from_split(col, row)
-                    if split_chan:
+                elif note and note.split is not None:
+                    if note.split:
                         self.midi_write(self.split_out, data, timestamp)
                     else:
                         self.midi_write(self.midi_out, data, timestamp)
