@@ -1056,11 +1056,8 @@ class Core:
                 #         self.midi_write(self.split_out, data, timestamp)
                 #     else:
                 #         self.midi_write(self.midi_out, data, timestamp)
-                elif note and note.location is not None:
-                    col = note.location.x
-                    row = note.location.y
-                    split_chan = self.channel_from_split(col, row)
-                    if split_chan:
+                elif note and note.split is not None:
+                    if note.split:
                         self.midi_write(self.split_out, data, timestamp)
                     else:
                         self.midi_write(self.midi_out, data, timestamp)
@@ -1641,6 +1638,11 @@ class Core:
         self.btn_sharps_flats = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect((bs.x * 16 + 2, y), (bs.x, bs.y)),
             text='#/b',
+            manager=self.gui  
+        )
+        self.btn_quit = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect((bs.x * 17 + 2, y), (bs.x, bs.y)),
+            text='QUIT',
             manager=self.gui
         )
         # self.next_scale = pygame_gui.elements.UIButton(
@@ -2242,6 +2244,8 @@ class Core:
                         self.prev_mode()
                     elif ev.ui_element == self.btn_sharps_flats:
                         self.toggle_sharps_flats()
+                    elif ev.ui_element == self.btn_quit:
+                        self.quit()    
                 # elif ev.type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
                 #     if ev.ui_element == self.slider_velocity:
                 #         global self.options.velocity_curve
