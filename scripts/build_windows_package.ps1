@@ -1,3 +1,3 @@
 cd .. 
-python -m PyInstaller --onefile midimech.py
+python -m PyInstaller --icon=icon.ico --onefile midimech.py
 cd scripts

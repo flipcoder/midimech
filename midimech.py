@@ -26,6 +26,11 @@ import pygame_gui
 #     print("The project dependencies have changed! Run the requirements setup command again!")
 #     sys.exit(1)
 
+def error(err):
+    print(err)
+    input()
+    sys.exit(1)
+
 try:
     import launchpad_py as launchpad
 except ImportError:
@@ -45,7 +50,6 @@ try:
     import musicpy as mp
 except ImportError:
     error("The project dependencies have changed! Run the requirements setup command again!")
-
 
 def main():
     core = None

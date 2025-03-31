@@ -109,8 +109,27 @@ def decompose_pitch_bend(pitch_bend_bytes):
 
 def compose_pitch_bend(pitch_bend_norm):
     pitch_bend_value = int((pitch_bend_norm + 1.0) * 8192)
-    pitch_bend_bytes = [pitch_bend_value & 0x7F, (pitch_bend_value >> 7) & 0x7F]
-    return pitch_bend_bytes
+    return pitch_bend_value & 0x7F, (pitch_bend_value >> 7) & 0x7F
+
+def decompose_pitch_bend(pitch_bend_bytes):
+    pitch_bend_value = (pitch_bend_bytes[0] << 7) + pitch_bend_bytes[1]
+    pitch_bend_norm = (pitch_bend_value - 8192) / 8191.5  # Adjust for exact [0, 16383] range
+    return pitch_bend_norm
+
+def compose_pitch_bend(norm, scale):
+    # scale is the range in semitones that norm=1.0 represents
+    # Map [-1, 1] to [0, 16383], scaling norm by the desired range
+    # Assuming a default synth range of ±2 semitones (16383 = 2 semitones)
+    scale_factor = scale / 2.0  # Adjust relative to default ±2 semitones
+    scaled_norm = norm * scale_factor
+    # Clamp to [-1, 1] to stay within synth's max range
+    scaled_norm = max(-1.0, min(1.0, scaled_norm))
+    # Convert to MIDI 14-bit value: [-1, 1] -> [0, 16383]
+    pitch_bend_value = int(((scaled_norm + 1.0) / 2.0) * 16383 + 0.5)
+    pitch_bend_value = max(0, min(16383, pitch_bend_value))
+    lsb = pitch_bend_value & 0x7F
+    msb = (pitch_bend_value >> 7) & 0x7F
+    return lsb, msb
 
 def decode_value(value):
     lsb = value & 0x7F

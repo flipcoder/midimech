@@ -1,6 +1,7 @@
-from enum import Enum
+
 from src.util import *
 from src.constants import *
+from enum import Enum
 
 class Articulation:
     State = Enum('state', 'off pre attack hold release')

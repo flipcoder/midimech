@@ -20,6 +20,12 @@ class Settings:
     # Color scheme using webcolors
     # split_colors: str = "cyan,blue,blue,blue,blue,blue,blue,blue,blue,blue,blue,blue"
     launchpad_colors: str = '5,1,9,1,13,122,1,37,45,94,1,95'
+
+    # By default we'll rotate the second launchpad so we can fit them together better.
+    rotate_launchpads: bool = True
+    
+    # Use this if the wrong launchpad is rotated (left vs right)
+    swap_launchpads: bool = False
     
     colors: str = "red,darkred,orange,goldenrod,yellow,green,darkolivegreen,blue,darkslateblue,indigo,darkorchid,pink"
     # colors: str = "cyan,green,green,green,green,green,green,green,green,green,green,green"
@@ -34,7 +40,7 @@ class Settings:
     # lite mode (no extra gfx, less processing)
     lite: bool = False
 
-    # Custom velocity curve exponent, ex: 0.5 = more sensitive
+    # Bend the velocity curve, examples: 0.5=sqrt, 1.0=default, 2.0=squared
     velocity_curve: float = 1.0
     
     # Velocity curve exponent for foot controller curve bending
@@ -84,7 +90,7 @@ class Settings:
     height: int = 8
 
     # launchpad viberato method (off, mod, or pitch)
-    vibrato: str = 'mod'
+    vibrato: str = 'off'
     
     # Set scale based on left hand chord (not yet impl)
     jazz: bool = False
@@ -105,6 +111,9 @@ class Settings:
     
     # octave splitting the linn and transposing octaves on the right side
     octave_split: int = 0
+
+    # Delay between RPN message batches
+    rpn_delay: float = 0.1
 
 DEFAULT_OPTIONS = Settings()
 

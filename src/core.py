@@ -17,6 +17,16 @@ from src.launchpad import Launchpad
 from src.articulation import Articulation
 # from src.gamepad import Gamepad
 
+GRADIENT = False
+
+try:
+    from easygui import msgbox
+except ImportError:
+    print("The project dependencies have changed! Run the requirements setup command again!")
+    sys.exit(1)
+
+msgbox("test")
+
 with open(os.devnull, "w") as devnull:
     # suppress pygame messages (to keep console output clean)
     stdout = sys.stdout
@@ -26,25 +36,30 @@ with open(os.devnull, "w") as devnull:
     sys.stdout = stdout
 import pygame_gui
 
+def error(err):
+    msgbox(err)
+    sys.exit(1)
+
+def dependency_error():
+    error("The project dependencies have changed! Run the requirements setup command again!")
+
 try:
     import launchpad_py as launchpad
 except ImportError:
     try:
         import launchpad
     except ImportError:
-        error("The project dependencies have changed! Run the requirements setup command again!")
+        dependency_error()
 
 try:
     import yaml
 except ImportError:
-    error("The project dependencies have changed! Run the requirements setup command again!")
-
-# import mido
+    dependency_error()
 
 try:
     import musicpy as mp
 except ImportError:
-    error("The project dependencies have changed! Run the requirements setup command again!")
+    dependency_error()
 
 class Core:
     CORE = None
@@ -150,8 +165,8 @@ class Core:
             return
         # for ch in range(0,15):
         ch = 0
-        self.midi_write(self.midi_out, [0xb0 | ch, 120, 0], 0)
-        self.midi_write(self.midi_out, [0xb0 | ch, 123, 0], 0)
+        self.midi_write(self.midi_out, [0xb0 | ch, 120, 0], 0) # all sounds off
+        self.midi_write(self.midi_out, [0xb0 | ch, 123, 0], 0) # all notes off
 
     def ls_color(self, x, y, col):
         """Set LinnStrument pad color"""
@@ -159,8 +174,21 @@ class Core:
             self.send_ls_cc(0, 20, x + 1)
             self.send_ls_cc(0, 21, self.board_h - y - 1)
             self.send_ls_cc(0, 22, col)
+            # time.sleep(self.options.rpn_delay)
 
-    def set_light(self, x, y, col, index=None, mark=False):  # col is [1,11], 0 resets
+    def transform_launchpad_coord(self, idx, x, y):
+        if self.launchpads[idx].rot:
+            x, y = y, x
+            x = (8-x-1)
+        return x, y
+
+    def untransform_launchpad_coord(self, idx, x, y):
+        if self.launchpads[idx].rot:
+            x = (8-x-1)
+            x, y = y, x
+        return x, y
+
+    def set_light(self, x, y, col, index=None, mark=False, transform=True):  # col is [1,11], 0 resets
         """Set light to color `col` at x, y if in range and connected"""
         if y < 0 or y >= self.board_h:
             return
@@ -186,19 +214,23 @@ class Core:
                         lp_col = 0
                     else:
                         lp_col = ivec3(0)
-                if 0 <= x < 8 and 0 <= y < 8:
-                    if not self.is_macro_button(x, y):
+                if transform:
+                    xx, yy = self.transform_launchpad_coord(lp.index, x, y)
+                else:
+                    xx, yy = x, y
+                if 0 <= xx < 8 and 0 <= yy < 8:
+                    if not self.is_macro_button(xx, yy):
                         if self.options.launchpad_colors:
-                            lp.out.LedCtrlXYByCode(x, y+1, lp_col)
+                            lp.out.LedCtrlXYByCode(xx, yy+1, lp_col)
                         else:
-                            lp.out.LedCtrlXY(x, y+1, lp_col[0], lp_col[1], None if lp_col[2] == 0 else lp_col[2])
+                            lp.out.LedCtrlXY(xx, yy+1, lp_col[0], lp_col[1], None if lp_col[2] == 0 else lp_col[2])
                     else:
                         if self.options.launchpad_colors:
-                            lp.out.LedCtrlXYByCode(x, y+1, 3)
+                            lp.out.LedCtrlXYByCode(xx, yy+1, 3)
                         else:
-                            lp.out.LedCtrlXY(x, y+1, 63, 63, 63)
+                            lp.out.LedCtrlXY(xx, yy+1, 63, 63, 63)
 
-    def reset_light(self, x, y, reset_red=True):
+    def reset_light(self, x, y, reset_red=True, transform=True):
         """Reset the light at x, y"""
         note = self.get_note_index(x, y, transpose=False)
         
@@ -223,10 +255,10 @@ class Core:
             except IndexError:
                 light_col = 7
 
-        self.set_light(x, y, light_col, note)
+        self.set_light(x, y, light_col, note, transform=transform)
         self.mark_lights[y][x] = False
 
-    def reset_launchpad_light(self, x, y, launchpad=None):
+    def reset_launchpad_light(self, x, y, launchpad=None, transform=True):
         """Reset the launchpad light at x, y"""
         note = self.get_note_index(x, 8-y-1, transpose=False)
         # if self.is_split():
@@ -238,18 +270,23 @@ class Core:
         # else:
         #     light_col = self.options.lights[note]
         for lp in ([launchpad] if launchpad else self.launchpads):
-            self.set_launchpad_light(x, y, note)
+            self.set_launchpad_light(x, y, note, transform=True)
 
-    def set_mark_light(self, x, y, state=True, launchpad=None):
+    # transform: rotate launchpad if in rotated mode
+    def set_mark_light(self, x, y, state=True, launchpad=None, transform=True):
         """Set launchpad light to touched color"""
         self.mark_lights[y][x] = state
         for lp in ([launchpad] if launchpad else self.launchpads):
             lp_col = self.options.mark_color
             if state:
-                lp.out.LedCtrlXY(x, y, lp_col[0], lp_col[1], lp_col[2])
+                if transform:
+                    xx, yy = self.transform_launchpad_coord(lp.index, x, y)
+                else:
+                    xx, yy = x, y
+                lp.out.LedCtrlXY(xx, yy, lp_col[0], lp_col[1], lp_col[2])
 
     # `color` below is an scale index (0, 1, 2...)
-    def set_launchpad_light(self, x, y, color, launchpad=None):
+    def set_launchpad_light(self, x, y, color, launchpad=None, transform=True):
         """Set launchpad light to color index"""
         if self.is_macro_button(x, 8 - y - 1):
             if self.options.launchpad_colors:
@@ -275,10 +312,14 @@ class Core:
                     col = self.options.mark_color / 4
 
         for lp in ([launchpad] if launchpad else self.launchpads):
+            if transform:
+                xx, yy = self.transform_launchpad_coord(lp.index, x, y)
+            else:
+                xx, yy = x, y
             if self.options.launchpad_colors:
                 lp.out.LedCtrlXYByCode(x, 8-y, col)
             else:
-                lp.out.LedCtrlXY(x, 8-y, col[0], col[1], col[2])
+                lp.out.LedCtrlXY(xx, 8-yy, col[0], col[1], col[2])
 
     def setup_lights(self):
         """Set all lights"""
@@ -549,7 +590,7 @@ class Core:
     def is_mpe(self):
         return self.options.one_channel == 0
 
-    def note_on(self, data, timestamp, width=None, curve=True, mpe=None, octave=0, transpose=0, force_channel=None):
+    def note_on(self, data, timestamp, width=None, curve=True, mpe=None, octave=0, transpose=0, force_channel=None, bend=0.0):
         # if mpe is None:
         #     mpe = self.options.mpe
         d0 = data[0]
@@ -708,6 +749,18 @@ class Core:
             self.chord_notes[midinote] = True
             self.note_set.add(midinote)
             self.dirty_chord = True
+
+        if GRADIENT:
+            if x > 6:
+                bend = (x-6) - y/2
+                bend *= (1/6)
+                try:
+                    # print(bend)
+                    pitch_lsb, pitch_msb = compose_pitch_bend(bend, 1/12)
+                    # print(pitch_msb, pitch_lsb)
+                    self.midi_write(self.midi_out, [0xE0 | ch, pitch_lsb, pitch_msb], timestamp)
+                except Exception as e:
+                    print(e)
 
         if self.is_split():
             if split_chan == 0:
@@ -1133,6 +1186,7 @@ class Core:
             note = y * 8 + x
             note += 12
             if not self.is_macro_button(x,  8 - y - 1):
+                # x, y = self.transform_launchpad_coord(lp.index, x, y)
                 self.note_on([160, note, event[2]], timestamp, width=8, transpose=lp.transpose, octave=lp.get_octave(), force_channel=self.options.launchpad_channel)
                 self.articulation.pressure(vel / 127)
             else:
@@ -1141,8 +1195,10 @@ class Core:
             x = event[0]
             y = 8 - event[1]
             if 0 <= x < 8 and 0 <= y < 8:
-                self.reset_launchpad_light(x, y, launchpad=lp)
+                # x2, y2 = self.untransform_launchpad_coord(lp.index, x, y)
+                # self.reset_launchpad_light(x2, y2, launchpad=lp, transform=False)
                 if not self.is_macro_button(x, 8 - y - 1):
+                    x, y = self.transform_launchpad_coord(lp.index, x, y)
                     note = y * 8 + x
                     self.note_off([128, note, event[2]], timestamp, width=8, transpose=lp.transpose, octave=lp.get_octave(), force_channel=self.options.launchpad_channel)
                 else:
@@ -1154,8 +1210,10 @@ class Core:
             x = event[0]
             y = 8 - event[1]
             if 0 <= x < 8 and 0 <= y < 8:
-                self.set_launchpad_light(x, y, -1, launchpad=lp)
+                # x2, y2 = self.untransform_launchpad_coord(lp.index, x, y)
+                # self.set_launchpad_light(x2, y2, -1, launchpad=lp, transform=False)
                 if not self.is_macro_button(x, 8 - y - 1):
+                    x, y = self.transform_launchpad_coord(lp.index, x, y)
                     note = y * 8 + x
                     self.note_on([144, note, event[2]], timestamp, width=8, transpose=lp.transpose, octave=lp.get_octave(), force_channel=self.options.launchpad_channel)
                 else:
@@ -1300,6 +1358,9 @@ class Core:
         self.options.colors = list(self.options.colors.split(","))
         self.options.colors = list(map(lambda x: glm.ivec3(get_color(x)), self.options.colors))
 
+        self.options.swap_launchpads = get_option(opts, "swap_launchpads", self.options.swap_launchpads)
+        self.options.rotate_launchpads = get_option(opts, "rotate_launchpads", self.options.rotate_launchpads)
+
         self.options.launchpad_colors = get_option(opts, "launchpad_colors", DEFAULT_OPTIONS.launchpad_colors)
         if self.options.launchpad_colors:
             self.options.launchpad_colors = list(self.options.launchpad_colors.split(","))
@@ -1348,6 +1409,10 @@ class Core:
             self.options.lite = get_option(
                 opts, "lite", DEFAULT_OPTIONS.lite
             )
+
+        self.options.rpn_delay = get_option(
+            opts, "rpn_delay", DEFAULT_OPTIONS.rpn_delay
+        )
 
         # bend the velocity curve, examples: 0.5=sqrt, 1.0=default, 2.0=squared
         self.options.velocity_curve = get_option(
@@ -1544,6 +1609,7 @@ class Core:
         pygame.display.set_caption(TITLE)
         self.icon = pygame.image.load('icon.png')
         pygame.display.set_icon(self.icon)
+        pygame.display.set_allow_screensaver(True)
         # if FOCUS:
         #     pygame.mouse.set_visible(0)
         #     pygame.event.set_grab(True)
@@ -1780,8 +1846,11 @@ class Core:
                         self.launchpads += [Launchpad(self, lp, "lpx", num_launchpads, self.options.octave_separation)]
                         num_launchpads += 1
         
-        if self.launchpads:
-            print('Launchpads:', len(self.launchpads))
+        # if self.launchpads:
+        #     launchpad_count = len(self.launchpads)
+        #     print('Launchpads:', launchpad_count)
+        #     if launchpad_count >= 2 and self.options.swap_launchpads:
+        #         self.launchpads = self.launchpads[::-1]
 
         self.done = False
 
@@ -1822,6 +1891,8 @@ class Core:
 
         self.setup_rpn()
         # self.test()
+
+        # msgbox("Welcome to midimech!\n\nThis project is still in development and some features are experimental. Feel free to play around and report any bugs to flipcoder. Thanks!", "midimech")
 
     def midi_mode_rpn(self, on=True):
         if on:
@@ -1875,7 +1946,7 @@ class Core:
         self.midi_write(self.linn_out, [176, 38, value_lsb])
         self.midi_write(self.linn_out, [176, 101, 127])
         self.midi_write(self.linn_out, [176, 100, 127])
-        time.sleep(0.05)
+        time.sleep(self.options.rpn_delay)
 
     def mpe_rpn(self, on=True):
         """Sets up MPE settings (except MIDI mode)"""
@@ -2354,7 +2425,7 @@ class Core:
 
         self.screen.surface.fill((0, 0, 0))
         b = 2  # border
-        sz = self.screen_w / self.board_w
+        sz = self.scale.x
         y = 0
         rad = int(sz // 2 - 8)
 

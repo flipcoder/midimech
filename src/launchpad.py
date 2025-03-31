@@ -8,10 +8,14 @@ class Launchpad(Device):
         self.mode = mode
         self.index = index
         self.octave_separation = octave_separation
+        self.rot = False
+        if core.options.rotate_launchpads:
+            if core.options.swap_launchpads:
+                self.rot = not bool(index)
+            else:
+                self.rot = bool(index)
 
         print("Launchpad", mode, 'Connected! (#' + str(index) + ")")
-
-        # self.pos = glm.ivec2(0, 0)
 
     def button(self, x, y):
         # if self.mode == 'lpx':
@@ -80,7 +84,7 @@ class Launchpad(Device):
                 self.core.prev_program()
 
     def set_lights(self):
-        # if self.mode == "lpx":
+
         self.out.LedCtrlXY(0, 0, 0, 0, 63)
         self.out.LedCtrlXY(1, 0, 0, 0, 63)
         self.out.LedCtrlXY(2, 0, 63, 0, 63)
