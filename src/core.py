@@ -25,8 +25,6 @@ except ImportError:
     print("The project dependencies have changed! Run the requirements setup command again!")
     sys.exit(1)
 
-msgbox("test")
-
 with open(os.devnull, "w") as devnull:
     # suppress pygame messages (to keep console output clean)
     stdout = sys.stdout
