@@ -80,8 +80,8 @@ class Settings:
     size: int = 128
 
     # Right now these are calculated from size, don't use
-    width: int = 16
-    height: int = 8
+    width: int = 0
+    height: int = 0
 
     # launchpad viberato method (off, mod, or pitch)
     vibrato: str = 'mod'

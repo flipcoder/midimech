@@ -7,6 +7,7 @@ import rtmidi2
 from dataclasses import dataclass
 from glm import ivec2, vec2, ivec3, vec3
 import time
+import colorsys
 
 from src.util import *
 from src.constants import *
@@ -1419,19 +1420,29 @@ class Core:
         self.options.octave_separation = get_option(opts, "octave_separation", DEFAULT_OPTIONS.octave_separation)
         self.options.octave_split = get_option(opts, "octave_split", DEFAULT_OPTIONS.octave_split)
 
+        self.options.width = get_option(opts, "width", 0)
+        self.options.height = get_option(opts, "height", 0)
+
+        self.split_point = None
+        
         hardware_split = False
-        self.options.size = get_option(opts, "size", DEFAULT_OPTIONS.size)
-        if self.options.size == 128:
-            self.options.width = 16
-            self.split_point = None
-        elif self.options.size == 200:
-            self.options.width = 25
-            self.split_point = 11
-            hardware_split = True
-        elif self.options.size < 0: # test hardware split
-            self.options.width = 16
-            self.split_point = -self.options.size
-            hardware_split = True
+        self.split_point = 11
+        if self.options.width<=0 or self.options.height<=0:
+            self.options.size = get_option(opts, "size", DEFAULT_OPTIONS.size)
+            if self.options.size == 200:
+                self.options.width = 25
+                self.options.height = 8
+                self.split_point = 11
+                hardware_split = False
+            elif self.options.size < 0: # test hardware split
+                self.options.width = 16
+                self.options.height = 8
+                self.split_point = -self.options.size
+                hardware_split = True
+            else: # if self.options.size == 128:
+                self.options.width = 16
+                self.options.height = 8
+                self.split_point = None
 
         # Note: The default below is what is determined by size above.
         # Overriding hardware_split is only useful for 128 user testing 200 behavior
@@ -1477,10 +1488,11 @@ class Core:
         self.scale = vec2(64.0)
 
         self.board_w = self.options.width
+        self.board_h = self.options.height
         self.board_sz = ivec2(self.board_w, self.board_h)
         self.screen_w = self.board_w * self.scale.x
         self.screen_h = self.board_h * self.scale.y + self.menu_sz + self.status_sz
-        self.button_sz = self.screen_w / self.board_w
+        self.button_sz = 64
         self.screen_sz = ivec2(self.screen_w, self.screen_h)
 
         self.lowest_note = None  # x,y location of lowest note currently pressed
@@ -1822,6 +1834,14 @@ class Core:
 
         self.setup_rpn()
         # self.test()
+
+        self.leds = None
+        # try:
+        #     from src.leds import LEDGridInterface
+        #     self.leds = LEDGridInterface()
+        #     print("LEDs initialized")
+        # except Exception as e:
+        #     print("LEDs not initialized: ", e)
 
     def midi_mode_rpn(self, on=True):
         if on:
@@ -2357,6 +2377,10 @@ class Core:
         sz = self.screen_w / self.board_w
         y = 0
         rad = int(sz // 2 - 8)
+        T = pygame.time.get_ticks()/1000
+
+        if self.leds:
+            self.leds.clear(BLACK)
 
         for row in self.board:
             x = 0
@@ -2376,12 +2400,36 @@ class Core:
                 # else:
                 #     col = self.get_color(x, y)
                 lit_col = ivec3(255, 0, 0)
-                unlit_col = copy.copy(self.get_color(x, y) or ivec3(0))
+                col = self.get_color(x, y) or ivec3(0)
+                unlit_col = copy.copy(col)
                 black = unlit_col == ivec3(0)
                 inner_col = copy.copy(unlit_col)
                 for i in range(len(unlit_col)):
                     unlit_col[i] = min(255, unlit_col[i] * 1.5)
 
+                if self.leds:
+                    if cell:
+                        lit = glm.vec3(1,1,1)
+                        self.leds.put(lit, x, y)
+                        # self.leds.put(red, x*2+1, y*2)
+                        # self.leds.put(red, x*2+1, y*2+1)
+                        # self.leds.put(red, x*2, y*2+1)
+                    else:
+                        colf = glm.vec3(col.x / 255, col.y / 255, col.z / 255)
+                        # # change saturation
+                        # r, g, b = colf.x, colf.y, colf.z
+                        # h, s, v = colorsys.rgb_to_hsv(r, g, b)
+                        # # if v > 0.1:
+                        # #     h = (h + T * 0.1) % 1.0
+                        # # h, s, v = color_grade_hsv((h, s, v))
+                        # r, g, b = colorsys.hsv_to_rgb(h, s, v)
+                        # colf = glm.vec3(r, g, b)
+                        
+                        self.leds.put(colf, x, y)
+                        # self.leds.put(colf, x*2+1, y*2)
+                        # self.leds.put(colf / 2, x*2+1, y*2+1)
+                        # self.leds.put(colf / 2, x*2, y*2+1)
+                    
                 ry = y + self.menu_sz  # real y
                 # pygame.gfxdraw.box(self.screen.surface, [x*sz + b, self.menu_sz + y*sz + b, sz - b, sz - b], unlit_col)
                 rect = [x * sz + b, self.menu_sz + y * sz + b, sz - b, sz - b]
@@ -2475,6 +2523,9 @@ class Core:
 
                 x += 1
             y += 1
+
+        if self.leds:
+            self.leds.draw()
 
         # if self.gamepad:
         #     pos = self.gamepad.positions()

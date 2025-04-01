@@ -13,6 +13,7 @@ FGAB = ivec3(64 * BRIGHTNESS)
 GRAY = ivec3(16 * BRIGHTNESS)
 BORDER_COLOR = ivec3(48)
 DARK = ivec3(0)
+BLACK = ivec3(0)
 BASE_OFFSET = -4 # linnstrument
 # CHORD_ANALYZER = get_option(opts,'chord_analyzer',False)
 EPSILON = 0.0001

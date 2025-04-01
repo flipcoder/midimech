@@ -32,19 +32,19 @@ except ImportError:
     try:
         import launchpad
     except ImportError:
-        error("The project dependencies have changed! Run the requirements setup command again!")
+        print("The project dependencies have changed! Run the requirements setup command again!")
 
 try:
     import yaml
 except ImportError:
-    error("The project dependencies have changed! Run the requirements setup command again!")
+    print("The project dependencies have changed! Run the requirements setup command again!")
 
 # import mido
 
 try:
     import musicpy as mp
 except ImportError:
-    error("The project dependencies have changed! Run the requirements setup command again!")
+    print("The project dependencies have changed! Run the requirements setup command again!")
 
 
 def main():
