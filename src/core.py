@@ -18,6 +18,11 @@ from src.launchpad import Launchpad
 from src.articulation import Articulation
 # from src.gamepad import Gamepad
 
+LEDS = False
+if LEDS:
+    from src.leds import LEDGridDisplay
+    print(LEDGridDisplay)
+
 with open(os.devnull, "w") as devnull:
     # suppress pygame messages (to keep console output clean)
     stdout = sys.stdout
@@ -1836,12 +1841,12 @@ class Core:
         # self.test()
 
         self.leds = None
-        # try:
-        #     from src.leds import LEDGridInterface
-        #     self.leds = LEDGridInterface()
-        #     print("LEDs initialized")
-        # except Exception as e:
-        #     print("LEDs not initialized: ", e)
+        if LEDS:
+            try:
+                self.leds = LEDGridDisplay()
+                print("LEDs initialized")
+            except Exception as e:
+                print("LEDs not initialized: ", e)
 
     def midi_mode_rpn(self, on=True):
         if on:
@@ -2410,7 +2415,7 @@ class Core:
                 if self.leds:
                     if cell:
                         lit = glm.vec3(1,1,1)
-                        self.leds.put(lit, x, y)
+                        self.leds.put(lit, x, y, 2)
                         # self.leds.put(red, x*2+1, y*2)
                         # self.leds.put(red, x*2+1, y*2+1)
                         # self.leds.put(red, x*2, y*2+1)
@@ -2425,7 +2430,7 @@ class Core:
                         # r, g, b = colorsys.hsv_to_rgb(h, s, v)
                         # colf = glm.vec3(r, g, b)
                         
-                        self.leds.put(colf, x, y)
+                        self.leds.put(colf, x, y, 2)
                         # self.leds.put(colf, x*2+1, y*2)
                         # self.leds.put(colf / 2, x*2+1, y*2+1)
                         # self.leds.put(colf / 2, x*2, y*2+1)
