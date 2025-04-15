@@ -39,9 +39,9 @@ LinnStrument Community Discord: https://discord.gg/h2BcrzmTXe
 
 ## Advantages
 
-- Notes that sound good together are closer together.  Notes that sound worse are furthest apart.  Mistakes will be less likely and more obvious!
+- Notes that sound good together are closer together.  Notes that sound worse are furthest apart.  Mistakes will be less likely and won't sound as dissonant.
 - Like the LinnStrument's layout, it is also isomorphic (the same chord and scale shapes can be played anywhere)
-- The most common chords and scales are far easier to play and remember than other layouts.
+- The most common chords and scales are far easier to play and remember than those of other layouts.
 - Extended range compared to standard +5 tuning, making room for using a split.
 - Less finger stretching than other layouts when playing chords, which may help ergonomically.
 - Arpeggios are quite smooth, as you're simply walking stacked shapes.
@@ -164,18 +164,13 @@ launchpad=false
 
 ### Vibrato
 
-Midimech adds a cool feature to the Launchpad where it can detect wiggling a note to create a vibrato effect.  This is enabled by default and mapped to CC0.  If your synth supports CC0 vibrato, you should hear the vibrato activate by rocking your finger back and forth from left to right while pressing the note down.
+Midimech adds a cool feature to the Launchpad where it can detect wiggling a note to create a vibrato effect.  This is disabled by default and mapped to CC0.  If your synth supports CC0 vibrato, you should hear the vibrato activate by rocking your finger back and forth from left to right while pressing the note down.
 
-You can disable it in settings.ini using:
+You can enable it in settings.ini using:
 ```
-vibrato=off
+vibrato=mod
 ```
 
-There is also experimental support for pitch wheel vibrato using:
-
-```
-vibrato=pitch
-```
 
 ## Color Schemes
 
