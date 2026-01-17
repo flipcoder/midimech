@@ -96,6 +96,9 @@ class Settings:
 
     bend_range: int = 24
 
+    # Pitch bend scaling for mech layout (1.0 = no scaling, 2.0 = double)
+    bend_scale: float = 1.0
+
     row_offset: int = 5
     column_offset: int = 2
     base_offset: int = 4
