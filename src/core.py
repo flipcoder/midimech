@@ -957,6 +957,15 @@ class Core:
             
             skip = False
             if msg == 14:
+                # Scale pitch bend for mech layout (bend_scale in settings.ini)
+                # Especially useful for whole-tone slides - smooth bends let you
+                # reliably hit semitones in between the whole tones
+                # NOTE: LinnStrument Pitch Quantize must be OFF for smooth slides
+                # NOTE: Synth must have MPE enabled for per-note slides
+                bend_val = decompose_pitch_bend((data[1], data[2]))
+                bend_val *= self.options.bend_scale
+                data[1], data[2] = compose_pitch_bend(bend_val)
+                
                 if self.is_split():
                     # experimental: ignore pitch bend for a certain split
                     split_chan = self.notes[ch].split
@@ -1385,6 +1394,11 @@ class Core:
 
         self.options.y_bend = get_option(
             opts, "y_bend", DEFAULT_OPTIONS.y_bend
+        )
+        
+        # Pitch bend scaling for mech layout (adjust if slides are too slow/fast)
+        self.options.bend_scale = get_option(
+            opts, "bend_scale", DEFAULT_OPTIONS.bend_scale
         )
 
         # self.options.mpe = get_option(
