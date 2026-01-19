@@ -964,6 +964,70 @@ class Core:
                 # NOTE: Synth must have MPE enabled for per-note slides
                 bend_val = decompose_pitch_bend((data[1], data[2]))
                 bend_val *= self.options.bend_scale
+                
+                # Software chromatic quantization (12-TET)
+                # Snaps pitch bends to nearest semitone for whole-tone layouts
+                # Requires: LinnStrument Quantize=OFF, Quantize Tap=OFF, Quantize Hold=OFF
+                if self.options.chromatic_quantize:
+                    # Semitone step size in normalized bend units
+                    # column_offset accounts for whole-tone layout (2 semitones per pad)
+                    semitone = 1.0 / (self.options.bend_range * self.options.column_offset)
+                    
+                    # Quan Hold: movement detection (allows vibrato when moving)
+                    # Based on LinnStrument firmware behavior
+                    note = self.notes[ch]
+                    hold_mode = self.options.quantize_hold
+                    
+                    # Mode settings: (rate_threshold, stationary_samples)
+                    # Lower threshold = more sensitive to movement
+                    # Higher samples = slower snap-back
+                    hold_configs = {
+                        "off": (0.0, 0),      # Always quantize
+                        "fast": (0.004, 8),   # Quick snap
+                        "medium": (0.003, 24), # Balanced
+                        "slow": (0.002, 48)   # Gradual
+                    }
+                    rate_threshold, stationary_samples = hold_configs.get(hold_mode, hold_configs["medium"])
+                    
+                    # Calculate movement rate (EMA of bend delta)
+                    delta = abs(bend_val - note.last_bend)
+                    alpha = 0.2  # EMA smoothing factor
+                    note.rate_x = note.rate_x * (1 - alpha) + delta * alpha
+                    note.last_bend = bend_val
+                    
+                    # Determine if stationary
+                    is_stationary = note.rate_x < rate_threshold
+                    
+                    if is_stationary:
+                        note.stationary_count = min(note.stationary_count + 1, stationary_samples + 10)
+                    else:
+                        note.stationary_count = max(0, note.stationary_count - 2)
+                    
+                    # Only quantize when stationary (or always if hold_mode is "off")
+                    should_quantize = hold_mode == "off" or note.stationary_count >= stationary_samples
+                    
+                    if should_quantize:
+                        semitones = bend_val / semitone
+                        bias = self.options.whole_tone_bias
+                        
+                        if bias == 0:
+                            nearest = round(semitones)
+                        else:
+                            # Biased rounding to compensate for mechanical/surface differences
+                            floor_semi = int(semitones) if semitones >= 0 else int(semitones) - 1
+                            frac = semitones - floor_semi
+                            
+                            # Even floor = whole tone (pad center), Odd = semitone (between pads)
+                            if floor_semi % 2 == 0:
+                                threshold = 0.5 + bias
+                            else:
+                                threshold = 0.5 - bias
+                            
+                            threshold = max(0.05, min(0.95, threshold))
+                            nearest = floor_semi + 1 if frac >= threshold else floor_semi
+                        
+                        bend_val = nearest * semitone
+                
                 data[1], data[2] = compose_pitch_bend(bend_val)
                 
                 if self.is_split():
@@ -1399,6 +1463,14 @@ class Core:
         # Pitch bend scaling for mech layout (adjust if slides are too slow/fast)
         self.options.bend_scale = get_option(
             opts, "bend_scale", DEFAULT_OPTIONS.bend_scale
+        )
+
+        # Software chromatic quantization (12-TET)
+        self.options.chromatic_quantize = get_option(
+            opts, "chromatic_quantize", DEFAULT_OPTIONS.chromatic_quantize
+        )
+        self.options.whole_tone_bias = get_option(
+            opts, "whole_tone_bias", DEFAULT_OPTIONS.whole_tone_bias
         )
 
         # self.options.mpe = get_option(

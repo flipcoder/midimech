@@ -14,6 +14,11 @@ class Note:
         # apply additional bend?
         self.bend = 0.0
         self.y_bend = 0.0
+        
+        # Quantize hold state (for movement detection)
+        self.last_bend = 0.0      # previous bend value
+        self.rate_x = 0.0         # exponential moving average of bend change rate
+        self.stationary_count = 0 # how many samples we've been stationary
 
     # def logic(self, dt):
     #     if self.pressed:  # pressed, fade to pressure value

@@ -3,6 +3,13 @@
 
 [general]
 size=128
+
+; Software chromatic quantization (12-TET) - see settings.py for full documentation
+; REQUIRED: LinnStrument Quantize=OFF, Quantize Tap=OFF, Quantize Hold=OFF
+;chromatic_quantize=true
+;whole_tone_bias=0.4375
+;quantize_hold=medium
+
 ;velocity_curve=1.0
 ;lights=1,9,9,2,2,3,3,5,8,8,11,11
 ;split_lights=4,7,5,7,5,5,7,5,7,5,7,5

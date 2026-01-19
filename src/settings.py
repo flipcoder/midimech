@@ -109,5 +109,29 @@ class Settings:
     # octave splitting the linn and transposing octaves on the right side
     octave_split: int = 0
 
+    # Software chromatic quantization (12-TET)
+    # Snaps pitch bends to nearest semitone, allowing semitones between whole-tone pads.
+    # Without quantization, every note has slight microtonal errors from human imprecision.
+    # At this pad scale, you can only realistically aim for semitones or whole tones.
+    # Hardware quantization only snaps to pad centers (whole tones), missing semitones.
+    # This software quantization snaps to ALL 12 chromatic semitones.
+    # REQUIRED: Set LinnStrument Quantize=OFF, Quantize Tap=OFF, Quantize Hold=OFF
+    chromatic_quantize: bool = False
+    
+    # Whole tone bias: adjusts the rounding threshold between semitones and whole tones.
+    # Range: -1.0 to 1.0
+    #   0.0 = equal zones (50/50 split, standard rounding at 0.5 threshold)
+    #   Positive = larger whole-tone zones (need to aim closer to center to hit semitones)
+    #   Negative = larger semitone zones (easier to hit semitones accidentally)
+    # Recommended: 0.4375 for LinnStrument speed bump surface
+    whole_tone_bias: float = 0.0
+    
+    # Quantize Hold: movement detection for vibrato support
+    # When moving (vibrato): allow microtones to pass through
+    # When stationary: snap to nearest semitone
+    # Modes: "off" = always snap, "fast" = quick snap, "medium" = balanced, "slow" = gradual
+    # Based on LinnStrument firmware Quan Hold behavior
+    quantize_hold: str = "medium"
+
 DEFAULT_OPTIONS = Settings()
 
