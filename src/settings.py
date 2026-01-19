@@ -126,13 +126,23 @@ class Settings:
     # Recommended: 0.4375 for LinnStrument speed bump surface
     whole_tone_bias: float = 0.0
     
-    # Quantize Hold Threshold: movement sensitivity for vibrato (0 to 1)
-    # Detects if you're wiggling (vibrato) vs holding still
-    # 0 = always snap (even when moving)
-    # 1 = never snap (all movement passes through as microtones)
-    # 0.5 = balanced (moderate movement triggers vibrato)
-    # Lower = need more aggressive movement to trigger vibrato
-    quantize_hold_threshold: float = 0.0
+    # Quantize Hold Threshold: movement sensitivity for vibrato detection (0 to 1)
+    # 
+    # How it works:
+    #   Detects finger movement (wiggling) vs holding still.
+    #   When moving: microtones pass through (allows vibrato/pitch bends)
+    #   When stationary: snaps to nearest semitone (clean pitch)
+    #
+    # Values:
+    #   0.0 = always snap, no vibrato passthrough (most stable)
+    #   0.5 = balanced - recommended default
+    #   1.0 = never snap, all microtones pass through (no quantization)
+    #
+    # Tuning guide:
+    #   Too low: vibrato won't trigger, sounds auto-tuned
+    #   Too high: natural hand tremor triggers unwanted microtones
+    #   Start at 0.5, adjust ±0.1 based on your playing style
+    quantize_hold_threshold: float = 0.5
 
 DEFAULT_OPTIONS = Settings()
 
