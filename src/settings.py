@@ -126,12 +126,13 @@ class Settings:
     # Recommended: 0.4375 for LinnStrument speed bump surface
     whole_tone_bias: float = 0.0
     
-    # Quantize Hold: movement detection for vibrato support
-    # When moving (vibrato): allow microtones to pass through
-    # When stationary: snap to nearest semitone
-    # Modes: "off" = always snap, "fast" = quick snap, "medium" = balanced, "slow" = gradual
-    # Based on LinnStrument firmware Quan Hold behavior
-    quantize_hold: str = "medium"
+    # Quantize Hold Threshold: movement sensitivity for vibrato (0 to 1)
+    # Detects if you're wiggling (vibrato) vs holding still
+    # 0 = always snap (even when moving)
+    # 1 = never snap (all movement passes through as microtones)
+    # 0.5 = balanced (moderate movement triggers vibrato)
+    # Lower = need more aggressive movement to trigger vibrato
+    quantize_hold_threshold: float = 0.0
 
 DEFAULT_OPTIONS = Settings()
 

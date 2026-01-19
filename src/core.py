@@ -973,38 +973,33 @@ class Core:
                     # column_offset accounts for whole-tone layout (2 semitones per pad)
                     semitone = 1.0 / (self.options.bend_range * self.options.column_offset)
                     
-                    # Quan Hold: movement detection (allows vibrato when moving)
-                    # Based on LinnStrument firmware behavior
+                    # Movement-based vibrato detection
+                    # threshold 0 = always snap, 1 = never snap (all vibrato passes)
                     note = self.notes[ch]
-                    hold_mode = self.options.quantize_hold
-                    
-                    # Mode settings: (rate_threshold, stationary_samples)
-                    # Lower threshold = more sensitive to movement
-                    # Higher samples = slower snap-back
-                    hold_configs = {
-                        "off": (0.0, 0),      # Always quantize
-                        "fast": (0.004, 8),   # Quick snap
-                        "medium": (0.003, 24), # Balanced
-                        "slow": (0.002, 48)   # Gradual
-                    }
-                    rate_threshold, stationary_samples = hold_configs.get(hold_mode, hold_configs["medium"])
+                    threshold = self.options.quantize_hold_threshold
                     
                     # Calculate movement rate (EMA of bend delta)
+                    # bend_val is normalized -1 to 1, delta is movement per message
                     delta = abs(bend_val - note.last_bend)
-                    alpha = 0.2  # EMA smoothing factor
+                    alpha = 0.2
                     note.rate_x = note.rate_x * (1 - alpha) + delta * alpha
                     note.last_bend = bend_val
                     
-                    # Determine if stationary
-                    is_stationary = note.rate_x < rate_threshold
+                    # Map threshold (0-1) to rate_threshold
+                    # 0 = high rate_threshold (hard to be "moving", always snap)
+                    # 1 = zero rate_threshold (any movement passes through)
+                    max_rate = 0.02  # 2% of bend range per message is significant movement
+                    rate_threshold = max_rate * (1 - threshold) ** 2
                     
-                    if is_stationary:
-                        note.stationary_count = min(note.stationary_count + 1, stationary_samples + 10)
+                    # Stationary counter for smooth transitions
+                    is_moving = note.rate_x > rate_threshold
+                    if is_moving:
+                        note.stationary_count = 0
                     else:
-                        note.stationary_count = max(0, note.stationary_count - 2)
+                        note.stationary_count = min(note.stationary_count + 1, 20)
                     
-                    # Only quantize when stationary (or always if hold_mode is "off")
-                    should_quantize = hold_mode == "off" or note.stationary_count >= stationary_samples
+                    # Quantize only when stationary for a few samples
+                    should_quantize = note.stationary_count >= 8
                     
                     if should_quantize:
                         semitones = bend_val / semitone
@@ -1019,14 +1014,15 @@ class Core:
                             
                             # Even floor = whole tone (pad center), Odd = semitone (between pads)
                             if floor_semi % 2 == 0:
-                                threshold = 0.5 + bias
+                                bias_threshold = 0.5 + bias
                             else:
-                                threshold = 0.5 - bias
+                                bias_threshold = 0.5 - bias
                             
-                            threshold = max(0.05, min(0.95, threshold))
-                            nearest = floor_semi + 1 if frac >= threshold else floor_semi
+                            bias_threshold = max(0.05, min(0.95, bias_threshold))
+                            nearest = floor_semi + 1 if frac >= bias_threshold else floor_semi
                         
                         bend_val = nearest * semitone
+                    # else: moving - bend_val stays raw (vibrato passes through)
                 
                 data[1], data[2] = compose_pitch_bend(bend_val)
                 
@@ -1471,6 +1467,9 @@ class Core:
         )
         self.options.whole_tone_bias = get_option(
             opts, "whole_tone_bias", DEFAULT_OPTIONS.whole_tone_bias
+        )
+        self.options.quantize_hold_threshold = get_option(
+            opts, "quantize_hold_threshold", DEFAULT_OPTIONS.quantize_hold_threshold
         )
 
         # self.options.mpe = get_option(

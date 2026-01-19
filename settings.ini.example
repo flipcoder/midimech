@@ -8,7 +8,7 @@ size=128
 ; REQUIRED: LinnStrument Quantize=OFF, Quantize Tap=OFF, Quantize Hold=OFF
 ;chromatic_quantize=true
 ;whole_tone_bias=0.4375
-;quantize_hold=medium
+;quantize_hold_threshold=0.3
 
 ;velocity_curve=1.0
 ;lights=1,9,9,2,2,3,3,5,8,8,11,11
