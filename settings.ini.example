@@ -16,6 +16,9 @@ size=128
 ;
 ; Vibrato sensitivity: movement detection threshold (0 to 1)
 ; 0 = always snap, 0.5 = balanced (recommended), 1 = never snap
+; If you increased LinnStrument's Touch Sensor Prescale (Global Settings > hold
+; Calibration + tap Pressure Medium) for more sensitivity, the sensor will detect
+; smaller movements, so unwanted microtones will pass through. Lower this value to fix.
 ;quantize_hold_threshold=0.5
 
 ;velocity_curve=1.0
