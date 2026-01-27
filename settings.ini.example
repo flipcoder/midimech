@@ -3,6 +3,24 @@
 
 [general]
 size=128
+
+; ===== CHROMATIC QUANTIZATION =====
+; Snaps pitch bends to semitones for whole-tone layouts.
+; REQUIRED: LinnStrument Quantize=OFF, Quantize Tap=OFF, Quantize Hold=OFF
+;
+;chromatic_quantize=true
+;
+; Whole tone bias: compensates for mechanical surface differences (-1 to 1)
+; 0 = equal, 0.4375 = recommended for speed bump surface
+;whole_tone_bias=0.4375
+;
+; Vibrato sensitivity: movement detection threshold (0 to 1)
+; 0 = always snap, 0.5 = balanced (recommended), 1 = never snap
+; If you increased LinnStrument's Touch Sensor Prescale (Global Settings > hold
+; Calibration + tap Pressure Medium) for more sensitivity, the sensor will detect
+; smaller movements, so unwanted microtones will pass through. Lower this value to fix.
+;quantize_hold_threshold=0.5
+
 ;velocity_curve=1.0
 ;lights=1,9,9,2,2,3,3,5,8,8,11,11
 ;split_lights=4,7,5,7,5,5,7,5,7,5,7,5

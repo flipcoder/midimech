@@ -957,6 +957,75 @@ class Core:
             
             skip = False
             if msg == 14:
+                # Scale pitch bend for mech layout (bend_scale in settings.ini)
+                # Especially useful for whole-tone slides - smooth bends let you
+                # reliably hit semitones in between the whole tones
+                # NOTE: LinnStrument Pitch Quantize must be OFF for smooth slides
+                # NOTE: Synth must have MPE enabled for per-note slides
+                bend_val = decompose_pitch_bend((data[1], data[2]))
+                bend_val *= self.options.bend_scale
+                
+                # Software chromatic quantization (12-TET)
+                # Snaps pitch bends to nearest semitone for whole-tone layouts
+                # Requires: LinnStrument Quantize=OFF, Quantize Tap=OFF, Quantize Hold=OFF
+                if self.options.chromatic_quantize:
+                    # Semitone step size in normalized bend units
+                    # column_offset accounts for whole-tone layout (2 semitones per pad)
+                    semitone = 1.0 / (self.options.bend_range * self.options.column_offset)
+                    
+                    # Movement-based vibrato detection
+                    # threshold 0 = always snap, 1 = never snap (all vibrato passes)
+                    note = self.notes[ch]
+                    threshold = self.options.quantize_hold_threshold
+                    
+                    # Calculate movement rate (EMA of bend delta)
+                    # bend_val is normalized -1 to 1, delta is movement per message
+                    delta = abs(bend_val - note.last_bend)
+                    alpha = 0.2
+                    note.rate_x = note.rate_x * (1 - alpha) + delta * alpha
+                    note.last_bend = bend_val
+                    
+                    # Map threshold (0-1) to rate_threshold
+                    # 0 = high rate_threshold (hard to be "moving", always snap)
+                    # 1 = zero rate_threshold (any movement passes through)
+                    max_rate = 0.02  # 2% of bend range per message is significant movement
+                    rate_threshold = max_rate * (1 - threshold) ** 2
+                    
+                    # Stationary counter for smooth transitions
+                    is_moving = note.rate_x > rate_threshold
+                    if is_moving:
+                        note.stationary_count = 0
+                    else:
+                        note.stationary_count = min(note.stationary_count + 1, 20)
+                    
+                    # Quantize only when stationary for a few samples
+                    should_quantize = note.stationary_count >= 8
+                    
+                    if should_quantize:
+                        semitones = bend_val / semitone
+                        bias = self.options.whole_tone_bias
+                        
+                        if bias == 0:
+                            nearest = round(semitones)
+                        else:
+                            # Biased rounding to compensate for mechanical/surface differences
+                            floor_semi = int(semitones) if semitones >= 0 else int(semitones) - 1
+                            frac = semitones - floor_semi
+                            
+                            # Even floor = whole tone (pad center), Odd = semitone (between pads)
+                            if floor_semi % 2 == 0:
+                                bias_threshold = 0.5 + bias
+                            else:
+                                bias_threshold = 0.5 - bias
+                            
+                            bias_threshold = max(0.05, min(0.95, bias_threshold))
+                            nearest = floor_semi + 1 if frac >= bias_threshold else floor_semi
+                        
+                        bend_val = nearest * semitone
+                    # else: moving - bend_val stays raw (vibrato passes through)
+                
+                data[1], data[2] = compose_pitch_bend(bend_val)
+                
                 if self.is_split():
                     # experimental: ignore pitch bend for a certain split
                     split_chan = self.notes[ch].split
@@ -1385,6 +1454,22 @@ class Core:
 
         self.options.y_bend = get_option(
             opts, "y_bend", DEFAULT_OPTIONS.y_bend
+        )
+        
+        # Pitch bend scaling for mech layout (adjust if slides are too slow/fast)
+        self.options.bend_scale = get_option(
+            opts, "bend_scale", DEFAULT_OPTIONS.bend_scale
+        )
+
+        # Software chromatic quantization (12-TET)
+        self.options.chromatic_quantize = get_option(
+            opts, "chromatic_quantize", DEFAULT_OPTIONS.chromatic_quantize
+        )
+        self.options.whole_tone_bias = get_option(
+            opts, "whole_tone_bias", DEFAULT_OPTIONS.whole_tone_bias
+        )
+        self.options.quantize_hold_threshold = get_option(
+            opts, "quantize_hold_threshold", DEFAULT_OPTIONS.quantize_hold_threshold
         )
 
         # self.options.mpe = get_option(

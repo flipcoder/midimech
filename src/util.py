@@ -108,7 +108,12 @@ def decompose_pitch_bend(pitch_bend_bytes):
     return pitch_bend_norm
 
 def compose_pitch_bend(pitch_bend_norm):
-    pitch_bend_value = int((pitch_bend_norm + 1.0) * 8192)
+    # Clamp input to valid range
+    pitch_bend_norm = max(-1.0, min(1.0, pitch_bend_norm))
+    # Scale to 0-16383 (14-bit MIDI pitch bend range)
+    # Using 8191.5 and round() to correctly map: -1.0->0, 0.0->8192, 1.0->16383
+    pitch_bend_value = int(round((pitch_bend_norm + 1.0) * 8191.5))
+    pitch_bend_value = max(0, min(16383, pitch_bend_value))  # Ensure valid range
     pitch_bend_bytes = [pitch_bend_value & 0x7F, (pitch_bend_value >> 7) & 0x7F]
     return pitch_bend_bytes
 
@@ -124,3 +129,6 @@ def get_color(col):
     if col.startswith("#"):
         return webcolors.hex_to_rgb(col)
     return webcolors.name_to_rgb(col)
+
+
+
