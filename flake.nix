@@ -127,12 +127,24 @@
             # Install the native MIDI virtual cable
             install -m755 midimech-vport $out/bin/midimech-vport
 
-            # Main entry point: launcher starts native MIDI cable + midimech
-            makeWrapper ${pythonEnv}/bin/python3 $out/bin/midimech \
-              --add-flags "$out/share/midimech/midimech-launch.py" \
+            # Main entry point: starts virtual MIDI cable, then midimech
+            cat > $out/bin/midimech <<LAUNCHER
+            #!/bin/sh
+            cleanup() { kill "\$VPORT_PID" 2>/dev/null; wait "\$VPORT_PID" 2>/dev/null; }
+            trap cleanup EXIT INT TERM
+            $out/bin/midimech-vport &
+            VPORT_PID=\$!
+            sleep 0.3
+            exec ${pythonEnv}/bin/python3 $out/share/midimech/midimech.py "\$@"
+            LAUNCHER
+            chmod +x $out/bin/midimech
+            patchShebangs $out/bin/midimech
+
+            # Wrap to include runtime libraries
+            wrapProgram $out/bin/midimech \
               --prefix LD_LIBRARY_PATH : "${runtimeLibs}"
 
-            # Direct entry (no loopback, for advanced users who manage MIDI themselves)
+            # Direct entry (no virtual cable, for users who manage MIDI themselves)
             makeWrapper ${pythonEnv}/bin/python3 $out/bin/midimech-raw \
               --add-flags "$out/share/midimech/midimech.py" \
               --prefix LD_LIBRARY_PATH : "${runtimeLibs}"
