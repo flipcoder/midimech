@@ -144,6 +144,20 @@
             wrapProgram $out/bin/midimech \
               --prefix LD_LIBRARY_PATH : "${runtimeLibs}"
 
+            # Desktop entry for application launchers
+            mkdir -p $out/share/applications $out/share/icons/hicolor/256x256/apps
+            cp $out/share/midimech/icon.png $out/share/icons/hicolor/256x256/apps/midimech.png
+            cat > $out/share/applications/midimech.desktop <<DESKTOP
+            [Desktop Entry]
+            Name=Midimech
+            Comment=Isomorphic musical layout engine for LinnStrument and Launchpad X
+            Exec=$out/bin/midimech
+            Icon=midimech
+            Terminal=false
+            Type=Application
+            Categories=Audio;Music;Midi;
+            DESKTOP
+
             # Direct entry (no virtual cable, for users who manage MIDI themselves)
             makeWrapper ${pythonEnv}/bin/python3 $out/bin/midimech-raw \
               --add-flags "$out/share/midimech/midimech.py" \
