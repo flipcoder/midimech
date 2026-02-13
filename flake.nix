@@ -160,10 +160,6 @@
             StartupWMClass=midimech
             DESKTOP
 
-            # Direct entry (no virtual cable, for users who manage MIDI themselves)
-            makeWrapper ${pythonEnv}/bin/python3 $out/bin/midimech-raw \
-              --add-flags "$out/share/midimech/midimech.py" \
-              --prefix LD_LIBRARY_PATH : "${runtimeLibs}"
           '';
 
           meta = with pkgs.lib; {

@@ -111,7 +111,6 @@ Then in your NixOS configuration:
 This installs midimech system-wide with:
 - Desktop entry with icon (shows in GNOME, KDE, etc.)
 - Virtual MIDI cable — equivalent to loopMIDI on Windows, started automatically
-- `midimech-raw` — direct entry for users who manage MIDI routing themselves
 - Removes the "Midi Through" phantom MIDI port (`snd_seq_dummy`)
 
 Point your DAW/synth (e.g. SurgeXT) at the **midimech** MIDI input to receive notes.
