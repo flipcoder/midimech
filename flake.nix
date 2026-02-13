@@ -108,7 +108,7 @@
       packages.${system} = {
         midimech = pkgs.stdenv.mkDerivation {
           pname = "midimech";
-          version = "0.1.0-chromatic-quantize";
+          version = "0.1.0";
           src = self;
 
           nativeBuildInputs = [ pkgs.makeWrapper pkgs.pkg-config ];
@@ -140,9 +140,11 @@
             chmod +x $out/bin/midimech
             patchShebangs $out/bin/midimech
 
-            # Wrap to include runtime libraries + set SDL app ID for Wayland icon matching
+            # Wrap to include runtime libraries + set window class for desktop icon matching
             wrapProgram $out/bin/midimech \
               --prefix LD_LIBRARY_PATH : "${runtimeLibs}" \
+              --set SDL_VIDEO_WAYLAND_WMCLASS midimech \
+              --set SDL_VIDEO_X11_WMCLASS midimech \
               --set SDL_APP_ID midimech
 
             # Desktop entry for application launchers
