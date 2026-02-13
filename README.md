@@ -92,12 +92,7 @@ The included Nix flake handles everything automatically — Python environment, 
 nix run github:flipcoder/midimech
 ```
 
-**Permanent install (adds to PATH + desktop entry with icon):**
-```
-nix profile install github:flipcoder/midimech
-```
-
-**NixOS module (recommended — system-wide with clean MIDI setup):**
+**NixOS module (recommended):**
 
 Add to your `flake.nix` inputs:
 ```nix
@@ -113,11 +108,11 @@ Then in your NixOS configuration:
 }
 ```
 
-This installs midimech system-wide with a desktop entry and automatically removes the "Midi Through" phantom MIDI port (`snd_seq_dummy`).
-
-**What's included:**
-- `midimech` — launches the virtual MIDI cable + midimech (recommended)
+This installs midimech system-wide with:
+- Desktop entry with icon (shows in GNOME, KDE, etc.)
+- Virtual MIDI cable — equivalent to loopMIDI on Windows, started automatically
 - `midimech-raw` — direct entry for users who manage MIDI routing themselves
+- Removes the "Midi Through" phantom MIDI port (`snd_seq_dummy`)
 
 Point your DAW/synth (e.g. SurgeXT) at the **midimech** MIDI input to receive notes.
 
