@@ -140,9 +140,10 @@
             chmod +x $out/bin/midimech
             patchShebangs $out/bin/midimech
 
-            # Wrap to include runtime libraries
+            # Wrap to include runtime libraries + set SDL app ID for Wayland icon matching
             wrapProgram $out/bin/midimech \
-              --prefix LD_LIBRARY_PATH : "${runtimeLibs}"
+              --prefix LD_LIBRARY_PATH : "${runtimeLibs}" \
+              --set SDL_APP_ID midimech
 
             # Desktop entry for application launchers
             mkdir -p $out/share/applications $out/share/icons/hicolor/256x256/apps
@@ -156,6 +157,7 @@
             Terminal=false
             Type=Application
             Categories=Audio;Music;Midi;
+            StartupWMClass=midimech
             DESKTOP
 
             # Direct entry (no virtual cable, for users who manage MIDI themselves)
