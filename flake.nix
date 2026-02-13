@@ -128,25 +128,14 @@
             install -m755 midimech-vport $out/bin/midimech-vport
 
             # Main entry point: starts virtual MIDI cable + midimech
-            # Use --no-vport to skip the virtual cable (for users who manage MIDI themselves)
             cat > $out/bin/midimech <<LAUNCHER
             #!/bin/sh
-            USE_VPORT=1
-            ARGS=""
-            for arg in "\$@"; do
-              case "\$arg" in
-                --no-vport) USE_VPORT=0 ;;
-                *) ARGS="\$ARGS \$arg" ;;
-              esac
-            done
-            if [ "\$USE_VPORT" = 1 ]; then
-              cleanup() { kill "\$VPORT_PID" 2>/dev/null; wait "\$VPORT_PID" 2>/dev/null; }
-              trap cleanup EXIT INT TERM
-              $out/bin/midimech-vport &
-              VPORT_PID=\$!
-              sleep 0.3
-            fi
-            exec ${pythonEnv}/bin/python3 $out/share/midimech/midimech.py \$ARGS
+            cleanup() { kill "\$VPORT_PID" 2>/dev/null; wait "\$VPORT_PID" 2>/dev/null; }
+            trap cleanup EXIT INT TERM
+            $out/bin/midimech-vport &
+            VPORT_PID=\$!
+            sleep 0.3
+            exec ${pythonEnv}/bin/python3 $out/share/midimech/midimech.py "\$@"
             LAUNCHER
             chmod +x $out/bin/midimech
             patchShebangs $out/bin/midimech
