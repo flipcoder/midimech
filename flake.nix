@@ -135,6 +135,7 @@
             $out/bin/midimech-vport &
             VPORT_PID=\$!
             sleep 0.3
+            cd $out/share/midimech
             exec ${pythonEnv}/bin/python3 $out/share/midimech/midimech.py "\$@"
             LAUNCHER
             chmod +x $out/bin/midimech
