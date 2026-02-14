@@ -144,6 +144,7 @@
             # Wrap to include runtime libraries + set window class for desktop icon matching
             wrapProgram $out/bin/midimech \
               --prefix LD_LIBRARY_PATH : "${runtimeLibs}" \
+              --set ALSA_CONFIG_PATH "${pkgs.alsa-lib}/share/alsa/alsa.conf" \
               --set SDL_VIDEO_WAYLAND_WMCLASS midimech \
               --set SDL_VIDEO_X11_WMCLASS midimech \
               --set SDL_APP_ID midimech
