@@ -1757,28 +1757,30 @@ class Core:
         self.launchpads = []
         num_launchpads = 0
         if self.options.launchpad:
-            launchpads = []
-            lp = launchpad.LaunchpadProMk3()
-            if lp.Check(0):
-                if lp.Open(0):
-                    self.launchpads += [Launchpad(self, lp, "promk3", num_launchpads)]
-                    num_launchpads += 1
-            lp = launchpad.LaunchpadPro()
-            if lp.Check(0):
-                if lp.Open(0):
-                    self.launchpads += [Launchpad(self, lp, "pro", num_launchpads)]
-                    num_launchpads += 1
-            lp = launchpad.LaunchpadLPX()
-            if lp.Check(1):
-                lp = launchpad.LaunchpadLPX()
-                if lp.Open(1):
-                    self.launchpads += [Launchpad(self, lp, "lpx", num_launchpads)]
-                    num_launchpads += 1
-                if launchpad.LaunchpadLPX().Check(3):
-                    lp = launchpad.LaunchpadLPX()
-                    if lp.Open(3): # second
-                        self.launchpads += [Launchpad(self, lp, "lpx", num_launchpads, self.options.octave_separation)]
+            try:
+                lp = launchpad.LaunchpadProMk3()
+                if lp.Check(0):
+                    if lp.Open(0):
+                        self.launchpads += [Launchpad(self, lp, "promk3", num_launchpads)]
                         num_launchpads += 1
+                lp = launchpad.LaunchpadPro()
+                if lp.Check(0):
+                    if lp.Open(0):
+                        self.launchpads += [Launchpad(self, lp, "pro", num_launchpads)]
+                        num_launchpads += 1
+                lp = launchpad.LaunchpadLPX()
+                if lp.Check(1):
+                    lp = launchpad.LaunchpadLPX()
+                    if lp.Open(1):
+                        self.launchpads += [Launchpad(self, lp, "lpx", num_launchpads)]
+                        num_launchpads += 1
+                    if launchpad.LaunchpadLPX().Check(3):
+                        lp = launchpad.LaunchpadLPX()
+                        if lp.Open(3): # second
+                            self.launchpads += [Launchpad(self, lp, "lpx", num_launchpads, self.options.octave_separation)]
+                            num_launchpads += 1
+            except Exception as e:
+                print(f"Launchpad detection skipped ({e})")
         
         if self.launchpads:
             print('Launchpads:', len(self.launchpads))

@@ -83,6 +83,38 @@ After downloading, make sure to follow the instructions under `Setup`.
 
 *Note: These builds are not always up to date.*
 
+### NixOS / Nix
+
+The included Nix flake handles everything automatically — Python environment, all dependencies, and a virtual MIDI cable (equivalent to loopMIDI on Windows).
+
+**Try it (no install):**
+```
+nix run github:flipcoder/midimech
+```
+
+**NixOS module (recommended):**
+
+Add to your `flake.nix` inputs:
+```nix
+midimech.url = "github:flipcoder/midimech";
+```
+
+Then in your NixOS configuration:
+```nix
+{ midimech, ... }:
+{
+  imports = [ midimech.nixosModules.default ];
+  services.midimech.enable = true;
+}
+```
+
+This installs midimech system-wide with:
+- Desktop entry with icon (shows in GNOME, KDE, etc.)
+- Virtual MIDI cable — equivalent to loopMIDI on Windows, started automatically
+- Removes the "Midi Through" phantom MIDI port (`snd_seq_dummy`)
+
+Point your DAW/synth (e.g. SurgeXT) at the **midimech** MIDI input to receive notes.
+
 ### Mac, Linux, and Running from Git
 
 - Download the project by typing the following commands in terminal:
