@@ -1,9 +1,8 @@
 from glm import ivec2, vec2, ivec3, vec3
 
-# CRITICAL: Window title must NOT exactly match the "midimech" MIDI loopback
-# device name. On Windows, SDL + the MIDI subsystem causes a fatal native
-# process termination when the window title matches a MIDI device name
-# (case-insensitive substring match). Adding any differentiating text avoids it.
+# Window title must not exactly match the "midimech" MIDI loopback device name.
+# On some Windows setups, SDL fatally terminates the process when the window
+# title matches a MIDI device name (case-insensitive). Exact cause unknown.
 TITLE = "midimech app"
 # FOCUS = False
 NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
