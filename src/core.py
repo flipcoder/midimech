@@ -924,6 +924,15 @@ class Core:
     
     def cb_midi_in(self, data, timestamp, force_channel=None):
         """LinnStrument MIDI Callback"""
+        if not hasattr(self, 'board'):
+            return  # not fully initialized yet
+        try:
+            self._cb_midi_in(data, timestamp, force_channel)
+        except Exception as e:
+            print(f"MIDI callback error: {e}")
+
+    def _cb_midi_in(self, data, timestamp, force_channel=None):
+        """LinnStrument MIDI Callback (inner)"""
         # d4 = None
         # if len(data)==4:
         #     d4 = data[3]

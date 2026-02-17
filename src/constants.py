@@ -1,6 +1,9 @@
 from glm import ivec2, vec2, ivec3, vec3
 
-TITLE = "midimech"
+# Window title must not exactly match the "midimech" MIDI loopback device name.
+# On some Windows setups, SDL fatally terminates the process when the window
+# title matches a MIDI device name (case-insensitive). Exact cause unknown.
+TITLE = "midimech app"
 # FOCUS = False
 NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 WHOLETONE = True

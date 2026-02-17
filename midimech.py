@@ -52,13 +52,23 @@ def main():
     try:
         core = Core()
         core()
-    except SystemExit:
-        pass
+    except SystemExit as e:
+        if e.code != 0:
+            print(f"midimech exited with code {e.code}")
     except:
         print(traceback.format_exc())
-    del core
-    pygame.midi.quit()
-    pygame.display.quit()
+    try:
+        del core
+    except:
+        pass
+    try:
+        pygame.midi.quit()
+    except:
+        pass
+    try:
+        pygame.display.quit()
+    except:
+        pass
     os._exit(0)
     # pygame.quit()
 
