@@ -79,7 +79,7 @@ class Settings:
     # Sustain pedal value multiplier (not yet impl)
     sustain: float = 1.0
 
-    # which split should sustain pedal use (left, right, both)
+    # which split should sustain pedal use (off, left, right, both)
     sustain_split: str = "both"
 
     # Size of LinnStrument (128 or 200)

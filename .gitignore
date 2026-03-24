@@ -6,3 +6,7 @@ midimech.spec
 build/
 dist/
 .idea/
+venv/
+.venv/
+src/*.py.bak
+.claude/

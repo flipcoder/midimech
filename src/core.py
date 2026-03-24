@@ -324,7 +324,7 @@ class Core:
             else:
                 xx, yy = x, y
             if self.options.launchpad_colors:
-                lp.out.LedCtrlXYByCode(x, 8-y, col)
+                lp.out.LedCtrlXYByCode(xx, 8-yy, col)
             else:
                 lp.out.LedCtrlXY(xx, 8-yy, col[0], col[1], col[2])
 
@@ -571,7 +571,7 @@ class Core:
         self.chord_notes = [False] * 127
         self.note_set = set()
 
-    def midi_write(self, dev, msg, ts=0):
+    def midi_write(self, dev, msg, ts=0, original_channel=None):
         """Write MIDI message `msg` to device `dev`"""
         # if type(dev) in (list,tuple):
         #     for d in dev:
@@ -590,12 +590,15 @@ class Core:
     def is_mpe(self):
         return self.options.one_channel == 0
 
-    def note_on(self, data, timestamp, width=None, curve=True, mpe=None, octave=0, transpose=0, force_channel=None, bend=0.0):
+    def note_on(self, data, timestamp, width=None, curve=True, mpe=None, octave=0, transpose=0, force_channel=None, bend=0.0, original_channel=None):
         # if mpe is None:
         #     mpe = self.options.mpe
         d0 = data[0]
         # print(data)
-        ch = d0 & 0x0F
+        if original_channel is not None:
+            ch = original_channel
+        else:
+            ch = d0 & 0x0F
         msg = (data[0] & 0xF0) >> 4
         aftertouch = (msg == 10)
         
@@ -614,7 +617,12 @@ class Core:
                 left_width = self.split_point
                 right_width = self.board_w - left_width
                 # print('hardware splits', left_width, right_width)
-                if ch >= 8:
+                if ch == 15:
+                    width = right_width
+                    within_hardware_split = True
+                    ch = 0
+                elif ch >= 8:
+                    ch -= 7
                     width = right_width
                     within_hardware_split = True
                 else:
@@ -631,7 +639,7 @@ class Core:
                 width = self.board_w
             # else: # 128
                 # width = 8 if self.options.hardware_split else 16
-        
+
         if self.options.debug:
             print("MIDI:", data)
             print("Message:", msg)
@@ -729,7 +737,7 @@ class Core:
             pass
         else:
             # if self.options.mpe:
-            note = self.notes[ch]
+            note = self.notes[original_channel if original_channel is not None else ch]
             # else:
             #     note = self.next_free_note()
             if note:
@@ -762,7 +770,10 @@ class Core:
                 except Exception as e:
                     print(e)
 
-        if self.is_split():
+
+        if within_hardware_split:
+            self.midi_write(self.split_out, data, timestamp)
+        elif self.is_split():
             if split_chan == 0:
                 # self.midi_out.write([[data, ev[1]]]
                 self.midi_write(self.midi_out, data, timestamp)
@@ -772,13 +783,18 @@ class Core:
             # print(data[1]) # midi note number
             self.midi_write(self.midi_out, data, timestamp)
 
-    def note_off(self, data, timestamp, width=None, mpe=None, octave=0, transpose=0, force_channel=None):
+    def note_off(self, data, timestamp, width=None, mpe=None, octave=0, transpose=0, force_channel=None, original_channel=None):
         # if mpe is None:
         #     mpe = self.options.mpe
         
         d0 = data[0]
         # print(data)
-        ch = d0 & 0x0F
+        # original_channel = ch = d0 & 0x0F
+        if original_channel is not None:
+            ch = original_channel
+        else:
+            ch = d0 & 0x0F
+
         msg = (data[0] & 0xF0) >> 4
         if force_channel:
             data[0] = (d0 & 0xF0) + (force_channel-1)
@@ -804,7 +820,12 @@ class Core:
                 left_width = self.split_point
                 right_width = self.board_w - left_width
                 # print('hardware splits', left_width, right_width)
-                if ch >= 8:
+                if ch == 15:
+                    ch = 0
+                    width = right_width
+                    within_hardware_split = True
+                elif ch >= 8:
+                    ch -= 7
                     width = right_width
                     within_hardware_split = True
                 else:
@@ -910,7 +931,9 @@ class Core:
             pass
         self.dirty_chord = True
 
-        if self.is_split():
+        if within_hardware_split:
+            self.midi_write(self.split_out, data, timestamp)
+        elif self.is_split():
             if split_chan == 0:
                 self.midi_write(self.midi_out, data, timestamp)
             else:
@@ -976,147 +999,174 @@ class Core:
     #     return col, row
     
     def cb_midi_in(self, data, timestamp, force_channel=None):
-        """LinnStrument MIDI Callback"""
-        # d4 = None
-        # if len(data)==4:
-        #     d4 = data[3]
-        #     data = data[:3]
-        d0 = data[0]
-        # print(data)
-        ch = d0 & 0x0F
-        msg = (data[0] & 0xF0) >> 4
-        row = None
-        col = None
-        # if not self.options.mpe:
-        #     row = ch % 8
-        #     col = ch // 8
-        if msg == 9:  # note on
-            if data[2] == 0: # 0 vel
-                self.note_off(data, timestamp)
-            else:
-                self.note_on(data, timestamp)
-            # print('note on: ', data)
-        elif msg == 8:  # note off
-            self.note_off(data, timestamp)
-        elif 0xF0 <= msg <= 0xF7:  # sysex
-            # rewrite the output channel based on app's MPE settings
-            self.midi_write(self.midi_out, data, timestamp)
-        else:
-            # rewrite the output channel based on app's MPE settings
-            if force_channel:
-                data[0] = (d0 & 0xF0) | (force_channel-1)
-            elif not self.is_mpe():
-                data[0] = (d0 & 0xF0) | (self.options.one_channel-1)
-            
-            skip = False
-            if msg == 14:
-                if self.is_split():
-                    # experimental: ignore pitch bend for a certain split
-                    split_chan = self.notes[ch].split
-                    if self.options.stable_left and split_chan == 0:
-                        data[1] = 0
-                        data[2] = 64
-                        self.midi_write(self.midi_out, data, timestamp)
-                        skip = True
-                    if self.options.stable_right and split_chan == 1:
-                        data[1] = 0
-                        data[2] = 64
-                        self.midi_write(self.split_out, data, timestamp)
-                        skip = True
+
+        try:
                 
-            # use_stabilizer = self.options.stabilizer
-            # bend = decompose_pitch_bend([data[1], data[2]])
-            # print('bend', bend)
-            # note_ofs = bend * 24
-            # print(' note_ofs', note_ofs)
-            # closest_ofs = round(note_ofs)
-            # print(' closest_ofs', closest_ofs)
-            # diff = note_ofs - closest_ofs # diff between note and tuning
-            # diff **= 0.9 # bend the curve
-            # print(' diff', diff)
-            # note_ofs = closest_ofs + diff
-            # bend = note_ofs / 24
-            # print(' end bend', bend)
-            # data[1], data[2] = compose_pitch_bend(bend)
-            # print(data[1], data[2])
-            # semitones = pitch_bend_to_semitones(bend)
-            # print('pitch', bend, semitones)
-            # stabilized = True
-            
-            # This block has to happen before the below block rewrites y axis to pitch bend
-            if self.options.y_bend:
-                pb_range = self.options.bend_range * 2
-                bend_threshold = 1 # units
-                if msg == 14:
-                    # if y-bending enabled, rewrite pitch bend based on y bend value
-                    note = self.notes[ch]
-                    # if note.y_bend > EPSILON:
-                    val = decompose_pitch_bend((data[1], data[2]))
-                    note.bend = val
-                    val += note.y_bend / pb_range
-                    data[1], data[2] = compose_pitch_bend(val)
-
-                if msg == 11 and data[1] == 74:
-                    # print(data[2])
-                    if data[2] > 127 - bend_threshold:
-                        bend = (data[2] - (127 - bend_threshold)) / bend_threshold
-                    elif data[2] <= bend_threshold:
-                        # bend down?
-                        # bend = -(bend_threshold - data[2]) / bend_threshold
-                        bend = None
+            """LinnStrument MIDI Callback"""
+            # d4 = None
+            # if len(data)==4:
+            #     d4 = data[3]
+            #     data = data[:3]
+            d0 = data[0]
+            original_channel = ch = d0 & 0x0F
+            msg = (data[0] & 0xF0) >> 4
+            # print(data, msg, ch)
+            has_hardware_split = self.options.hardware_split
+            # reroute split channels 7-16 to 0-7 for consistent behavior
+            if not force_channel:
+                if has_hardware_split and self.is_split():
+                    if ch == 15:
+                        ch = 0
+                        data[0] = ((msg << 4) & 0xF0)
+                        print('rerouted channel:', original_channel, '->', ch)
+                    elif ch >= 7:
+                        ch -= 7
+                        data[0] = ((msg << 4) & 0xF0) | ch
+                        print('rerouted channel:', original_channel, '->', ch)
                     else:
-                        bend = None
-                    note = self.notes[ch]
-                    data = [0xe0 | ch,0,0]
-                    if force_channel:
-                        data[0] = 0xe0 | (force_channel-1)
-                    elif not self.is_mpe():
-                        data[0] = 0xe0 | (self.options.one_channel-1)
-                    if bend is not None:
-                        if bend > 0.9:
-                            bend = 1.0
-                        elif bend < -0.9:
-                            bend = -1.0
-                        note.y_bend = bend
-                        data[1], data[2] = compose_pitch_bend(note.bend + note.y_bend / pb_range)
-                    else:
-                        note.y_bend = 0.0
-                        data[1], data[2] = compose_pitch_bend(note.bend + note.y_bend / pb_range)
+                        data[0] = ((msg << 4) & 0xF0) | ch
 
-
-            if skip:
-                pass
-            elif msg == 11 and data[1] == 64:  # sustain pedal
-                if self.is_split():
-                    for dev in self.sustainable_devices():
-                        self.midi_write(dev, data, timestamp)
+            row = None
+            col = None
+            # if not self.options.mpe:
+            #     row = ch % 8
+            #     col = ch // 8
+            if msg == 9:  # note on
+                if data[2] == 0: # 0 vel
+                    self.note_off(data, timestamp, original_channel=original_channel)
                 else:
-                    self.midi_write(self.midi_out, data, timestamp)
-            elif self.is_split(): # everything else (if split)...
-                # print('ch', ch)
-                try:
-                    note = self.notes[ch]
-                except:
-                    note = None
-                if ch == 0:
-                    self.midi_write(self.midi_out, data, timestamp)
-                    self.midi_write(self.split_out, data, timestamp)
-                # else:
-                #     split_chan = 1 if ch >= 8 else 0
-                #     if split_chan:
-                #         self.midi_write(self.split_out, data, timestamp)
-                #     else:
-                #         self.midi_write(self.midi_out, data, timestamp)
-                elif note and note.split is not None:
-                    if note.split:
-                        self.midi_write(self.split_out, data, timestamp)
+                    self.note_on(data, timestamp, original_channel=original_channel)
+                # print('note on: ', data)
+            elif msg == 8:  # note off
+                self.note_off(data, timestamp, original_channel=original_channel)
+            elif 0xF0 <= msg <= 0xF7:  # sysex
+                # rewrite the output channel based on app's MPE settings
+                self.midi_write(self.midi_out, data, timestamp)
+            else:
+                # rewrite the output channel based on app's MPE settings
+                if force_channel:
+                    data[0] = (d0 & 0xF0) | (force_channel-1)
+                elif not self.is_mpe():
+                    data[0] = (d0 & 0xF0) | (self.options.one_channel-1)
+                
+                skip = False
+                if msg == 14:
+                    if self.is_split():
+                        # experimental: ignore pitch bend for a certain split
+                        chan = original_channel if original_channel is not None else ch
+                        split_chan = self.notes[chan].split
+                        if self.options.stable_left and split_chan == 0:
+                            data[1] = 0
+                            data[2] = 64
+                            self.midi_write(self.midi_out, data, timestamp)
+                            skip = True
+                        if self.options.stable_right and split_chan == 1:
+                            data[1] = 0
+                            data[2] = 64
+                            print(split_chan, data)
+                            self.midi_write(self.split_out, data, timestamp, original_channel=original_channel)
+                            skip = True
+                    
+                # use_stabilizer = self.options.stabilizer
+                # bend = decompose_pitch_bend([data[1], data[2]])
+                # print('bend', bend)
+                # note_ofs = bend * 24
+                # print(' note_ofs', note_ofs)
+                # closest_ofs = round(note_ofs)
+                # print(' closest_ofs', closest_ofs)
+                # diff = note_ofs - closest_ofs # diff between note and tuning
+                # diff **= 0.9 # bend the curve
+                # print(' diff', diff)
+                # note_ofs = closest_ofs + diff
+                # bend = note_ofs / 24
+                # print(' end bend', bend)
+                # data[1], data[2] = compose_pitch_bend(bend)
+                # print(data[1], data[2])
+                # semitones = pitch_bend_to_semitones(bend)
+                # print('pitch', bend, semitones)
+                # stabilized = True
+                
+                # This block has to happen before the below block rewrites y axis to pitch bend
+                # if self.options.y_bend:
+                #     pb_range = self.options.bend_range * 2
+                #     bend_threshold = 1 # units
+                #     if msg == 14:
+                #         # if y-bending enabled, rewrite pitch bend based on y bend value
+                #         note = self.notes[ch]
+                #         # if note.y_bend > EPSILON:
+                #         val = decompose_pitch_bend((data[1], data[2]))
+                #         note.bend = val
+                #         val += note.y_bend / pb_range
+                #         data[1], data[2] = compose_pitch_bend(val)
+
+                #     if msg == 11 and data[1] == 74:
+                #         # print(data[2])
+                #         if data[2] > 127 - bend_threshold:
+                #             bend = (data[2] - (127 - bend_threshold)) / bend_threshold
+                #         elif data[2] <= bend_threshold:
+                #             # bend down?
+                #             # bend = -(bend_threshold - data[2]) / bend_threshold
+                #             bend = None
+                #         else:
+                #             bend = None
+                #         note = self.notes[ch]
+                #         data = [0xe0 | ch,0,0]
+                #         if force_channel:
+                #             data[0] = 0xe0 | (force_channel-1)
+                #         elif not self.is_mpe():
+                #             data[0] = 0xe0 | (self.options.one_channel-1)
+                #         if bend is not None:
+                #             if bend > 0.9:
+                #                 bend = 1.0
+                #             elif bend < -0.9:
+                #                 bend = -1.0
+                #             note.y_bend = bend
+                #             data[1], data[2] = compose_pitch_bend(note.bend + note.y_bend / pb_range)
+                #         else:
+                #             note.y_bend = 0.0
+                #             data[1], data[2] = compose_pitch_bend(note.bend + note.y_bend / pb_range)
+
+
+                if skip:
+                    pass
+                elif msg == 11 and data[1] == 64:  # sustain pedal
+                    for dev in self.sustainable_devices():
+                        if has_hardware_split and self.is_split():
+                            sustain_data = [0xB0 | ch, data[1], data[2]]
+                            self.midi_write(dev, sustain_data, timestamp, original_channel=original_channel)
+                        else:
+                            self.midi_write(dev, data, timestamp)
+                elif self.is_split(): # everything else (if split)...
+                    # print('ch', ch)
+                    try:
+                        note = self.notes[original_channel if original_channel is not None else ch]
+                    except:
+                        print('error finding note for channel', original_channel)
+                        note = None
+                    if original_channel == 0:
+                        self.midi_write(self.midi_out, data, timestamp)
+                    elif original_channel == 15:
+                        self.midi_write(self.split_out, data, timestamp, force_channel=ch)
+                    # else:
+                    #     split_chan = 1 if ch >= 8 else 0
+                    #     if split_chan:
+                    #         self.midi_write(self.split_out, data, timestamp)
+                    #     else:
+                    #         self.midi_write(self.midi_out, data, timestamp)
+                    elif note and note.split is not None:
+                        if note.split:
+                            self.midi_write(self.split_out, data, timestamp, original_channel=original_channel)
+                        else:
+                            self.midi_write(self.midi_out, data, timestamp)
                     else:
                         self.midi_write(self.midi_out, data, timestamp)
-                else:
+                        self.midi_write(self.split_out, data, timestamp, original_channel=ch) # use transposed channel
+                else:  # everything else (if not split)...
                     self.midi_write(self.midi_out, data, timestamp)
-                    self.midi_write(self.split_out, data, timestamp)
-            else:  # everything else (if not split)...
-                self.midi_write(self.midi_out, data, timestamp)
+
+        except Exception as e:
+
+            print("Error in MIDI callback:", e)
 
     def cb_visualizer(self, data, timestamp):
         """Visualizer MIDI Callback"""
@@ -1124,10 +1174,13 @@ class Core:
         ch = data[0] & 0x0F
         msg = data[0] >> 4
         if msg == 9:  # note on
-            self.mark(data[1] + self.vis_octave * 12, 1, True)
+            if data[2] == 0: # 0 velocity is also note off
+                self.mark(data[1] + self.vis_octave * 12, 0, True)
+            else: 
+                self.mark(data[1] + self.vis_octave * 12, 1, True)
         elif msg == 8:  # note off
             self.mark(data[1] + self.vis_octave * 12, 0, True)
-        # else:
+            # else:
             # print(msg, data)
 
     def cb_foot(self, data, timestamp):
@@ -1470,12 +1523,12 @@ class Core:
         #     opts, "sustain", DEFAULT_OPTIONS.sustain
         # )
 
-        # which split the sustain affects
+        # which split the sustain affectFs
         self.options.sustain_split = get_option(
             opts, "sustain_split", "both"
         )  # left, right, both
-        if self.options.sustain_split not in ("left", "right", "both"):
-            print("Invalid sustain split value. Settings: left, right, both.")
+        if self.options.sustain_split not in ("both", "left", "right"):
+            print("Invalid sustain split value. Settings: both, left, right")
             sys.exit(1)
 
         self.options.octave_separation = get_option(opts, "octave_separation", DEFAULT_OPTIONS.octave_separation)
@@ -1778,6 +1831,7 @@ class Core:
         self.use_sharps = True
         self.NOTES = NOTES_SHARPS
 
+        limit_midi_out_count = 0
 
         outnames = rtmidi2.get_out_ports()
         for i in range(len(outnames)):
@@ -1796,9 +1850,11 @@ class Core:
                 self.split_out = rtmidi2.MidiOut()
                 self.split_out.open_port(i)
             elif self.options.midi_out in name_lower:
-                print("Loopback (Out): " + name)
-                self.midi_out = rtmidi2.MidiOut()
-                self.midi_out.open_port(i)
+                if limit_midi_out_count <= 0:
+                    print("Loopback (Out): " + name)
+                    self.midi_out = rtmidi2.MidiOut()
+                    self.midi_out.open_port(i)
+                    limit_midi_out_count += 1
 
         self.midi_in = None
         self.visualizer = None

@@ -4,6 +4,5 @@
 
 _First versioned release._
 
-## 0.6.0-pre
+## 0.6.0
 
-_Currently in development._
