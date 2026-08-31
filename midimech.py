@@ -51,6 +51,29 @@ def main():
     core = None
     try:
         core = Core()
+        original_midi_write = core.midi_write
+        def patched_midi_write(out, msg):
+            try:
+                if (
+                    msg
+                    and len(msg) >= 3
+                    and (msg[0] & 0xF0) == 0xB0
+                    and getattr(core, "split", core.options.split)
+                    and core.options.one_channel == 0
+                ):
+                    split_out = getattr(core, "split_out", None)
+                    if (
+                        split_out is not None
+                        and split_out is not out
+                        and out is getattr(core, "midi_out", None)
+                        and (msg[0] & 0x0F)
+                        >= getattr(core, "split_channel", getattr(core, "width", 16) // 2)
+                    ):
+                        out = split_out
+            except Exception:
+                pass
+            original_midi_write(out, msg)
+        core.midi_write = patched_midi_write
         core()
     except SystemExit:
         pass
